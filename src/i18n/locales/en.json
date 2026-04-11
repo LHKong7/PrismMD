@@ -1,0 +1,121 @@
+{
+  "app": {
+    "name": "PrismMD",
+    "welcome": {
+      "title": "Welcome to PrismMD",
+      "subtitle": "Open a Markdown file or folder to start reading. You can also drag and drop files here.",
+      "openFile": "Open File",
+      "openFolder": "Open Folder",
+      "tip": "Tip: Press {{shortcut}} to open the command palette"
+    }
+  },
+  "sidebar": {
+    "explorer": "Explorer",
+    "noFolder": "No folder open",
+    "openFolder": "Open Folder",
+    "contents": "Contents",
+    "noHeadings": "No headings found",
+    "pinSidebar": "Pin sidebar",
+    "unpinSidebar": "Unpin sidebar"
+  },
+  "titlebar": {
+    "toggleFileTree": "Toggle file tree",
+    "toggleOutline": "Toggle outline",
+    "settings": "Settings",
+    "theme": "Theme"
+  },
+  "commandPalette": {
+    "placeholder": "Search files or commands...",
+    "noResults": "No results found.",
+    "recentFiles": "Recent Files",
+    "files": "Files",
+    "commands": "Commands",
+    "lightTheme": "Switch to Light Theme",
+    "darkTheme": "Switch to Dark Theme",
+    "systemTheme": "Use System Theme",
+    "openSettings": "Open Settings",
+    "toggleAgent": "Toggle AI Assistant",
+    "knowledgeGraph": "Open Knowledge Graph",
+    "toggleFocusMode": "Toggle Focus Mode",
+    "togglePrivacy": "Toggle Privacy Mode"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": {
+      "title": "Language",
+      "description": "Choose your preferred language"
+    },
+    "theme": {
+      "title": "Theme",
+      "description": "Choose a color theme",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System",
+      "followSystem": "Follow system appearance"
+    },
+    "ai": {
+      "title": "AI Providers",
+      "description": "Configure API keys for AI assistants. Cloud and local models supported.",
+      "openai": "OpenAI",
+      "anthropic": "Anthropic",
+      "google": "Google AI",
+      "ollama": "Ollama (Local)",
+      "apiKey": "API Key",
+      "apiKeyPlaceholder": "Enter your API key...",
+      "baseUrl": "Endpoint URL",
+      "baseUrlPlaceholder": "http://localhost:11434",
+      "model": "Model",
+      "save": "Save",
+      "saved": "Saved",
+      "testConnection": "Test",
+      "connectionSuccess": "Connection successful!",
+      "connectionFailed": "Connection failed",
+      "localNote": "No API key needed. Ensure Ollama is running locally."
+    },
+    "privacy": {
+      "title": "Privacy & Security",
+      "description": "Control data privacy and network access",
+      "privacyMode": "Privacy Mode",
+      "privacyModeDesc": "Block all external API calls. Only local models (Ollama) are allowed.",
+      "focusMode": "Focus Mode",
+      "focusModeDesc": "Dim background document when AI is generating responses.",
+      "clearMemory": "Clear AI Memory",
+      "clearMemoryDesc": "Remove all stored conversation history and preferences.",
+      "cleared": "Memory cleared"
+    },
+    "close": "Close"
+  },
+  "agent": {
+    "title": "AI Assistant",
+    "placeholder": "Ask about this document...",
+    "send": "Send",
+    "stop": "Stop",
+    "clear": "Clear chat",
+    "noDocument": "Open a document to start chatting with AI",
+    "selectProvider": "Select AI provider",
+    "thinking": "Thinking...",
+    "error": "An error occurred. Please check your API key and try again.",
+    "ragStatus": "{{count}} docs indexed",
+    "ragIndexing": "Indexing...",
+    "memoryEnabled": "Memory active",
+    "contextMenu": {
+      "explain": "Explain this",
+      "translate": "Translate",
+      "summarize": "Summarize",
+      "rewrite": "Rewrite"
+    }
+  },
+  "statusBar": {
+    "words": "{{count}} words",
+    "chars": "{{count}} chars",
+    "readingTime": "{{count}} min read",
+    "noModel": "No AI model",
+    "ready": "Ready",
+    "privacyOn": "Privacy Mode",
+    "ragDocs": "RAG: {{count}} docs"
+  },
+  "knowledgeGraph": {
+    "title": "Knowledge Graph",
+    "empty": "Open a folder to visualize document connections"
+  }
+}

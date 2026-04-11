@@ -1,0 +1,21 @@
+/* CJK-specific typography rules */
+
+.markdown-body {
+  word-break: break-word;
+  overflow-wrap: break-word;
+  line-break: strict;
+}
+
+/* Slightly wider letter spacing for CJK text readability */
+.markdown-body p,
+.markdown-body li,
+.markdown-body blockquote {
+  letter-spacing: 0.02em;
+}
+
+/* CJK-Latin auto-spacing (inserted by remarkCjkSpacing plugin) */
+.cjk-space {
+  display: inline;
+  font-size: 0;
+  word-spacing: 0.25em;
+}
