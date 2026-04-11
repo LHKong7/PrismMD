@@ -1,0 +1,28 @@
+appId: com.prismmd.app
+productName: PrismMD
+directories:
+  buildResources: build
+files:
+  - dist/**/*
+  - dist-electron/**/*
+asar: true
+fileAssociations:
+  - ext: md
+    name: Markdown
+    role: Viewer
+  - ext: markdown
+    name: Markdown
+    role: Viewer
+mac:
+  target:
+    - dmg
+    - zip
+  category: public.app-category.developer-tools
+win:
+  target:
+    - nsis
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Utility
