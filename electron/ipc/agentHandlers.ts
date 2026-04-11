@@ -1,6 +1,5 @@
 import { BrowserWindow, ipcMain } from 'electron'
 import { sendMessage, stopGeneration, testConnection } from '../services/aiService'
-import { indexWorkspace, retrieveContext, getIndexedDocumentCount, clearIndex } from '../services/ragService'
 import { saveMemory, getMemoryContext, clearMemory, extractSummaryFromConversation } from '../services/memoryService'
 
 export function registerAgentHandlers(mainWindow: BrowserWindow) {
@@ -14,23 +13,6 @@ export function registerAgentHandlers(mainWindow: BrowserWindow) {
 
   ipcMain.handle('agent:test-connection', async (_event, provider: string, apiKey: string, baseUrl?: string) => {
     return testConnection(provider, apiKey, baseUrl)
-  })
-
-  // RAG handlers
-  ipcMain.handle('rag:index-workspace', async (_event, workspacePath: string) => {
-    return indexWorkspace(workspacePath)
-  })
-
-  ipcMain.handle('rag:retrieve', async (_event, query: string, topK?: number, excludeFile?: string) => {
-    return retrieveContext(query, topK, excludeFile)
-  })
-
-  ipcMain.handle('rag:get-doc-count', () => {
-    return getIndexedDocumentCount()
-  })
-
-  ipcMain.handle('rag:clear', () => {
-    clearIndex()
   })
 
   // Memory handlers

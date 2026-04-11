@@ -15,8 +15,6 @@ interface AgentStore {
   isStreaming: boolean
   streamingContent: string
   agentSidebarOpen: boolean
-  ragIndexed: boolean
-  ragDocCount: number
 
   addMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => void
   setStreaming: (isStreaming: boolean) => void
@@ -26,11 +24,7 @@ interface AgentStore {
   toggleAgentSidebar: () => void
   setAgentSidebarOpen: (open: boolean) => void
 
-  // RAG
-  indexWorkspace: (workspacePath: string) => Promise<void>
-  setRagIndexed: (indexed: boolean) => void
-
-  // Send with RAG + memory
+  // Send with memory
   sendMessage: (content: string, documentContext?: string, currentFilePath?: string) => Promise<void>
   stopGeneration: () => void
 
@@ -43,8 +37,6 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
   isStreaming: false,
   streamingContent: '',
   agentSidebarOpen: false,
-  ragIndexed: false,
-  ragDocCount: 0,
 
   addMessage: (message) => {
     const newMsg: ChatMessage = {
@@ -74,19 +66,6 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
   toggleAgentSidebar: () => set((state) => ({ agentSidebarOpen: !state.agentSidebarOpen })),
   setAgentSidebarOpen: (open) => set({ agentSidebarOpen: open }),
 
-  // RAG
-  indexWorkspace: async (workspacePath: string) => {
-    try {
-      const chunkCount = await window.electronAPI.indexWorkspace(workspacePath)
-      const docCount = await window.electronAPI.ragGetDocCount()
-      set({ ragIndexed: true, ragDocCount: docCount })
-    } catch {
-      set({ ragIndexed: false, ragDocCount: 0 })
-    }
-  },
-
-  setRagIndexed: (indexed) => set({ ragIndexed: indexed }),
-
   sendMessage: async (content, documentContext, currentFilePath) => {
     const { addMessage, setStreaming, appendStreamContent, finalizeStream } = get()
 
@@ -95,12 +74,6 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
     set({ streamingContent: '' })
 
     try {
-      // Gather RAG context
-      let ragContext: string | undefined
-      if (get().ragIndexed) {
-        ragContext = await window.electronAPI.ragRetrieve(content, 5, currentFilePath) || undefined
-      }
-
       // Gather memory context
       let memoryContext: string | undefined
       try {
@@ -122,7 +95,6 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
       const result = await window.electronAPI.sendAgentMessage({
         messages: history,
         documentContext: documentContext ?? undefined,
-        ragContext,
         memoryContext,
       })
 

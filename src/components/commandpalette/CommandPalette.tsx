@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Command } from 'cmdk'
-import { FileText, Sun, Moon, Monitor, Settings, Bot, Network, Shield, Eye } from 'lucide-react'
+import { FileText, Sun, Moon, Monitor, Settings, Bot, Shield, Eye } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useUIStore } from '../../store/uiStore'
 import { useFileStore } from '../../store/fileStore'
@@ -10,10 +10,9 @@ import { applyTheme, getThemeById } from '../../lib/theme/themes'
 
 interface CommandPaletteProps {
   onOpenSettings: () => void
-  onOpenKnowledgeGraph: () => void
 }
 
-export function CommandPalette({ onOpenSettings, onOpenKnowledgeGraph }: CommandPaletteProps) {
+export function CommandPalette({ onOpenSettings }: CommandPaletteProps) {
   const { t } = useTranslation()
   const open = useUIStore((s) => s.commandPaletteOpen)
   const setOpen = useUIStore((s) => s.setCommandPaletteOpen)
@@ -25,7 +24,7 @@ export function CommandPalette({ onOpenSettings, onOpenKnowledgeGraph }: Command
   const setFocusMode = useSettingsStore((s) => s.setFocusMode)
   const openFile = useFileStore((s) => s.openFile)
   const recentFiles = useFileStore((s) => s.recentFiles)
-  const fileTree = useFileStore((s) => s.fileTree)
+  const openFolders = useFileStore((s) => s.openFolders)
   const toggleAgentSidebar = useAgentStore((s) => s.toggleAgentSidebar)
   const [search, setSearch] = useState('')
 
@@ -44,8 +43,7 @@ export function CommandPalette({ onOpenSettings, onOpenKnowledgeGraph }: Command
     setOpen(false)
   }
 
-  const flattenFiles = (nodes: typeof fileTree): string[] => {
-    if (!nodes) return []
+  const flattenFiles = (nodes: import('../../types/electron').FileTreeNode[]): string[] => {
     const files: string[] = []
     for (const node of nodes) {
       if (node.type === 'file') files.push(node.path)
@@ -54,7 +52,7 @@ export function CommandPalette({ onOpenSettings, onOpenKnowledgeGraph }: Command
     return files
   }
 
-  const allFiles = flattenFiles(fileTree)
+  const allFiles = openFolders.flatMap((f) => flattenFiles(f.tree))
   const fileName = (path: string) => path.split(/[/\\]/).pop() ?? path
 
   if (!open) return null
@@ -119,9 +117,6 @@ export function CommandPalette({ onOpenSettings, onOpenKnowledgeGraph }: Command
               </Command.Item>
               <Command.Item value="Toggle AI" onSelect={() => { toggleAgentSidebar(); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
                 <Bot size={14} /><span>{t('commandPalette.toggleAgent')}</span>
-              </Command.Item>
-              <Command.Item value="Knowledge Graph" onSelect={() => { onOpenKnowledgeGraph(); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
-                <Network size={14} /><span>{t('commandPalette.knowledgeGraph')}</span>
               </Command.Item>
               <Command.Item value="Toggle Privacy" onSelect={() => { setPrivacyMode(!privacyMode); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
                 <Shield size={14} /><span>{t('commandPalette.togglePrivacy')}</span>

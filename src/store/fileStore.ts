@@ -2,30 +2,40 @@ import { create } from 'zustand'
 import type { FileTreeNode } from '../types/electron'
 import type { TocEntry } from '../lib/markdown/remarkToc'
 
+interface OpenFolder {
+  path: string
+  name: string
+  tree: FileTreeNode[]
+}
+
 interface FileStore {
   currentFilePath: string | null
   currentContent: string | null
-  rootFolderPath: string | null
-  fileTree: FileTreeNode[] | null
+  openFolders: OpenFolder[]
   recentFiles: string[]
   toc: TocEntry[]
 
   openFile: (filePath: string) => Promise<void>
   openFileWithContent: (filePath: string, content: string) => void
   openFolder: (folderPath: string) => Promise<void>
+  closeFolder: (folderPath: string) => void
   setContent: (content: string) => void
   setToc: (toc: TocEntry[]) => void
-  refreshFileTree: () => Promise<void>
+  refreshFolder: (folderPath: string) => Promise<void>
+  refreshAllFolders: () => Promise<void>
   addRecentFile: (filePath: string) => void
   openFileDialog: () => Promise<void>
   openFolderDialog: () => Promise<void>
 }
 
+function folderName(folderPath: string): string {
+  return folderPath.split(/[/\\]/).pop() ?? folderPath
+}
+
 export const useFileStore = create<FileStore>((set, get) => ({
   currentFilePath: null,
   currentContent: null,
-  rootFolderPath: null,
-  fileTree: null,
+  openFolders: [],
   recentFiles: [],
   toc: [],
 
@@ -33,8 +43,6 @@ export const useFileStore = create<FileStore>((set, get) => ({
     const content = await window.electronAPI.readFile(filePath)
     set({ currentFilePath: filePath, currentContent: content })
     get().addRecentFile(filePath)
-
-    // Watch this file for changes
     window.electronAPI.watchFile(filePath)
   },
 
@@ -45,11 +53,25 @@ export const useFileStore = create<FileStore>((set, get) => ({
   },
 
   openFolder: async (folderPath: string) => {
-    const tree = await window.electronAPI.readDirectory(folderPath)
-    set({ rootFolderPath: folderPath, fileTree: tree })
+    // Don't add duplicates
+    const { openFolders } = get()
+    if (openFolders.some((f) => f.path === folderPath)) return
 
-    // Watch the directory for changes
+    const tree = await window.electronAPI.readDirectory(folderPath)
+    set({
+      openFolders: [
+        ...openFolders,
+        { path: folderPath, name: folderName(folderPath), tree },
+      ],
+    })
     window.electronAPI.watchDirectory(folderPath)
+  },
+
+  closeFolder: (folderPath: string) => {
+    window.electronAPI.unwatchDirectory(folderPath)
+    set((state) => ({
+      openFolders: state.openFolders.filter((f) => f.path !== folderPath),
+    }))
   },
 
   setContent: (content: string) => {
@@ -60,11 +82,24 @@ export const useFileStore = create<FileStore>((set, get) => ({
     set({ toc })
   },
 
-  refreshFileTree: async () => {
-    const { rootFolderPath } = get()
-    if (!rootFolderPath) return
-    const tree = await window.electronAPI.readDirectory(rootFolderPath)
-    set({ fileTree: tree })
+  refreshFolder: async (folderPath: string) => {
+    const tree = await window.electronAPI.readDirectory(folderPath)
+    set((state) => ({
+      openFolders: state.openFolders.map((f) =>
+        f.path === folderPath ? { ...f, tree } : f
+      ),
+    }))
+  },
+
+  refreshAllFolders: async () => {
+    const { openFolders } = get()
+    const updated = await Promise.all(
+      openFolders.map(async (f) => {
+        const tree = await window.electronAPI.readDirectory(f.path)
+        return { ...f, tree }
+      })
+    )
+    set({ openFolders: updated })
   },
 
   addRecentFile: (filePath: string) => {

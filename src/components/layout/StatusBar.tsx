@@ -2,8 +2,7 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useFileStore } from '../../store/fileStore'
 import { useSettingsStore } from '../../store/settingsStore'
-import { useAgentStore } from '../../store/agentStore'
-import { Bot, Globe, Shield, Database } from 'lucide-react'
+import { Bot, Globe, Shield } from 'lucide-react'
 
 export function StatusBar() {
   const { t } = useTranslation()
@@ -12,9 +11,6 @@ export function StatusBar() {
   const activeProvider = useSettingsStore((s) => s.activeProvider)
   const providers = useSettingsStore((s) => s.providers)
   const privacyMode = useSettingsStore((s) => s.privacyMode)
-  const ragIndexed = useAgentStore((s) => s.ragIndexed)
-  const ragDocCount = useAgentStore((s) => s.ragDocCount)
-
   const stats = useMemo(() => {
     if (!currentContent) return null
     const chars = currentContent.length
@@ -52,12 +48,6 @@ export function StatusBar() {
           </div>
         )}
 
-        {ragIndexed && (
-          <div className="flex items-center gap-1">
-            <Database size={11} />
-            <span>{t('statusBar.ragDocs', { count: ragDocCount })}</span>
-          </div>
-        )}
       </div>
 
       <div className="flex items-center gap-3">

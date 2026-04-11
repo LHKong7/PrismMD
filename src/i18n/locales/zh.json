@@ -13,6 +13,8 @@
     "explorer": "资源管理器",
     "noFolder": "未打开文件夹",
     "openFolder": "打开文件夹",
+    "addFolder": "添加文件夹",
+    "closeFolder": "关闭文件夹",
     "contents": "目录大纲",
     "noHeadings": "未找到标题",
     "pinSidebar": "固定侧栏",
@@ -35,7 +37,6 @@
     "systemTheme": "跟随系统外观",
     "openSettings": "打开设置",
     "toggleAgent": "切换 AI 助手",
-    "knowledgeGraph": "打开知识图谱",
     "toggleFocusMode": "切换专注模式",
     "togglePrivacy": "切换隐私模式"
   },
@@ -70,7 +71,11 @@
       "testConnection": "测试",
       "connectionSuccess": "连接成功！",
       "connectionFailed": "连接失败",
-      "localNote": "无需 API 密钥，请确保 Ollama 正在本地运行。"
+      "localNote": "无需 API 密钥，请确保 Ollama 正在本地运行。",
+      "custom": "自定义服务商",
+      "customBaseUrlPlaceholder": "https://api.example.com/v1",
+      "customModelPlaceholder": "输入模型名称...",
+      "customNote": "支持任何 OpenAI 兼容的 API 端点。输入服务地址、API 密钥和模型名称。"
     },
     "privacy": {
       "title": "隐私与安全",
@@ -95,8 +100,6 @@
     "selectProvider": "选择 AI 服务商",
     "thinking": "思考中...",
     "error": "发生错误，请检查 API 密钥后重试。",
-    "ragStatus": "已索引 {{count}} 篇文档",
-    "ragIndexing": "索引中...",
     "memoryEnabled": "记忆已启用",
     "contextMenu": {
       "explain": "解释这段",
@@ -112,10 +115,6 @@
     "noModel": "无 AI 模型",
     "ready": "就绪",
     "privacyOn": "隐私模式",
-    "ragDocs": "RAG: {{count}} 篇"
-  },
-  "knowledgeGraph": {
-    "title": "知识图谱",
-    "empty": "打开文件夹以可视化文档连接"
+    "privacyOn": "隐私模式"
   }
 }

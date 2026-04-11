@@ -4,7 +4,7 @@ import fs from 'fs/promises'
 
 export class FileWatcherService {
   private fileWatchers = new Map<string, FSWatcher>()
-  private dirWatcher: FSWatcher | null = null
+  private dirWatchers = new Map<string, FSWatcher>()
   private mainWindow: BrowserWindow
 
   constructor(mainWindow: BrowserWindow) {
@@ -44,26 +44,28 @@ export class FileWatcherService {
   }
 
   watchDirectory(dirPath: string) {
-    if (this.dirWatcher) {
-      this.dirWatcher.close()
-    }
+    // Already watching this directory
+    if (this.dirWatchers.has(dirPath)) return
 
-    this.dirWatcher = watch(dirPath, {
+    const watcher = watch(dirPath, {
       persistent: true,
       ignoreInitial: true,
       depth: 10,
       ignored: /(node_modules|\.git|dist|build)/,
     })
 
-    this.dirWatcher.on('all', () => {
-      this.mainWindow.webContents.send('fs:directory-changed')
+    watcher.on('all', () => {
+      this.mainWindow.webContents.send('fs:directory-changed', dirPath)
     })
+
+    this.dirWatchers.set(dirPath, watcher)
   }
 
-  unwatchDirectory(_dirPath: string) {
-    if (this.dirWatcher) {
-      this.dirWatcher.close()
-      this.dirWatcher = null
+  unwatchDirectory(dirPath: string) {
+    const watcher = this.dirWatchers.get(dirPath)
+    if (watcher) {
+      watcher.close()
+      this.dirWatchers.delete(dirPath)
     }
   }
 }

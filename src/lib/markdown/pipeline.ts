@@ -6,7 +6,8 @@ import remarkRehype from 'remark-rehype'
 import rehypeSlug from 'rehype-slug'
 import rehypeKatex from 'rehype-katex'
 import rehypeReact from 'rehype-react'
-import { createElement, Fragment } from 'react'
+import { Fragment } from 'react'
+import { jsx, jsxs } from 'react/jsx-runtime'
 import type { ReactElement } from 'react'
 import { remarkToc, type TocEntry } from './remarkToc'
 import { remarkCjkSpacing } from './remarkCjkSpacing'
@@ -33,7 +34,8 @@ export async function processMarkdown(source: string): Promise<MarkdownResult> {
     .use(rehypeKatex)
     // @ts-expect-error rehype-react types are complex
     .use(rehypeReact, {
-      createElement,
+      jsx,
+      jsxs,
       Fragment,
       components: {
         pre: CodeBlock,

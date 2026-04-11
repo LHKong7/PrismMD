@@ -2,9 +2,8 @@ import { useEffect } from 'react'
 import { useFileStore } from '../store/fileStore'
 
 export function useFileWatcher() {
-  const currentFilePath = useFileStore((s) => s.currentFilePath)
   const setContent = useFileStore((s) => s.setContent)
-  const refreshFileTree = useFileStore((s) => s.refreshFileTree)
+  const refreshFolder = useFileStore((s) => s.refreshFolder)
 
   // Watch for file content changes
   useEffect(() => {
@@ -17,11 +16,11 @@ export function useFileWatcher() {
     return cleanup
   }, [setContent])
 
-  // Watch for directory changes
+  // Watch for directory changes — refresh only the affected folder
   useEffect(() => {
-    const cleanup = window.electronAPI.onDirectoryChanged(() => {
-      refreshFileTree()
+    const cleanup = window.electronAPI.onDirectoryChanged((dirPath) => {
+      refreshFolder(dirPath)
     })
     return cleanup
-  }, [refreshFileTree])
+  }, [refreshFolder])
 }

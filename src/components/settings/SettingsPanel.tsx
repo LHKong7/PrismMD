@@ -163,11 +163,12 @@ function AISettings() {
   const setProviderConfig = useSettingsStore((s) => s.setProviderConfig)
   const setActiveProvider = useSettingsStore((s) => s.setActiveProvider)
 
-  const providerList: { id: AIProvider; name: string; color: string; isLocal?: boolean }[] = [
+  const providerList: { id: AIProvider; name: string; color: string; isLocal?: boolean; isCustom?: boolean }[] = [
     { id: 'ollama', name: t('settings.ai.ollama'), color: '#666666', isLocal: true },
     { id: 'openai', name: 'OpenAI', color: '#10a37f' },
     { id: 'anthropic', name: 'Anthropic', color: '#d4a574' },
     { id: 'google', name: 'Google AI', color: '#4285f4' },
+    { id: 'custom', name: t('settings.ai.custom'), color: '#8b5cf6', isCustom: true },
   ]
 
   return (
@@ -175,14 +176,15 @@ function AISettings() {
       <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{t('settings.ai.title')}</h3>
       <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>{t('settings.ai.description')}</p>
       <div className="space-y-4">
-        {providerList.map(({ id, name, color, isLocal }) => (
+        {providerList.map(({ id, name, color, isLocal, isCustom }) => (
           <AIProviderCard
             key={id}
             id={id}
             name={name}
             color={color}
             isLocal={isLocal}
-            config={providers[id]}
+            isCustom={isCustom}
+            config={providers[id] ?? { apiKey: '', model: '', enabled: false, baseUrl: '' }}
             isActive={activeProvider === id}
             isDisabled={privacyMode && !isLocal}
             onUpdate={(config) => setProviderConfig(id, config)}
@@ -268,9 +270,9 @@ function PrivacySettings() {
 }
 
 function AIProviderCard({
-  id, name, color, isLocal, config, isActive, isDisabled, onUpdate, onActivate,
+  id, name, color, isLocal, isCustom, config, isActive, isDisabled, onUpdate, onActivate,
 }: {
-  id: AIProvider; name: string; color: string; isLocal?: boolean
+  id: AIProvider; name: string; color: string; isLocal?: boolean; isCustom?: boolean
   config: { apiKey: string; model: string; enabled: boolean; baseUrl?: string }
   isActive: boolean; isDisabled?: boolean
   onUpdate: (config: { apiKey?: string; model?: string; enabled?: boolean; baseUrl?: string }) => void
@@ -318,23 +320,24 @@ function AIProviderCard({
         </button>
       </div>
 
-      {/* Ollama base URL */}
-      {isLocal && (
+      {/* Base URL (Ollama + Custom) */}
+      {(isLocal || isCustom) && (
         <div className="mb-3">
           <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('settings.ai.baseUrl')}</label>
           <input
             type="text"
             value={config.baseUrl ?? ''}
             onChange={(e) => onUpdate({ baseUrl: e.target.value })}
-            placeholder={t('settings.ai.baseUrlPlaceholder')}
+            placeholder={isCustom ? t('settings.ai.customBaseUrlPlaceholder') : t('settings.ai.baseUrlPlaceholder')}
             className="w-full text-sm px-3 py-2 rounded-md border bg-transparent outline-none focus:border-[var(--accent-color)]"
             style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
           />
-          <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{t('settings.ai.localNote')}</p>
+          {isLocal && <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{t('settings.ai.localNote')}</p>}
+          {isCustom && <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>{t('settings.ai.customNote')}</p>}
         </div>
       )}
 
-      {/* API Key (not for local) */}
+      {/* API Key (not for local-only providers) */}
       {!isLocal && (
         <div className="mb-3">
           <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('settings.ai.apiKey')}</label>
@@ -391,16 +394,27 @@ function AIProviderCard({
       {/* Model */}
       <div>
         <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('settings.ai.model')}</label>
-        <select
-          value={config.model}
-          onChange={(e) => onUpdate({ model: e.target.value })}
-          className="w-full text-sm px-3 py-2 rounded-md border bg-transparent outline-none"
-          style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
-        >
-          {DEFAULT_MODELS[id].map((model) => (
-            <option key={model} value={model}>{model}</option>
-          ))}
-        </select>
+        {isCustom ? (
+          <input
+            type="text"
+            value={config.model}
+            onChange={(e) => onUpdate({ model: e.target.value })}
+            placeholder={t('settings.ai.customModelPlaceholder')}
+            className="w-full text-sm px-3 py-2 rounded-md border bg-transparent outline-none focus:border-[var(--accent-color)]"
+            style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+          />
+        ) : (
+          <select
+            value={config.model}
+            onChange={(e) => onUpdate({ model: e.target.value })}
+            className="w-full text-sm px-3 py-2 rounded-md border bg-transparent outline-none"
+            style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+          >
+            {DEFAULT_MODELS[id].map((model) => (
+              <option key={model} value={model}>{model}</option>
+            ))}
+          </select>
+        )}
       </div>
     </div>
   )

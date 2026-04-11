@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { SupportedLanguage } from '../i18n'
 
-export type AIProvider = 'openai' | 'anthropic' | 'google' | 'ollama'
+export type AIProvider = 'openai' | 'anthropic' | 'google' | 'ollama' | 'custom'
 
 export interface AIProviderConfig {
   apiKey: string
@@ -15,6 +15,7 @@ export const DEFAULT_MODELS: Record<AIProvider, string[]> = {
   anthropic: ['claude-sonnet-4-20250514', 'claude-haiku-4-20250414', 'claude-3-5-sonnet-20241022'],
   google: ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-pro'],
   ollama: ['llama3', 'llama3:70b', 'qwen2', 'qwen2:72b', 'mistral', 'codellama', 'gemma2'],
+  custom: [],
 }
 
 interface SettingsStore {
@@ -64,6 +65,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     anthropic: { apiKey: '', model: 'claude-sonnet-4-20250514', enabled: false },
     google: { apiKey: '', model: 'gemini-1.5-pro', enabled: false },
     ollama: { apiKey: 'ollama', model: 'llama3', enabled: false, baseUrl: 'http://localhost:11434' },
+    custom: { apiKey: '', model: '', enabled: false, baseUrl: '' },
   },
   activeProvider: null,
 
@@ -132,7 +134,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
           themeMode: (s.themeMode as 'manual' | 'system') ?? 'system',
           vibrancy: (s.vibrancy as boolean) ?? false,
           privacyMode: (s.privacyMode as boolean) ?? false,
-          providers: (s.providers as Record<AIProvider, AIProviderConfig>) ?? get().providers,
+          providers: { ...get().providers, ...(s.providers as Record<AIProvider, AIProviderConfig>) },
           activeProvider: (s.activeProvider as AIProvider | null) ?? null,
         })
       }

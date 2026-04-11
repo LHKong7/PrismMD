@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Square, Trash2, Bot, ChevronDown, Database, Brain } from 'lucide-react'
+import { Send, Square, Trash2, Bot, ChevronDown, Brain } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAgentStore } from '../../store/agentStore'
 import { useFileStore } from '../../store/fileStore'
@@ -19,13 +19,8 @@ export function AgentSidebar() {
   const sendMessage = useAgentStore((s) => s.sendMessage)
   const stopGeneration = useAgentStore((s) => s.stopGeneration)
   const clearMessages = useAgentStore((s) => s.clearMessages)
-  const ragIndexed = useAgentStore((s) => s.ragIndexed)
-  const ragDocCount = useAgentStore((s) => s.ragDocCount)
-  const indexWorkspace = useAgentStore((s) => s.indexWorkspace)
-
   const currentContent = useFileStore((s) => s.currentContent)
   const currentFilePath = useFileStore((s) => s.currentFilePath)
-  const rootFolderPath = useFileStore((s) => s.rootFolderPath)
   const activeProvider = useSettingsStore((s) => s.activeProvider)
   const providers = useSettingsStore((s) => s.providers)
   const privacyMode = useSettingsStore((s) => s.privacyMode)
@@ -36,13 +31,6 @@ export function AgentSidebar() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, streamingContent])
-
-  // Auto-index workspace when folder is open
-  useEffect(() => {
-    if (rootFolderPath && !ragIndexed) {
-      indexWorkspace(rootFolderPath)
-    }
-  }, [rootFolderPath, ragIndexed, indexWorkspace])
 
   const handleSend = () => {
     const trimmed = input.trim()
@@ -75,12 +63,6 @@ export function AgentSidebar() {
           </span>
         </div>
         <div className="flex items-center gap-1">
-          {ragIndexed && (
-            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px]" style={{ color: 'var(--text-muted)' }}>
-              <Database size={10} />
-              {t('agent.ragStatus', { count: ragDocCount })}
-            </div>
-          )}
           <div className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px]" style={{ color: 'var(--text-muted)' }}>
             <Brain size={10} />
           </div>
@@ -110,29 +92,44 @@ export function AgentSidebar() {
 
         {showModelPicker && (
           <div className="mt-2 space-y-1 max-h-48 overflow-y-auto">
-            {(['ollama', 'openai', 'anthropic', 'google'] as AIProvider[]).map((p) => {
+            {(['ollama', 'openai', 'anthropic', 'google', 'custom'] as AIProvider[]).map((p) => {
               const config = providers[p]
-              if (p !== 'ollama' && !config.apiKey) return null
+              if (p !== 'ollama' && !config.apiKey && !(p === 'custom' && config.baseUrl)) return null
               if (privacyMode && p !== 'ollama') return null
+              if (p === 'custom' && !config.model) return null
               return (
                 <div key={p} className="space-y-1">
                   <p className="text-[10px] font-semibold uppercase px-1 flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
                     {p}
                     {p === 'ollama' && <span className="text-green-600">LOCAL</span>}
+                    {p === 'custom' && <span className="text-purple-500">CUSTOM</span>}
                   </p>
-                  {DEFAULT_MODELS[p].map((model) => (
+                  {p === 'custom' ? (
                     <button
-                      key={model}
-                      onClick={() => { setActiveProvider(p); setProviderConfig(p, { model }); setShowModelPicker(false) }}
+                      onClick={() => { setActiveProvider(p); setShowModelPicker(false) }}
                       className={clsx(
                         'w-full text-left text-xs px-2 py-1.5 rounded transition-colors',
-                        activeProvider === p && config.model === model ? 'font-medium' : 'hover:bg-black/5 dark:hover:bg-white/5'
+                        activeProvider === p ? 'font-medium' : 'hover:bg-black/5 dark:hover:bg-white/5'
                       )}
-                      style={{ color: activeProvider === p && config.model === model ? 'var(--accent-color)' : 'var(--text-secondary)' }}
+                      style={{ color: activeProvider === p ? 'var(--accent-color)' : 'var(--text-secondary)' }}
                     >
-                      {model}
+                      {config.model}
                     </button>
-                  ))}
+                  ) : (
+                    DEFAULT_MODELS[p].map((model) => (
+                      <button
+                        key={model}
+                        onClick={() => { setActiveProvider(p); setProviderConfig(p, { model }); setShowModelPicker(false) }}
+                        className={clsx(
+                          'w-full text-left text-xs px-2 py-1.5 rounded transition-colors',
+                          activeProvider === p && config.model === model ? 'font-medium' : 'hover:bg-black/5 dark:hover:bg-white/5'
+                        )}
+                        style={{ color: activeProvider === p && config.model === model ? 'var(--accent-color)' : 'var(--text-secondary)' }}
+                      >
+                        {model}
+                      </button>
+                    ))
+                  )}
                 </div>
               )
             })}

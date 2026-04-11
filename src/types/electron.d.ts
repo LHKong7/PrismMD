@@ -30,7 +30,7 @@ export interface ElectronAPI {
   watchDirectory: (dirPath: string) => void
   unwatchDirectory: (dirPath: string) => void
   onFileChanged: (callback: (filePath: string, content: string) => void) => () => void
-  onDirectoryChanged: (callback: () => void) => () => void
+  onDirectoryChanged: (callback: (dirPath: string) => void) => () => void
 
   // Annotations
   loadAnnotations: (filePath: string) => Promise<Annotation[]>
@@ -55,18 +55,11 @@ export interface ElectronAPI {
   sendAgentMessage: (request: {
     messages: Array<{ role: string; content: string }>
     documentContext?: string
-    ragContext?: string
     memoryContext?: string
   }) => Promise<{ provider: string; model: string }>
   onAgentStream: (callback: (chunk: string) => void) => () => void
   stopAgentGeneration: () => void
   testAgentConnection: (provider: string, apiKey: string, baseUrl?: string) => Promise<boolean>
-
-  // RAG
-  indexWorkspace: (workspacePath: string) => Promise<number>
-  ragRetrieve: (query: string, topK?: number, excludeFile?: string) => Promise<string>
-  ragGetDocCount: () => Promise<number>
-  ragClear: () => Promise<void>
 
   // Memory
   memorySave: (filePath: string, summary: string, topics: string[]) => Promise<void>

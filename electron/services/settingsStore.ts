@@ -31,6 +31,7 @@ const store = new Store<{ settings: AppSettings }>({
         anthropic: { apiKey: '', model: 'claude-sonnet-4-20250514', enabled: false },
         google: { apiKey: '', model: 'gemini-1.5-pro', enabled: false },
         ollama: { apiKey: 'ollama', model: 'llama3', enabled: false, baseUrl: 'http://localhost:11434' },
+        custom: { apiKey: '', model: '', enabled: false, baseUrl: '' },
       },
       activeProvider: null,
     },

@@ -8,7 +8,6 @@ import { HighlightPopover } from './components/annotations/HighlightPopover'
 import { SettingsPanel } from './components/settings/SettingsPanel'
 import { GhostText } from './components/ghosttext/GhostText'
 import { FocusOverlay } from './components/focusmode/FocusOverlay'
-import { KnowledgeGraph } from './components/knowledgegraph/KnowledgeGraph'
 import { useFileWatcher } from './hooks/useFileWatcher'
 import { useAutoHide } from './hooks/useAutoHide'
 import { useAnnotations } from './hooks/useAnnotations'
@@ -22,7 +21,6 @@ function AppContent() {
   useAutoHide()
   const { addAnnotation } = useAnnotations()
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [knowledgeGraphOpen, setKnowledgeGraphOpen] = useState(false)
   const loadSettings = useSettingsStore((s) => s.loadSettings)
 
   useEffect(() => { loadSettings() }, [loadSettings])
@@ -33,11 +31,6 @@ function AppContent() {
       if ((e.metaKey || e.ctrlKey) && e.key === ',') {
         e.preventDefault()
         setSettingsOpen((prev) => !prev)
-      }
-      // Ctrl/Cmd + G: knowledge graph
-      if ((e.metaKey || e.ctrlKey) && e.key === 'g') {
-        e.preventDefault()
-        setKnowledgeGraphOpen((prev) => !prev)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -50,14 +43,10 @@ function AppContent() {
       <FocusOverlay />
       <AppShell />
       <StatusBar />
-      <CommandPalette
-        onOpenSettings={() => setSettingsOpen(true)}
-        onOpenKnowledgeGraph={() => setKnowledgeGraphOpen(true)}
-      />
+      <CommandPalette onOpenSettings={() => setSettingsOpen(true)} />
       <HighlightPopover onHighlight={addAnnotation} />
       <GhostText />
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-      <KnowledgeGraph open={knowledgeGraphOpen} onClose={() => setKnowledgeGraphOpen(false)} />
     </div>
   )
 }

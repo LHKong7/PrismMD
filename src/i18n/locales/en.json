@@ -13,6 +13,8 @@
     "explorer": "Explorer",
     "noFolder": "No folder open",
     "openFolder": "Open Folder",
+    "addFolder": "Add Folder",
+    "closeFolder": "Close Folder",
     "contents": "Contents",
     "noHeadings": "No headings found",
     "pinSidebar": "Pin sidebar",
@@ -35,7 +37,6 @@
     "systemTheme": "Use System Theme",
     "openSettings": "Open Settings",
     "toggleAgent": "Toggle AI Assistant",
-    "knowledgeGraph": "Open Knowledge Graph",
     "toggleFocusMode": "Toggle Focus Mode",
     "togglePrivacy": "Toggle Privacy Mode"
   },
@@ -70,7 +71,11 @@
       "testConnection": "Test",
       "connectionSuccess": "Connection successful!",
       "connectionFailed": "Connection failed",
-      "localNote": "No API key needed. Ensure Ollama is running locally."
+      "localNote": "No API key needed. Ensure Ollama is running locally.",
+      "custom": "Custom Provider",
+      "customBaseUrlPlaceholder": "https://api.example.com/v1",
+      "customModelPlaceholder": "Enter model name...",
+      "customNote": "Any OpenAI-compatible API endpoint. Enter the base URL, API key, and model name."
     },
     "privacy": {
       "title": "Privacy & Security",
@@ -95,8 +100,6 @@
     "selectProvider": "Select AI provider",
     "thinking": "Thinking...",
     "error": "An error occurred. Please check your API key and try again.",
-    "ragStatus": "{{count}} docs indexed",
-    "ragIndexing": "Indexing...",
     "memoryEnabled": "Memory active",
     "contextMenu": {
       "explain": "Explain this",
@@ -112,10 +115,6 @@
     "noModel": "No AI model",
     "ready": "Ready",
     "privacyOn": "Privacy Mode",
-    "ragDocs": "RAG: {{count}} docs"
-  },
-  "knowledgeGraph": {
-    "title": "Knowledge Graph",
-    "empty": "Open a folder to visualize document connections"
+    "privacyOn": "Privacy Mode"
   }
 }

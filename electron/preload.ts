@@ -40,8 +40,8 @@ const electronAPI = {
     ipcRenderer.on('fs:file-changed', handler)
     return () => ipcRenderer.removeListener('fs:file-changed', handler)
   },
-  onDirectoryChanged: (callback: () => void): (() => void) => {
-    const handler = () => callback()
+  onDirectoryChanged: (callback: (dirPath: string) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, dirPath: string) => callback(dirPath)
     ipcRenderer.on('fs:directory-changed', handler)
     return () => ipcRenderer.removeListener('fs:directory-changed', handler)
   },
@@ -82,7 +82,6 @@ const electronAPI = {
   sendAgentMessage: (request: {
     messages: Array<{ role: string; content: string }>
     documentContext?: string
-    ragContext?: string
     memoryContext?: string
   }): Promise<{ provider: string; model: string }> =>
     ipcRenderer.invoke('agent:send-message', request),
@@ -94,16 +93,6 @@ const electronAPI = {
   stopAgentGeneration: (): void => { ipcRenderer.send('agent:stop') },
   testAgentConnection: (provider: string, apiKey: string, baseUrl?: string): Promise<boolean> =>
     ipcRenderer.invoke('agent:test-connection', provider, apiKey, baseUrl),
-
-  // RAG
-  indexWorkspace: (workspacePath: string): Promise<number> =>
-    ipcRenderer.invoke('rag:index-workspace', workspacePath),
-  ragRetrieve: (query: string, topK?: number, excludeFile?: string): Promise<string> =>
-    ipcRenderer.invoke('rag:retrieve', query, topK, excludeFile),
-  ragGetDocCount: (): Promise<number> =>
-    ipcRenderer.invoke('rag:get-doc-count'),
-  ragClear: (): Promise<void> =>
-    ipcRenderer.invoke('rag:clear'),
 
   // Memory
   memorySave: (filePath: string, summary: string, topics: string[]): Promise<void> =>
