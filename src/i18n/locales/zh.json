@@ -1,0 +1,94 @@
+{
+  "app": {
+    "name": "PrismMD",
+    "welcome": {
+      "title": "欢迎使用 PrismMD",
+      "subtitle": "打开 Markdown 文件或文件夹开始阅读，也可以直接拖拽文件到此处。",
+      "openFile": "打开文件",
+      "openFolder": "打开文件夹",
+      "tip": "提示：按下 {{shortcut}} 打开命令面板"
+    }
+  },
+  "sidebar": {
+    "explorer": "资源管理器",
+    "noFolder": "未打开文件夹",
+    "openFolder": "打开文件夹",
+    "contents": "目录大纲",
+    "noHeadings": "未找到标题",
+    "pinSidebar": "固定侧栏",
+    "unpinSidebar": "取消固定"
+  },
+  "titlebar": {
+    "toggleFileTree": "切换文件树",
+    "toggleOutline": "切换大纲",
+    "settings": "设置",
+    "theme": "主题"
+  },
+  "commandPalette": {
+    "placeholder": "搜索文件或命令...",
+    "noResults": "没有找到结果。",
+    "recentFiles": "最近的文件",
+    "files": "文件",
+    "commands": "命令",
+    "lightTheme": "切换到浅色主题",
+    "darkTheme": "切换到深色主题",
+    "systemTheme": "跟随系统外观",
+    "openSettings": "打开设置",
+    "toggleAgent": "切换 AI 助手"
+  },
+  "settings": {
+    "title": "设置",
+    "language": {
+      "title": "语言",
+      "description": "选择您的首选语言"
+    },
+    "theme": {
+      "title": "主题",
+      "description": "选择颜色主题",
+      "light": "浅色",
+      "dark": "深色",
+      "system": "跟随系统",
+      "followSystem": "跟随系统外观设置"
+    },
+    "ai": {
+      "title": "AI 服务商",
+      "description": "配置 AI 助手的 API 密钥",
+      "openai": "OpenAI",
+      "anthropic": "Anthropic",
+      "google": "Google AI",
+      "apiKey": "API 密钥",
+      "apiKeyPlaceholder": "输入您的 API 密钥...",
+      "model": "模型",
+      "save": "保存",
+      "saved": "已保存",
+      "testConnection": "测试连接",
+      "connectionSuccess": "连接成功！",
+      "connectionFailed": "连接失败"
+    },
+    "close": "关闭"
+  },
+  "agent": {
+    "title": "AI 助手",
+    "placeholder": "关于这篇文档，有什么想问的...",
+    "send": "发送",
+    "stop": "停止",
+    "clear": "清空对话",
+    "noDocument": "请打开文档后开始与 AI 对话",
+    "selectProvider": "选择 AI 服务商",
+    "thinking": "思考中...",
+    "error": "发生错误，请检查 API 密钥后重试。",
+    "contextMenu": {
+      "explain": "解释这段",
+      "translate": "翻译",
+      "summarize": "总结",
+      "rewrite": "改写"
+    }
+  },
+  "statusBar": {
+    "words": "{{count}} 字",
+    "chars": "{{count}} 字符",
+    "readingTime": "约 {{count}} 分钟阅读",
+    "noModel": "无 AI 模型",
+    "ready": "就绪"
+  }
+}

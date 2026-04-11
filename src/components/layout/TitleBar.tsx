@@ -1,19 +1,29 @@
 import { useState, useEffect, type CSSProperties } from 'react'
-import { Minus, Square, X, Sun, Moon, PanelLeft, PanelRight } from 'lucide-react'
+import { Minus, Square, X, Palette, PanelLeft, PanelRight, Settings, Bot } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useUIStore } from '../../store/uiStore'
 import { useFileStore } from '../../store/fileStore'
+import { useSettingsStore } from '../../store/settingsStore'
+import { useAgentStore } from '../../store/agentStore'
+import { themes, applyTheme, getThemeById } from '../../lib/theme/themes'
 
 const dragStyle = { WebkitAppRegion: 'drag' } as unknown as CSSProperties
 const noDragStyle = { WebkitAppRegion: 'no-drag' } as unknown as CSSProperties
 
-export function TitleBar() {
+interface TitleBarProps {
+  onOpenSettings: () => void
+}
+
+export function TitleBar({ onOpenSettings }: TitleBarProps) {
+  const { t } = useTranslation()
   const [isMaximized, setIsMaximized] = useState(false)
-  const resolvedTheme = useUIStore((s) => s.resolvedTheme)
-  const theme = useUIStore((s) => s.theme)
-  const setTheme = useUIStore((s) => s.setTheme)
   const toggleLeftSidebar = useUIStore((s) => s.toggleLeftSidebar)
   const toggleRightSidebar = useUIStore((s) => s.toggleRightSidebar)
   const currentFilePath = useFileStore((s) => s.currentFilePath)
+  const themeId = useSettingsStore((s) => s.themeId)
+  const setThemeId = useSettingsStore((s) => s.setThemeId)
+  const setThemeMode = useSettingsStore((s) => s.setThemeMode)
+  const toggleAgentSidebar = useAgentStore((s) => s.toggleAgentSidebar)
 
   const isMac = window.electronAPI.platform === 'darwin'
 
@@ -24,9 +34,12 @@ export function TitleBar() {
   }, [])
 
   const cycleTheme = () => {
-    const order: Array<'light' | 'dark' | 'system'> = ['light', 'dark', 'system']
-    const idx = order.indexOf(theme)
-    setTheme(order[(idx + 1) % order.length])
+    const currentIdx = themes.findIndex((t) => t.id === themeId)
+    const nextIdx = (currentIdx + 1) % themes.length
+    const next = themes[nextIdx]
+    setThemeId(next.id)
+    setThemeMode('manual')
+    applyTheme(next)
   }
 
   const fileName = currentFilePath
@@ -48,7 +61,7 @@ export function TitleBar() {
         <button
           onClick={toggleLeftSidebar}
           className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-          title="Toggle file tree (Ctrl+B)"
+          title={`${t('titlebar.toggleFileTree')} (Ctrl+B)`}
         >
           <PanelLeft size={16} style={{ color: 'var(--text-secondary)' }} />
         </button>
@@ -62,22 +75,32 @@ export function TitleBar() {
       {/* Right controls */}
       <div className="flex items-center gap-1 px-2" style={noDragStyle}>
         <button
+          onClick={toggleAgentSidebar}
+          className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+          title="AI Assistant (Ctrl+J)"
+        >
+          <Bot size={16} style={{ color: 'var(--text-secondary)' }} />
+        </button>
+        <button
           onClick={toggleRightSidebar}
           className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-          title="Toggle outline (Ctrl+Shift+B)"
+          title={`${t('titlebar.toggleOutline')} (Ctrl+Shift+B)`}
         >
           <PanelRight size={16} style={{ color: 'var(--text-secondary)' }} />
         </button>
         <button
           onClick={cycleTheme}
           className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-          title={`Theme: ${theme}`}
+          title={`${t('titlebar.theme')}: ${getThemeById(themeId)?.name ?? themeId} (Ctrl+T)`}
         >
-          {resolvedTheme === 'dark' ? (
-            <Moon size={16} style={{ color: 'var(--text-secondary)' }} />
-          ) : (
-            <Sun size={16} style={{ color: 'var(--text-secondary)' }} />
-          )}
+          <Palette size={16} style={{ color: 'var(--text-secondary)' }} />
+        </button>
+        <button
+          onClick={onOpenSettings}
+          className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+          title={`${t('titlebar.settings')} (Ctrl+,)`}
+        >
+          <Settings size={16} style={{ color: 'var(--text-secondary)' }} />
         </button>
 
         {/* Window controls (non-macOS) */}

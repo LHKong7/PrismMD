@@ -1,16 +1,27 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Command } from 'cmdk'
-import { FileText, Sun, Moon, Monitor } from 'lucide-react'
+import { FileText, Sun, Moon, Monitor, Settings, Bot } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useUIStore } from '../../store/uiStore'
 import { useFileStore } from '../../store/fileStore'
+import { useSettingsStore } from '../../store/settingsStore'
+import { useAgentStore } from '../../store/agentStore'
+import { applyTheme, getThemeById } from '../../lib/theme/themes'
 
-export function CommandPalette() {
+interface CommandPaletteProps {
+  onOpenSettings: () => void
+}
+
+export function CommandPalette({ onOpenSettings }: CommandPaletteProps) {
+  const { t } = useTranslation()
   const open = useUIStore((s) => s.commandPaletteOpen)
   const setOpen = useUIStore((s) => s.setCommandPaletteOpen)
-  const setTheme = useUIStore((s) => s.setTheme)
+  const setThemeId = useSettingsStore((s) => s.setThemeId)
+  const setThemeMode = useSettingsStore((s) => s.setThemeMode)
   const openFile = useFileStore((s) => s.openFile)
   const recentFiles = useFileStore((s) => s.recentFiles)
   const fileTree = useFileStore((s) => s.fileTree)
+  const toggleAgentSidebar = useAgentStore((s) => s.toggleAgentSidebar)
   const [search, setSearch] = useState('')
 
   // Keyboard shortcut
@@ -28,7 +39,15 @@ export function CommandPalette() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [open, setOpen])
 
-  // Flatten file tree to get all files
+  const switchTheme = (id: string) => {
+    setThemeId(id)
+    setThemeMode('manual')
+    const theme = getThemeById(id)
+    if (theme) applyTheme(theme)
+    setOpen(false)
+  }
+
+  // Flatten file tree
   const flattenFiles = (nodes: typeof fileTree): string[] => {
     if (!nodes) return []
     const files: string[] = []
@@ -47,21 +66,17 @@ export function CommandPalette() {
 
   if (!open) return null
 
+  const cmdItemClass = "flex items-center gap-2 px-3 py-2 mx-2 rounded text-sm cursor-pointer aria-selected:bg-black/5 dark:aria-selected:bg-white/5"
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]"
       onClick={() => setOpen(false)}
     >
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-
-      {/* Dialog */}
       <div
         className="relative w-full max-w-lg rounded-xl overflow-hidden shadow-2xl border"
-        style={{
-          backgroundColor: 'var(--bg-primary)',
-          borderColor: 'var(--border-color)',
-        }}
+        style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}
         onClick={(e) => e.stopPropagation()}
       >
         <Command
@@ -71,30 +86,23 @@ export function CommandPalette() {
           style={{ color: 'var(--text-primary)' }}
         >
           <Command.Input
-            placeholder="Search files or commands..."
+            placeholder={t('commandPalette.placeholder')}
             className="w-full px-4 py-3 text-sm outline-none border-b bg-transparent"
-            style={{
-              borderColor: 'var(--border-color)',
-              color: 'var(--text-primary)',
-            }}
+            style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
           />
           <Command.List className="max-h-72 overflow-y-auto py-2">
             <Command.Empty className="px-4 py-6 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
-              No results found.
+              {t('commandPalette.noResults')}
             </Command.Empty>
 
-            {/* Recent files */}
             {recentFiles.length > 0 && (
-              <Command.Group heading="Recent Files" style={{ color: 'var(--text-muted)' }}>
+              <Command.Group heading={t('commandPalette.recentFiles')} style={{ color: 'var(--text-muted)' }}>
                 {recentFiles.map((filePath) => (
                   <Command.Item
                     key={filePath}
                     value={fileName(filePath)}
-                    onSelect={() => {
-                      openFile(filePath)
-                      setOpen(false)
-                    }}
-                    className="flex items-center gap-2 px-3 py-2 mx-2 rounded text-sm cursor-pointer aria-selected:bg-black/5 dark:aria-selected:bg-white/5"
+                    onSelect={() => { openFile(filePath); setOpen(false) }}
+                    className={cmdItemClass}
                     style={{ color: 'var(--text-secondary)' }}
                   >
                     <FileText size={14} style={{ color: 'var(--text-muted)' }} />
@@ -104,18 +112,14 @@ export function CommandPalette() {
               </Command.Group>
             )}
 
-            {/* All files */}
             {allFiles.length > 0 && (
-              <Command.Group heading="Files" style={{ color: 'var(--text-muted)' }}>
+              <Command.Group heading={t('commandPalette.files')} style={{ color: 'var(--text-muted)' }}>
                 {allFiles.map((filePath) => (
                   <Command.Item
                     key={filePath}
                     value={fileName(filePath)}
-                    onSelect={() => {
-                      openFile(filePath)
-                      setOpen(false)
-                    }}
-                    className="flex items-center gap-2 px-3 py-2 mx-2 rounded text-sm cursor-pointer aria-selected:bg-black/5 dark:aria-selected:bg-white/5"
+                    onSelect={() => { openFile(filePath); setOpen(false) }}
+                    className={cmdItemClass}
                     style={{ color: 'var(--text-secondary)' }}
                   >
                     <FileText size={14} style={{ color: 'var(--text-muted)' }} />
@@ -125,34 +129,51 @@ export function CommandPalette() {
               </Command.Group>
             )}
 
-            {/* Commands */}
-            <Command.Group heading="Commands" style={{ color: 'var(--text-muted)' }}>
+            <Command.Group heading={t('commandPalette.commands')} style={{ color: 'var(--text-muted)' }}>
               <Command.Item
                 value="Light theme"
-                onSelect={() => { setTheme('light'); setOpen(false) }}
-                className="flex items-center gap-2 px-3 py-2 mx-2 rounded text-sm cursor-pointer aria-selected:bg-black/5 dark:aria-selected:bg-white/5"
+                onSelect={() => switchTheme('light')}
+                className={cmdItemClass}
                 style={{ color: 'var(--text-secondary)' }}
               >
                 <Sun size={14} />
-                <span>Switch to Light Theme</span>
+                <span>{t('commandPalette.lightTheme')}</span>
               </Command.Item>
               <Command.Item
                 value="Dark theme"
-                onSelect={() => { setTheme('dark'); setOpen(false) }}
-                className="flex items-center gap-2 px-3 py-2 mx-2 rounded text-sm cursor-pointer aria-selected:bg-black/5 dark:aria-selected:bg-white/5"
+                onSelect={() => switchTheme('dark')}
+                className={cmdItemClass}
                 style={{ color: 'var(--text-secondary)' }}
               >
                 <Moon size={14} />
-                <span>Switch to Dark Theme</span>
+                <span>{t('commandPalette.darkTheme')}</span>
               </Command.Item>
               <Command.Item
                 value="System theme"
-                onSelect={() => { setTheme('system'); setOpen(false) }}
-                className="flex items-center gap-2 px-3 py-2 mx-2 rounded text-sm cursor-pointer aria-selected:bg-black/5 dark:aria-selected:bg-white/5"
+                onSelect={() => { setThemeMode('system'); setOpen(false) }}
+                className={cmdItemClass}
                 style={{ color: 'var(--text-secondary)' }}
               >
                 <Monitor size={14} />
-                <span>Use System Theme</span>
+                <span>{t('commandPalette.systemTheme')}</span>
+              </Command.Item>
+              <Command.Item
+                value="Open Settings"
+                onSelect={() => { onOpenSettings(); setOpen(false) }}
+                className={cmdItemClass}
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                <Settings size={14} />
+                <span>{t('commandPalette.openSettings')}</span>
+              </Command.Item>
+              <Command.Item
+                value="Toggle AI Assistant"
+                onSelect={() => { toggleAgentSidebar(); setOpen(false) }}
+                className={cmdItemClass}
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                <Bot size={14} />
+                <span>{t('commandPalette.toggleAgent')}</span>
               </Command.Item>
             </Command.Group>
           </Command.List>

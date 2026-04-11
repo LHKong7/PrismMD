@@ -1,4 +1,5 @@
 import { useRef, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useFileStore } from '../../store/fileStore'
 import { useMarkdown } from '../../hooks/useMarkdown'
 import { useReadingProgress } from '../../hooks/useReadingProgress'
@@ -7,6 +8,7 @@ import '../../styles/markdown.css'
 import '../../styles/cjk.css'
 
 export function MarkdownReader() {
+  const { t } = useTranslation()
   const currentContent = useFileStore((s) => s.currentContent)
   const openFileDialog = useFileStore((s) => s.openFileDialog)
   const openFolderDialog = useFileStore((s) => s.openFolderDialog)
@@ -57,37 +59,31 @@ export function MarkdownReader() {
             <Upload size={32} style={{ color: 'var(--text-muted)' }} />
           </div>
           <h2 className="text-xl font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
-            Welcome to PrismMD
+            {t('app.welcome.title')}
           </h2>
           <p className="text-sm mb-6" style={{ color: 'var(--text-muted)' }}>
-            Open a Markdown file or folder to start reading. You can also drag and drop files here.
+            {t('app.welcome.subtitle')}
           </p>
           <div className="flex gap-3 justify-center">
             <button
               onClick={openFileDialog}
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-              style={{
-                backgroundColor: 'var(--accent-color)',
-                color: '#ffffff',
-              }}
+              style={{ backgroundColor: 'var(--accent-color)', color: '#ffffff' }}
             >
               <FileText size={16} />
-              Open File
+              {t('app.welcome.openFile')}
             </button>
             <button
               onClick={openFolderDialog}
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-              style={{
-                borderColor: 'var(--border-color)',
-                color: 'var(--text-secondary)',
-              }}
+              style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
             >
               <FolderOpen size={16} />
-              Open Folder
+              {t('app.welcome.openFolder')}
             </button>
           </div>
           <p className="text-xs mt-6" style={{ color: 'var(--text-muted)' }}>
-            Tip: Press Ctrl+P to open the command palette
+            {t('app.welcome.tip', { shortcut: 'Ctrl+P' })}
           </p>
         </div>
       </div>

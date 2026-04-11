@@ -1,9 +1,11 @@
 import { useUIStore } from '../../store/uiStore'
 import { useFileStore } from '../../store/fileStore'
+import { useAgentStore } from '../../store/agentStore'
 import { LeftSidebar } from './LeftSidebar'
 import { RightSidebar } from './RightSidebar'
 import { MarkdownReader } from '../reader/MarkdownReader'
 import { ReadingProgress } from '../reader/ReadingProgress'
+import { AgentSidebar } from '../agent/AgentSidebar'
 
 export function AppShell() {
   const leftSidebarOpen = useUIStore((s) => s.leftSidebarOpen)
@@ -13,6 +15,7 @@ export function AppShell() {
   const setLeftSidebarOpen = useUIStore((s) => s.setLeftSidebarOpen)
   const setRightSidebarOpen = useUIStore((s) => s.setRightSidebarOpen)
   const toc = useFileStore((s) => s.toc)
+  const agentSidebarOpen = useAgentStore((s) => s.agentSidebarOpen)
 
   return (
     <div className="flex flex-1 overflow-hidden relative">
@@ -53,12 +56,14 @@ export function AppShell() {
         <MarkdownReader />
       </div>
 
-      {/* Right sidebar */}
+      {/* Right sidebar (TOC) */}
       <div
-        className="absolute top-0 bottom-0 right-0 z-30 transition-transform duration-200 ease-in-out"
+        className="absolute top-0 bottom-0 z-30 transition-transform duration-200 ease-in-out"
         style={{
           width: 220,
+          right: agentSidebarOpen ? 340 : 0,
           transform: rightSidebarOpen ? 'translateX(0)' : 'translateX(100%)',
+          transition: 'transform 200ms ease-in-out, right 200ms ease-in-out',
         }}
         onMouseLeave={() => {
           if (!rightSidebarPinned) setRightSidebarOpen(false)
@@ -75,6 +80,17 @@ export function AppShell() {
           onMouseEnter={() => setRightSidebarOpen(true)}
         />
       )}
+
+      {/* Agent sidebar */}
+      <div
+        className="absolute top-0 bottom-0 right-0 z-30 transition-transform duration-200 ease-in-out"
+        style={{
+          width: 340,
+          transform: agentSidebarOpen ? 'translateX(0)' : 'translateX(100%)',
+        }}
+      >
+        <AgentSidebar />
+      </div>
     </div>
   )
 }

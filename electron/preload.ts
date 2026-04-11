@@ -107,6 +107,35 @@ const electronAPI = {
     return () => ipcRenderer.removeListener('window:maximize-change', handler)
   },
 
+  // Settings
+  loadSettings: (): Promise<Record<string, unknown>> =>
+    ipcRenderer.invoke('settings:load'),
+
+  saveSettings: (settings: Record<string, unknown>): Promise<void> =>
+    ipcRenderer.invoke('settings:save', settings),
+
+  // Agent / AI
+  sendAgentMessage: (request: {
+    messages: Array<{ role: string; content: string }>
+    documentContext?: string
+  }): Promise<{ provider: string; model: string }> =>
+    ipcRenderer.invoke('agent:send-message', request),
+
+  onAgentStream: (callback: (chunk: string) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, chunk: string) => {
+      callback(chunk)
+    }
+    ipcRenderer.on('agent:stream-chunk', handler)
+    return () => ipcRenderer.removeListener('agent:stream-chunk', handler)
+  },
+
+  stopAgentGeneration: (): void => {
+    ipcRenderer.send('agent:stop')
+  },
+
+  testAgentConnection: (provider: string, apiKey: string): Promise<boolean> =>
+    ipcRenderer.invoke('agent:test-connection', provider, apiKey),
+
   // Platform info
   platform: process.platform,
 }
