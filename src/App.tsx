@@ -6,13 +6,15 @@ import { StatusBar } from './components/layout/StatusBar'
 import { CommandPalette } from './components/commandpalette/CommandPalette'
 import { HighlightPopover } from './components/annotations/HighlightPopover'
 import { SettingsPanel } from './components/settings/SettingsPanel'
+import { GhostText } from './components/ghosttext/GhostText'
+import { FocusOverlay } from './components/focusmode/FocusOverlay'
+import { KnowledgeGraph } from './components/knowledgegraph/KnowledgeGraph'
 import { useFileWatcher } from './hooks/useFileWatcher'
 import { useAutoHide } from './hooks/useAutoHide'
 import { useAnnotations } from './hooks/useAnnotations'
 import { useSettingsStore } from './store/settingsStore'
 import { initI18n } from './i18n'
 
-// Initialize i18n (will be re-configured after settings load)
 initI18n()
 
 function AppContent() {
@@ -20,19 +22,22 @@ function AppContent() {
   useAutoHide()
   const { addAnnotation } = useAnnotations()
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [knowledgeGraphOpen, setKnowledgeGraphOpen] = useState(false)
   const loadSettings = useSettingsStore((s) => s.loadSettings)
 
-  // Load persisted settings on mount
-  useEffect(() => {
-    loadSettings()
-  }, [loadSettings])
+  useEffect(() => { loadSettings() }, [loadSettings])
 
-  // Ctrl/Cmd + , : open settings
+  // Ctrl/Cmd + , : settings
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === ',') {
         e.preventDefault()
         setSettingsOpen((prev) => !prev)
+      }
+      // Ctrl/Cmd + G: knowledge graph
+      if ((e.metaKey || e.ctrlKey) && e.key === 'g') {
+        e.preventDefault()
+        setKnowledgeGraphOpen((prev) => !prev)
       }
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -42,11 +47,17 @@ function AppContent() {
   return (
     <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--bg-primary)' }}>
       <TitleBar onOpenSettings={() => setSettingsOpen(true)} />
+      <FocusOverlay />
       <AppShell />
       <StatusBar />
-      <CommandPalette onOpenSettings={() => setSettingsOpen(true)} />
+      <CommandPalette
+        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenKnowledgeGraph={() => setKnowledgeGraphOpen(true)}
+      />
       <HighlightPopover onHighlight={addAnnotation} />
+      <GhostText />
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <KnowledgeGraph open={knowledgeGraphOpen} onClose={() => setKnowledgeGraphOpen(false)} />
     </div>
   )
 }

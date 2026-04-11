@@ -34,7 +34,10 @@
     "darkTheme": "Switch to Dark Theme",
     "systemTheme": "Use System Theme",
     "openSettings": "Open Settings",
-    "toggleAgent": "Toggle AI Assistant"
+    "toggleAgent": "Toggle AI Assistant",
+    "knowledgeGraph": "Open Knowledge Graph",
+    "toggleFocusMode": "Toggle Focus Mode",
+    "togglePrivacy": "Toggle Privacy Mode"
   },
   "settings": {
     "title": "Settings",
@@ -52,18 +55,33 @@
     },
     "ai": {
       "title": "AI Providers",
-      "description": "Configure API keys for AI assistants",
+      "description": "Configure API keys for AI assistants. Cloud and local models supported.",
       "openai": "OpenAI",
       "anthropic": "Anthropic",
       "google": "Google AI",
+      "ollama": "Ollama (Local)",
       "apiKey": "API Key",
       "apiKeyPlaceholder": "Enter your API key...",
+      "baseUrl": "Endpoint URL",
+      "baseUrlPlaceholder": "http://localhost:11434",
       "model": "Model",
       "save": "Save",
       "saved": "Saved",
-      "testConnection": "Test Connection",
+      "testConnection": "Test",
       "connectionSuccess": "Connection successful!",
-      "connectionFailed": "Connection failed"
+      "connectionFailed": "Connection failed",
+      "localNote": "No API key needed. Ensure Ollama is running locally."
+    },
+    "privacy": {
+      "title": "Privacy & Security",
+      "description": "Control data privacy and network access",
+      "privacyMode": "Privacy Mode",
+      "privacyModeDesc": "Block all external API calls. Only local models (Ollama) are allowed.",
+      "focusMode": "Focus Mode",
+      "focusModeDesc": "Dim background document when AI is generating responses.",
+      "clearMemory": "Clear AI Memory",
+      "clearMemoryDesc": "Remove all stored conversation history and preferences.",
+      "cleared": "Memory cleared"
     },
     "close": "Close"
   },
@@ -77,6 +95,9 @@
     "selectProvider": "Select AI provider",
     "thinking": "Thinking...",
     "error": "An error occurred. Please check your API key and try again.",
+    "ragStatus": "{{count}} docs indexed",
+    "ragIndexing": "Indexing...",
+    "memoryEnabled": "Memory active",
     "contextMenu": {
       "explain": "Explain this",
       "translate": "Translate",
@@ -89,6 +110,12 @@
     "chars": "{{count}} chars",
     "readingTime": "{{count}} min read",
     "noModel": "No AI model",
-    "ready": "Ready"
+    "ready": "Ready",
+    "privacyOn": "Privacy Mode",
+    "ragDocs": "RAG: {{count}} docs"
+  },
+  "knowledgeGraph": {
+    "title": "Knowledge Graph",
+    "empty": "Open a folder to visualize document connections"
   }
 }

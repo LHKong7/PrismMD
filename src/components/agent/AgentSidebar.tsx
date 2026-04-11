@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Square, Trash2, Bot, ChevronDown } from 'lucide-react'
+import { Send, Square, Trash2, Bot, ChevronDown, Database, Brain } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAgentStore } from '../../store/agentStore'
 import { useFileStore } from '../../store/fileStore'
@@ -12,7 +12,6 @@ export function AgentSidebar() {
   const [input, setInput] = useState('')
   const [showModelPicker, setShowModelPicker] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLTextAreaElement>(null)
 
   const messages = useAgentStore((s) => s.messages)
   const isStreaming = useAgentStore((s) => s.isStreaming)
@@ -20,23 +19,36 @@ export function AgentSidebar() {
   const sendMessage = useAgentStore((s) => s.sendMessage)
   const stopGeneration = useAgentStore((s) => s.stopGeneration)
   const clearMessages = useAgentStore((s) => s.clearMessages)
+  const ragIndexed = useAgentStore((s) => s.ragIndexed)
+  const ragDocCount = useAgentStore((s) => s.ragDocCount)
+  const indexWorkspace = useAgentStore((s) => s.indexWorkspace)
 
   const currentContent = useFileStore((s) => s.currentContent)
+  const currentFilePath = useFileStore((s) => s.currentFilePath)
+  const rootFolderPath = useFileStore((s) => s.rootFolderPath)
   const activeProvider = useSettingsStore((s) => s.activeProvider)
   const providers = useSettingsStore((s) => s.providers)
+  const privacyMode = useSettingsStore((s) => s.privacyMode)
   const setActiveProvider = useSettingsStore((s) => s.setActiveProvider)
   const setProviderConfig = useSettingsStore((s) => s.setProviderConfig)
 
-  // Auto-scroll to bottom
+  // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, streamingContent])
+
+  // Auto-index workspace when folder is open
+  useEffect(() => {
+    if (rootFolderPath && !ragIndexed) {
+      indexWorkspace(rootFolderPath)
+    }
+  }, [rootFolderPath, ragIndexed, indexWorkspace])
 
   const handleSend = () => {
     const trimmed = input.trim()
     if (!trimmed || isStreaming) return
     setInput('')
-    sendMessage(trimmed, currentContent ?? undefined)
+    sendMessage(trimmed, currentContent ?? undefined, currentFilePath ?? undefined)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -47,7 +59,7 @@ export function AgentSidebar() {
   }
 
   const activeConfig = activeProvider ? providers[activeProvider] : null
-  const hasApiKey = activeConfig?.apiKey
+  const hasApiKey = activeProvider === 'ollama' || (activeConfig?.apiKey)
 
   return (
     <div
@@ -55,10 +67,7 @@ export function AgentSidebar() {
       style={{ backgroundColor: 'var(--bg-sidebar)', borderColor: 'var(--border-color)' }}
     >
       {/* Header */}
-      <div
-        className="flex items-center justify-between px-3 py-2 border-b flex-shrink-0"
-        style={{ borderColor: 'var(--border-color)' }}
-      >
+      <div className="flex items-center justify-between px-3 py-2 border-b flex-shrink-0" style={{ borderColor: 'var(--border-color)' }}>
         <div className="flex items-center gap-2">
           <Bot size={14} style={{ color: 'var(--accent-color)' }} />
           <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
@@ -66,15 +75,27 @@ export function AgentSidebar() {
           </span>
         </div>
         <div className="flex items-center gap-1">
-          <button
-            onClick={clearMessages}
-            className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-            title={t('agent.clear')}
-          >
+          {ragIndexed && (
+            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px]" style={{ color: 'var(--text-muted)' }}>
+              <Database size={10} />
+              {t('agent.ragStatus', { count: ragDocCount })}
+            </div>
+          )}
+          <div className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px]" style={{ color: 'var(--text-muted)' }}>
+            <Brain size={10} />
+          </div>
+          <button onClick={clearMessages} className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors" title={t('agent.clear')}>
             <Trash2 size={13} style={{ color: 'var(--text-muted)' }} />
           </button>
         </div>
       </div>
+
+      {/* Privacy badge */}
+      {privacyMode && (
+        <div className="px-3 py-1.5 text-[10px] font-semibold text-center" style={{ backgroundColor: '#ef44441a', color: '#ef4444' }}>
+          Privacy Mode - Local Models Only
+        </div>
+      )}
 
       {/* Model picker */}
       <div className="px-3 py-2 border-b flex-shrink-0" style={{ borderColor: 'var(--border-color)' }}>
@@ -83,43 +104,31 @@ export function AgentSidebar() {
           className="w-full flex items-center justify-between px-2 py-1.5 rounded text-xs border hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
           style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
         >
-          <span>
-            {activeProvider
-              ? `${activeProvider} / ${activeConfig?.model ?? ''}`
-              : t('agent.selectProvider')}
-          </span>
+          <span>{activeProvider ? `${activeProvider} / ${activeConfig?.model ?? ''}` : t('agent.selectProvider')}</span>
           <ChevronDown size={12} className={clsx('transition-transform', showModelPicker && 'rotate-180')} />
         </button>
 
         {showModelPicker && (
-          <div className="mt-2 space-y-1">
-            {(['openai', 'anthropic', 'google'] as AIProvider[]).map((p) => {
+          <div className="mt-2 space-y-1 max-h-48 overflow-y-auto">
+            {(['ollama', 'openai', 'anthropic', 'google'] as AIProvider[]).map((p) => {
               const config = providers[p]
-              if (!config.apiKey) return null
+              if (p !== 'ollama' && !config.apiKey) return null
+              if (privacyMode && p !== 'ollama') return null
               return (
                 <div key={p} className="space-y-1">
-                  <p className="text-[10px] font-semibold uppercase px-1" style={{ color: 'var(--text-muted)' }}>
+                  <p className="text-[10px] font-semibold uppercase px-1 flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
                     {p}
+                    {p === 'ollama' && <span className="text-green-600">LOCAL</span>}
                   </p>
                   {DEFAULT_MODELS[p].map((model) => (
                     <button
                       key={model}
-                      onClick={() => {
-                        setActiveProvider(p)
-                        setProviderConfig(p, { model })
-                        setShowModelPicker(false)
-                      }}
+                      onClick={() => { setActiveProvider(p); setProviderConfig(p, { model }); setShowModelPicker(false) }}
                       className={clsx(
                         'w-full text-left text-xs px-2 py-1.5 rounded transition-colors',
-                        activeProvider === p && config.model === model
-                          ? 'font-medium'
-                          : 'hover:bg-black/5 dark:hover:bg-white/5'
+                        activeProvider === p && config.model === model ? 'font-medium' : 'hover:bg-black/5 dark:hover:bg-white/5'
                       )}
-                      style={{
-                        color: activeProvider === p && config.model === model
-                          ? 'var(--accent-color)'
-                          : 'var(--text-secondary)',
-                      }}
+                      style={{ color: activeProvider === p && config.model === model ? 'var(--accent-color)' : 'var(--text-secondary)' }}
                     >
                       {model}
                     </button>
@@ -146,16 +155,10 @@ export function AgentSidebar() {
             ))}
             {isStreaming && streamingContent && (
               <div className="flex gap-2.5 px-4 py-3 bg-black/[0.02] dark:bg-white/[0.02]">
-                <div
-                  className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5"
-                  style={{ backgroundColor: 'var(--bg-secondary)' }}
-                >
+                <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: 'var(--bg-secondary)' }}>
                   <Bot size={14} style={{ color: 'var(--accent-color)' }} />
                 </div>
-                <div
-                  className="text-sm leading-relaxed whitespace-pre-wrap break-words"
-                  style={{ color: 'var(--text-secondary)' }}
-                >
+                <div className="text-sm leading-relaxed whitespace-pre-wrap break-words" style={{ color: 'var(--text-secondary)' }}>
                   {streamingContent}
                   <span className="inline-block w-1.5 h-4 ml-0.5 animate-pulse" style={{ backgroundColor: 'var(--accent-color)' }} />
                 </div>
@@ -163,15 +166,10 @@ export function AgentSidebar() {
             )}
             {isStreaming && !streamingContent && (
               <div className="flex gap-2.5 px-4 py-3">
-                <div
-                  className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0"
-                  style={{ backgroundColor: 'var(--bg-secondary)' }}
-                >
+                <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0" style={{ backgroundColor: 'var(--bg-secondary)' }}>
                   <Bot size={14} className="animate-pulse" style={{ color: 'var(--accent-color)' }} />
                 </div>
-                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  {t('agent.thinking')}
-                </span>
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t('agent.thinking')}</span>
               </div>
             )}
             <div ref={messagesEndRef} />
@@ -181,12 +179,8 @@ export function AgentSidebar() {
 
       {/* Input */}
       <div className="p-3 border-t flex-shrink-0" style={{ borderColor: 'var(--border-color)' }}>
-        <div
-          className="flex items-end gap-2 rounded-lg border px-3 py-2"
-          style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-primary)' }}
-        >
+        <div className="flex items-end gap-2 rounded-lg border px-3 py-2" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-primary)' }}>
           <textarea
-            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -197,22 +191,11 @@ export function AgentSidebar() {
             style={{ color: 'var(--text-primary)' }}
           />
           {isStreaming ? (
-            <button
-              onClick={stopGeneration}
-              className="p-1.5 rounded-md transition-colors"
-              style={{ backgroundColor: 'var(--accent-color)' }}
-              title={t('agent.stop')}
-            >
+            <button onClick={stopGeneration} className="p-1.5 rounded-md" style={{ backgroundColor: 'var(--accent-color)' }} title={t('agent.stop')}>
               <Square size={14} color="#fff" />
             </button>
           ) : (
-            <button
-              onClick={handleSend}
-              disabled={!input.trim() || !hasApiKey}
-              className="p-1.5 rounded-md transition-colors disabled:opacity-30"
-              style={{ backgroundColor: 'var(--accent-color)' }}
-              title={t('agent.send')}
-            >
+            <button onClick={handleSend} disabled={!input.trim() || !hasApiKey} className="p-1.5 rounded-md disabled:opacity-30" style={{ backgroundColor: 'var(--accent-color)' }} title={t('agent.send')}>
               <Send size={14} color="#fff" />
             </button>
           )}
