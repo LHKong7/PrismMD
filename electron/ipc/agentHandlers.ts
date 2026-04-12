@@ -1,10 +1,13 @@
-import { BrowserWindow, ipcMain } from 'electron'
+import { ipcMain } from 'electron'
 import { sendMessage, stopGeneration, testConnection } from '../services/aiService'
 import { saveMemory, getMemoryContext, clearMemory, extractSummaryFromConversation } from '../services/memoryService'
+import { getMainWindow } from '../main'
 
-export function registerAgentHandlers(mainWindow: BrowserWindow) {
+export function registerAgentHandlers() {
   ipcMain.handle('agent:send-message', async (_event, request) => {
-    return sendMessage(mainWindow, request)
+    const win = getMainWindow()
+    if (!win) throw new Error('Main window is not available')
+    return sendMessage(win, request)
   })
 
   ipcMain.on('agent:stop', () => {

@@ -1,14 +1,16 @@
-import { BrowserWindow, dialog, ipcMain } from 'electron'
+import { dialog, ipcMain } from 'electron'
 import fs from 'fs/promises'
-import path from 'path'
 import { buildFileTree } from '../services/fileTree'
 import { FileWatcherService } from '../services/fileWatcher'
+import { getMainWindow } from '../main'
 
-export function registerFileHandlers(mainWindow: BrowserWindow) {
-  const fileWatcher = new FileWatcherService(mainWindow)
+export function registerFileHandlers() {
+  const fileWatcher = new FileWatcherService(getMainWindow)
 
   ipcMain.handle('dialog:open-file', async () => {
-    const result = await dialog.showOpenDialog(mainWindow, {
+    const win = getMainWindow()
+    if (!win) return null
+    const result = await dialog.showOpenDialog(win, {
       properties: ['openFile'],
       filters: [{ name: 'Markdown', extensions: ['md', 'markdown', 'mdx'] }],
     })
@@ -23,7 +25,9 @@ export function registerFileHandlers(mainWindow: BrowserWindow) {
   })
 
   ipcMain.handle('dialog:open-folder', async () => {
-    const result = await dialog.showOpenDialog(mainWindow, {
+    const win = getMainWindow()
+    if (!win) return null
+    const result = await dialog.showOpenDialog(win, {
       properties: ['openDirectory'],
     })
 

@@ -1,33 +1,35 @@
-import { BrowserWindow, ipcMain, nativeTheme } from 'electron'
+import { ipcMain, nativeTheme } from 'electron'
+import { getMainWindow } from '../main'
 
-export function registerThemeHandlers(mainWindow: BrowserWindow) {
+export function registerThemeHandlers() {
   ipcMain.handle('theme:get-system', () => {
     return nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
   })
 
   nativeTheme.on('updated', () => {
+    const win = getMainWindow()
+    if (!win || win.isDestroyed()) return
     const theme = nativeTheme.shouldUseDarkColors ? 'dark' : 'light'
-    mainWindow.webContents.send('theme:changed', theme)
+    win.webContents.send('theme:changed', theme)
   })
 
   // Window controls
   ipcMain.on('window:minimize', () => {
-    mainWindow.minimize()
+    getMainWindow()?.minimize()
   })
 
   ipcMain.on('window:maximize', () => {
-    if (mainWindow.isMaximized()) {
-      mainWindow.unmaximize()
-    } else {
-      mainWindow.maximize()
-    }
+    const win = getMainWindow()
+    if (!win) return
+    if (win.isMaximized()) win.unmaximize()
+    else win.maximize()
   })
 
   ipcMain.on('window:close', () => {
-    mainWindow.close()
+    getMainWindow()?.close()
   })
 
   ipcMain.handle('window:is-maximized', () => {
-    return mainWindow.isMaximized()
+    return getMainWindow()?.isMaximized() ?? false
   })
 }

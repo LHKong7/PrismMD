@@ -1,11 +1,28 @@
 import { app, BrowserWindow } from 'electron'
 import path from 'path'
 import { registerIpcHandlers } from './ipc'
+import { appConfig } from '../app.config'
+
+// Apply app identity from the central config
+app.setName(appConfig.name)
 
 let mainWindow: BrowserWindow | null = null
 
+export function getMainWindow(): BrowserWindow | null {
+  return mainWindow
+}
+
 function createWindow() {
+  const iconPath = appConfig.icon
+    ? path.join(
+        app.isPackaged ? process.resourcesPath : app.getAppPath(),
+        `${appConfig.icon}.${process.platform === 'win32' ? 'ico' : 'png'}`,
+      )
+    : undefined
+
   mainWindow = new BrowserWindow({
+    title: appConfig.name,
+    ...(iconPath ? { icon: iconPath } : {}),
     width: 1200,
     height: 800,
     minWidth: 800,
@@ -20,8 +37,6 @@ function createWindow() {
       sandbox: false,
     },
   })
-
-  registerIpcHandlers(mainWindow)
 
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL)
@@ -42,7 +57,10 @@ function createWindow() {
   })
 }
 
-app.whenReady().then(createWindow)
+app.whenReady().then(() => {
+  registerIpcHandlers()
+  createWindow()
+})
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

@@ -5,10 +5,17 @@ import fs from 'fs/promises'
 export class FileWatcherService {
   private fileWatchers = new Map<string, FSWatcher>()
   private dirWatchers = new Map<string, FSWatcher>()
-  private mainWindow: BrowserWindow
+  private getWindow: () => BrowserWindow | null
 
-  constructor(mainWindow: BrowserWindow) {
-    this.mainWindow = mainWindow
+  constructor(getWindow: () => BrowserWindow | null) {
+    this.getWindow = getWindow
+  }
+
+  private send(channel: string, ...args: unknown[]) {
+    const win = this.getWindow()
+    if (win && !win.isDestroyed()) {
+      win.webContents.send(channel, ...args)
+    }
   }
 
   watchFile(filePath: string) {
@@ -26,7 +33,7 @@ export class FileWatcherService {
     watcher.on('change', async () => {
       try {
         const content = await fs.readFile(filePath, 'utf-8')
-        this.mainWindow.webContents.send('fs:file-changed', filePath, content)
+        this.send('fs:file-changed', filePath, content)
       } catch {
         // File might have been deleted
       }
@@ -55,7 +62,7 @@ export class FileWatcherService {
     })
 
     watcher.on('all', () => {
-      this.mainWindow.webContents.send('fs:directory-changed', dirPath)
+      this.send('fs:directory-changed', dirPath)
     })
 
     this.dirWatchers.set(dirPath, watcher)

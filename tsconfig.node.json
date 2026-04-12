@@ -13,6 +13,7 @@
   },
   "include": [
     "electron/**/*.ts",
+    "app.config.ts",
     "forge.config.ts",
     "vite.main.config.ts",
     "vite.preload.config.ts",

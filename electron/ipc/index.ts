@@ -1,14 +1,22 @@
-import { BrowserWindow } from 'electron'
 import { registerFileHandlers } from './fileHandlers'
 import { registerThemeHandlers } from './themeHandlers'
 import { registerAnnotationHandlers } from './annotationHandlers'
 import { registerSettingsHandlers } from './settingsHandlers'
 import { registerAgentHandlers } from './agentHandlers'
+import { getMainWindow } from '../main'
 
-export function registerIpcHandlers(mainWindow: BrowserWindow) {
-  registerFileHandlers(mainWindow)
-  registerThemeHandlers(mainWindow)
+/**
+ * Lazily resolve the current main window. Handlers that send events to the
+ * renderer should call this each time rather than capturing the window
+ * reference at registration time, since windows can be recreated on macOS
+ * after all windows are closed.
+ */
+export { getMainWindow }
+
+export function registerIpcHandlers() {
+  registerFileHandlers()
+  registerThemeHandlers()
   registerAnnotationHandlers()
   registerSettingsHandlers()
-  registerAgentHandlers(mainWindow)
+  registerAgentHandlers()
 }

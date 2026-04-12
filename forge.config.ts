@@ -4,15 +4,18 @@ import { MakerDMG } from '@electron-forge/maker-dmg'
 import { MakerZIP } from '@electron-forge/maker-zip'
 import { MakerSquirrel } from '@electron-forge/maker-squirrel'
 import { MakerDeb } from '@electron-forge/maker-deb'
+import { appConfig } from './app.config'
 
 const config: ForgeConfig = {
   packagerConfig: {
     asar: {
       unpack: '**/node_modules/{chokidar,fsevents}/**',
     },
-    appBundleId: 'com.prismmd.app',
-    name: 'PrismMD',
-    executableName: 'prismmd',
+    appBundleId: appConfig.appBundleId,
+    name: appConfig.name,
+    executableName: appConfig.executableName,
+    appCopyright: `Copyright © ${new Date().getFullYear()} ${appConfig.name}`,
+    ...(appConfig.icon ? { icon: appConfig.icon } : {}),
     extendInfo: {
       CFBundleDocumentTypes: [
         {
@@ -25,13 +28,19 @@ const config: ForgeConfig = {
     },
   },
   makers: [
-    new MakerDMG({}),
+    new MakerDMG({
+      ...(appConfig.icon ? { icon: `${appConfig.icon}.icns` } : {}),
+    }),
     new MakerZIP({}, ['darwin']),
-    new MakerSquirrel({ name: 'PrismMD' }),
+    new MakerSquirrel({
+      name: appConfig.name,
+      ...(appConfig.icon ? { iconUrl: `${appConfig.icon}.ico`, setupIcon: `${appConfig.icon}.ico` } : {}),
+    }),
     new MakerDeb({
       options: {
         categories: ['Utility'],
         mimeType: ['text/markdown'],
+        ...(appConfig.icon ? { icon: `${appConfig.icon}.png` } : {}),
       },
     }),
   ],

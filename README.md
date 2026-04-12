@@ -50,16 +50,43 @@ This starts both the Vite dev server and the Electron app with hot reload.
 
 ### 4. Build for production
 
+The project ships with a build script that wraps [Electron Forge](https://www.electronforge.io/) with preflight checks.
+
 ```bash
-npm run build
+# Build installer for the current platform (default)
+./scripts/build.sh
+
+# Package the app without creating an installer
+./scripts/build.sh --package
+
+# Target a specific platform explicitly
+./scripts/build.sh --platform darwin
+./scripts/build.sh --platform win32
+./scripts/build.sh --platform linux
+
+# Skip steps for faster iteration
+./scripts/build.sh --skip-typecheck
+./scripts/build.sh --skip-install
 ```
 
-This compiles TypeScript, bundles the renderer with Vite, and packages the Electron app via electron-builder. Output is written to the `release/` directory.
+The script runs: Node version check → `npm ci` → `tsc --noEmit` → `electron-forge make` (or `package`).
 
-Supported targets:
+**Output:**
+- Installers: `out/make/`
+- Packaged (unpacked) app: `out/`
+
+**Supported targets:**
 - **macOS** — DMG, ZIP
-- **Windows** — NSIS installer
-- **Linux** — AppImage, DEB
+- **Windows** — Squirrel installer (`.exe`)
+- **Linux** — DEB
+
+You can also invoke Electron Forge directly:
+
+```bash
+npm run make      # Build installers
+npm run package   # Package without installer
+npm run typecheck # TypeScript check only
+```
 
 ## Project Structure
 
@@ -71,15 +98,15 @@ PrismMD/
 │   ├── ipc/                # IPC handler registration
 │   └── services/           # Backend services
 │       ├── aiService.ts    # AI agent (borderless-agent)
-│       ├── ragService.ts   # Workspace indexing & retrieval
 │       ├── memoryService.ts# Conversation memory
 │       └── settingsStore.ts# Persistent settings
+├── scripts/                # Build scripts
+│   └── build.sh            # Production build wrapper
 ├── src/                    # Renderer (React + Tailwind)
 │   ├── components/         # UI components
 │   │   ├── agent/          # AI chat sidebar
 │   │   ├── reader/         # Markdown renderer
 │   │   ├── filetree/       # File explorer
-│   │   ├── knowledgegraph/ # Document relationship graph
 │   │   ├── settings/       # Settings panel
 │   │   └── ...
 │   ├── store/              # Zustand state management
