@@ -83,6 +83,7 @@ const electronAPI = {
     messages: Array<{ role: string; content: string }>
     documentContext?: string
     memoryContext?: string
+    graphContext?: string
   }): Promise<{ provider: string; model: string }> =>
     ipcRenderer.invoke('agent:send-message', request),
   onAgentStream: (callback: (chunk: string) => void): (() => void) => {
@@ -103,6 +104,29 @@ const electronAPI = {
     ipcRenderer.invoke('memory:extract-summary', messages),
   memoryClear: (): Promise<void> =>
     ipcRenderer.invoke('memory:clear'),
+
+  // InsightGraph (optional knowledge-graph RAG)
+  insightGraphTestNeo4j: (uri: string, user: string, password: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('insightgraph:test-neo4j', uri, user, password),
+  insightGraphIngest: (
+    filePath: string,
+  ): Promise<{ ok: true; result: Record<string, unknown> } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('insightgraph:ingest', filePath),
+  insightGraphQuery: (
+    question: string,
+    sessionId?: string,
+  ): Promise<{ ok: true; result: Record<string, unknown> } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('insightgraph:query', question, sessionId),
+  insightGraphListReports: (): Promise<
+    { ok: true; reports: Record<string, unknown>[] } | { ok: false; error: string }
+  > => ipcRenderer.invoke('insightgraph:list-reports'),
+  insightGraphCreateSession: (): Promise<{ ok: true; sessionId: string } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('insightgraph:create-session'),
+  onInsightGraphProgress: (callback: (event: { stage: string; reportId?: string; [k: string]: unknown }) => void): (() => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, ev: { stage: string; reportId?: string }) => callback(ev)
+    ipcRenderer.on('insightgraph:progress', handler)
+    return () => ipcRenderer.removeListener('insightgraph:progress', handler)
+  },
 
   // Platform info
   platform: process.platform,

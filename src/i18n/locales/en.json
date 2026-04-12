@@ -38,7 +38,8 @@
     "openSettings": "Open Settings",
     "toggleAgent": "Toggle AI Assistant",
     "toggleFocusMode": "Toggle Focus Mode",
-    "togglePrivacy": "Toggle Privacy Mode"
+    "togglePrivacy": "Toggle Privacy Mode",
+    "insightGraphIngest": "Save Document to Knowledge Graph"
   },
   "settings": {
     "title": "Settings",
@@ -88,6 +89,33 @@
       "clearMemoryDesc": "Remove all stored conversation history and preferences.",
       "cleared": "Memory cleared"
     },
+    "insightgraph": {
+      "title": "Knowledge Graph",
+      "description": "Save documents as nodes in a Neo4j knowledge graph and ask questions across them. Uses your active AI provider for extraction. Requires a running Neo4j instance.",
+      "enable": "Enable Knowledge Graph",
+      "enableDesc": "Turn on graph-RAG features. When enabled, the AI assistant gets extra context from your ingested documents.",
+      "neo4j": "Neo4j Connection",
+      "uri": "Bolt URI",
+      "uriPlaceholder": "bolt://localhost:7687",
+      "user": "Username",
+      "userPlaceholder": "neo4j",
+      "password": "Password",
+      "passwordPlaceholder": "Enter password",
+      "testConnection": "Test Connection",
+      "connectionSuccess": "Connected!",
+      "connectionFailed": "Connection failed",
+      "domain": "Extraction Domain",
+      "domainDefault": "Default",
+      "domainStock": "Stock Analysis",
+      "domainRestaurant": "Restaurant Analysis",
+      "providerWarning": "Knowledge Graph uses your active AI provider. Anthropic and Google are not OpenAI-compatible — switch to OpenAI, Ollama, or Custom to use this feature.",
+      "reports": "Ingested Documents",
+      "noReports": "No documents ingested yet. Use the command palette or right-click a file in the explorer to save it to the graph.",
+      "refreshReports": "Refresh",
+      "entities": "entities",
+      "claims": "claims",
+      "relationships": "relationships"
+    },
     "close": "Close"
   },
   "agent": {
@@ -115,6 +143,17 @@
     "noModel": "No AI model",
     "ready": "Ready",
     "privacyOn": "Privacy Mode",
-    "privacyOn": "Privacy Mode"
+    "ingest": {
+      "parsing": "Parsing document…",
+      "extracting": "Extracting entities…",
+      "resolving": "Resolving duplicates…",
+      "writing": "Writing to graph…",
+      "completed": "Saved to graph",
+      "failed": "Ingest failed"
+    }
+  },
+  "filetree": {
+    "saveToGraph": "Save to Knowledge Graph",
+    "savingToGraph": "Saving…"
   }
 }

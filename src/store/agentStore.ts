@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import type { AIProvider } from './settingsStore'
+import { useSettingsStore } from './settingsStore'
+import { useInsightGraphStore } from './insightGraphStore'
 
 export interface ChatMessage {
   id: string
@@ -82,6 +84,42 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
         // Memory not available
       }
 
+      // Gather knowledge-graph RAG context (optional, best-effort)
+      let graphContext: string | undefined
+      const graphEnabled = useSettingsStore.getState().insightGraph.enabled
+      if (graphEnabled) {
+        try {
+          const sessionId = await useInsightGraphStore.getState().ensureSession()
+          const res = await window.electronAPI.insightGraphQuery(content, sessionId ?? undefined)
+          if (res.ok) {
+            const r = res.result as Record<string, unknown>
+            const parts: string[] = []
+            if (r.answer) parts.push(`Answer: ${String(r.answer)}`)
+            if (Array.isArray(r.keyFindings) && r.keyFindings.length) {
+              parts.push(`Key findings:\n- ${(r.keyFindings as unknown[]).map((f) => String(f)).join('\n- ')}`)
+            }
+            if (Array.isArray(r.evidence) && r.evidence.length) {
+              const ev = (r.evidence as unknown[])
+                .slice(0, 5)
+                .map((e) => {
+                  if (typeof e === 'string') return e
+                  if (e && typeof e === 'object') {
+                    const obj = e as Record<string, unknown>
+                    return String(obj.text ?? obj.claim ?? JSON.stringify(obj))
+                  }
+                  return String(e)
+                })
+                .join('\n- ')
+              parts.push(`Evidence:\n- ${ev}`)
+            }
+            if (r.confidence !== undefined) parts.push(`Confidence: ${String(r.confidence)}`)
+            if (parts.length) graphContext = parts.join('\n\n')
+          }
+        } catch {
+          // Graph RAG best-effort — don't block chat.
+        }
+      }
+
       // Build message history
       const history = get().messages.map((m) => ({
         role: m.role as 'user' | 'assistant' | 'system',
@@ -96,6 +134,7 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
         messages: history,
         documentContext: documentContext ?? undefined,
         memoryContext,
+        graphContext,
       })
 
       cleanup()

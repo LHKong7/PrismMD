@@ -3,6 +3,7 @@ import { registerThemeHandlers } from './themeHandlers'
 import { registerAnnotationHandlers } from './annotationHandlers'
 import { registerSettingsHandlers } from './settingsHandlers'
 import { registerAgentHandlers } from './agentHandlers'
+import { registerInsightGraphHandlers } from './insightGraphHandlers'
 import { getMainWindow } from '../main'
 
 /**
@@ -19,4 +20,5 @@ export function registerIpcHandlers() {
   registerAnnotationHandlers()
   registerSettingsHandlers()
   registerAgentHandlers()
+  registerInsightGraphHandlers()
 }

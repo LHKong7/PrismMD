@@ -38,7 +38,8 @@
     "openSettings": "打开设置",
     "toggleAgent": "切换 AI 助手",
     "toggleFocusMode": "切换专注模式",
-    "togglePrivacy": "切换隐私模式"
+    "togglePrivacy": "切换隐私模式",
+    "insightGraphIngest": "将当前文档存入知识图谱"
   },
   "settings": {
     "title": "设置",
@@ -88,6 +89,33 @@
       "clearMemoryDesc": "删除所有存储的对话历史与偏好。",
       "cleared": "记忆已清除"
     },
+    "insightgraph": {
+      "title": "知识图谱",
+      "description": "将文档存入 Neo4j 知识图谱，并跨文档提问。使用当前激活的 AI 服务进行抽取，需要本地或远程的 Neo4j 实例。",
+      "enable": "启用知识图谱",
+      "enableDesc": "开启图谱增强的问答。启用后 AI 助手会引入已存储文档中的上下文。",
+      "neo4j": "Neo4j 连接",
+      "uri": "Bolt 地址",
+      "uriPlaceholder": "bolt://localhost:7687",
+      "user": "用户名",
+      "userPlaceholder": "neo4j",
+      "password": "密码",
+      "passwordPlaceholder": "请输入密码",
+      "testConnection": "测试连接",
+      "connectionSuccess": "连接成功！",
+      "connectionFailed": "连接失败",
+      "domain": "抽取领域",
+      "domainDefault": "默认",
+      "domainStock": "股票分析",
+      "domainRestaurant": "餐厅分析",
+      "providerWarning": "知识图谱使用当前激活的 AI 服务。Anthropic 与 Google 不兼容 OpenAI 协议——请切换至 OpenAI / Ollama / 自定义服务商使用此功能。",
+      "reports": "已存入的文档",
+      "noReports": "尚未存入任何文档。可在命令面板或资源管理器中右键文件存入图谱。",
+      "refreshReports": "刷新",
+      "entities": "实体",
+      "claims": "陈述",
+      "relationships": "关系"
+    },
     "close": "关闭"
   },
   "agent": {
@@ -115,6 +143,17 @@
     "noModel": "无 AI 模型",
     "ready": "就绪",
     "privacyOn": "隐私模式",
-    "privacyOn": "隐私模式"
+    "ingest": {
+      "parsing": "解析文档中…",
+      "extracting": "抽取实体中…",
+      "resolving": "消歧合并中…",
+      "writing": "写入图谱中…",
+      "completed": "已存入图谱",
+      "failed": "存入失败"
+    }
+  },
+  "filetree": {
+    "saveToGraph": "存入知识图谱",
+    "savingToGraph": "保存中…"
   }
 }

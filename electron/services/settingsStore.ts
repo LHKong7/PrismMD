@@ -7,6 +7,16 @@ interface ProviderConfig {
   baseUrl?: string
 }
 
+export interface InsightGraphSettings {
+  enabled: boolean
+  neo4j: {
+    uri: string
+    user: string
+    password: string
+  }
+  domain: 'default' | 'stock_analysis' | 'restaurant_analysis'
+}
+
 interface AppSettings {
   language: string
   themeId: string
@@ -15,6 +25,17 @@ interface AppSettings {
   privacyMode: boolean
   providers: Record<string, ProviderConfig>
   activeProvider: string | null
+  insightGraph: InsightGraphSettings
+}
+
+const DEFAULT_INSIGHT_GRAPH: InsightGraphSettings = {
+  enabled: false,
+  neo4j: {
+    uri: 'bolt://localhost:7687',
+    user: 'neo4j',
+    password: '',
+  },
+  domain: 'default',
 }
 
 const store = new Store<{ settings: AppSettings }>({
@@ -34,12 +55,29 @@ const store = new Store<{ settings: AppSettings }>({
         custom: { apiKey: '', model: '', enabled: false, baseUrl: '' },
       },
       activeProvider: null,
+      insightGraph: DEFAULT_INSIGHT_GRAPH,
     },
   },
 })
 
 export function loadSettings(): AppSettings {
-  return store.get('settings')
+  const s = store.get('settings')
+  // Defensive merge so older persisted settings don't crash on new fields.
+  return {
+    ...s,
+    insightGraph: {
+      ...DEFAULT_INSIGHT_GRAPH,
+      ...(s.insightGraph ?? {}),
+      neo4j: {
+        ...DEFAULT_INSIGHT_GRAPH.neo4j,
+        ...(s.insightGraph?.neo4j ?? {}),
+      },
+    },
+  }
+}
+
+export function getInsightGraphSettings(): InsightGraphSettings {
+  return loadSettings().insightGraph
 }
 
 export function saveSettings(settings: AppSettings): void {

@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { Command } from 'cmdk'
-import { FileText, Sun, Moon, Monitor, Settings, Bot, Shield, Eye } from 'lucide-react'
+import { FileText, Sun, Moon, Monitor, Settings, Bot, Shield, Eye, Network } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useUIStore } from '../../store/uiStore'
 import { useFileStore } from '../../store/fileStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useAgentStore } from '../../store/agentStore'
+import { useInsightGraphStore } from '../../store/insightGraphStore'
 import { applyTheme, getThemeById } from '../../lib/theme/themes'
 
 interface CommandPaletteProps {
@@ -25,7 +26,10 @@ export function CommandPalette({ onOpenSettings }: CommandPaletteProps) {
   const openFile = useFileStore((s) => s.openFile)
   const recentFiles = useFileStore((s) => s.recentFiles)
   const openFolders = useFileStore((s) => s.openFolders)
+  const currentFilePath = useFileStore((s) => s.currentFilePath)
   const toggleAgentSidebar = useAgentStore((s) => s.toggleAgentSidebar)
+  const insightGraphEnabled = useSettingsStore((s) => s.insightGraph.enabled)
+  const ingestFile = useInsightGraphStore((s) => s.ingestFile)
   const [search, setSearch] = useState('')
 
   useEffect(() => {
@@ -124,6 +128,16 @@ export function CommandPalette({ onOpenSettings }: CommandPaletteProps) {
               <Command.Item value="Toggle Focus" onSelect={() => { setFocusMode(!focusMode); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
                 <Eye size={14} /><span>{t('commandPalette.toggleFocusMode')}</span>
               </Command.Item>
+              {insightGraphEnabled && currentFilePath && (
+                <Command.Item
+                  value="Save Document to Knowledge Graph"
+                  onSelect={() => { ingestFile(currentFilePath); setOpen(false) }}
+                  className={cls}
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  <Network size={14} /><span>{t('commandPalette.insightGraphIngest')}</span>
+                </Command.Item>
+              )}
             </Command.Group>
           </Command.List>
         </Command>

@@ -12,6 +12,7 @@ interface SendMessageRequest {
   messages: ChatMessage[]
   documentContext?: string
   memoryContext?: string
+  graphContext?: string
 }
 
 let currentAbortController: AbortController | null = null
@@ -89,6 +90,10 @@ export async function sendMessage(
 
   if (request.documentContext) {
     systemParts.push(`\n## Current Document\n${request.documentContext}`)
+  }
+
+  if (request.graphContext) {
+    systemParts.push(`\n## Knowledge Graph Insights\n${request.graphContext}`)
   }
 
   systemParts.push('\nAnswer the user\'s questions based on the context above.')

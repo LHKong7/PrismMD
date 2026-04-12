@@ -1,9 +1,14 @@
-import { useState } from 'react'
-import { ChevronRight, FileText, Folder } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ChevronRight, FileText, Folder, Network } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { clsx } from 'clsx'
 import type { FileTreeNode } from '../../types/electron'
 import { useFileStore } from '../../store/fileStore'
+import { useSettingsStore } from '../../store/settingsStore'
+import { useInsightGraphStore } from '../../store/insightGraphStore'
 import { FileTree } from './FileTree'
+
+const MARKDOWN_EXTS = /\.(md|mdx|markdown)$/i
 
 interface FileTreeNodeItemProps {
   node: FileTreeNode
@@ -11,12 +16,18 @@ interface FileTreeNodeItemProps {
 }
 
 export function FileTreeNodeItem({ node, depth }: FileTreeNodeItemProps) {
+  const { t } = useTranslation()
   const [expanded, setExpanded] = useState(depth === 0)
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const currentFilePath = useFileStore((s) => s.currentFilePath)
   const openFile = useFileStore((s) => s.openFile)
+  const insightGraphEnabled = useSettingsStore((s) => s.insightGraph.enabled)
+  const ingestFile = useInsightGraphStore((s) => s.ingestFile)
 
   const isActive = node.type === 'file' && node.path === currentFilePath
   const paddingLeft = 8 + depth * 16
+  const isMarkdownFile = node.type === 'file' && MARKDOWN_EXTS.test(node.name)
+  const canIngest = insightGraphEnabled && isMarkdownFile
 
   const handleClick = () => {
     if (node.type === 'directory') {
@@ -26,10 +37,32 @@ export function FileTreeNodeItem({ node, depth }: FileTreeNodeItemProps) {
     }
   }
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+    if (!canIngest) return
+    e.preventDefault()
+    setMenu({ x: e.clientX, y: e.clientY })
+  }
+
+  useEffect(() => {
+    if (!menu) return
+    const close = () => setMenu(null)
+    window.addEventListener('click', close)
+    window.addEventListener('scroll', close, true)
+    window.addEventListener('resize', close)
+    window.addEventListener('keydown', close)
+    return () => {
+      window.removeEventListener('click', close)
+      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('resize', close)
+      window.removeEventListener('keydown', close)
+    }
+  }, [menu])
+
   return (
     <div>
       <button
         onClick={handleClick}
+        onContextMenu={handleContextMenu}
         className={clsx(
           'w-full flex items-center gap-1.5 py-1 px-1 text-left text-sm transition-colors',
           'hover:bg-black/5 dark:hover:bg-white/5',
@@ -60,6 +93,31 @@ export function FileTreeNodeItem({ node, depth }: FileTreeNodeItemProps) {
 
       {node.type === 'directory' && expanded && node.children && (
         <FileTree nodes={node.children} depth={depth + 1} />
+      )}
+
+      {menu && canIngest && (
+        <div
+          className="fixed z-50 min-w-[200px] rounded-md border shadow-lg py-1 text-xs"
+          style={{
+            left: menu.x,
+            top: menu.y,
+            backgroundColor: 'var(--bg-primary)',
+            borderColor: 'var(--border-color)',
+            color: 'var(--text-secondary)',
+          }}
+        >
+          <button
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-black/5 dark:hover:bg-white/5"
+            onClick={(e) => {
+              e.stopPropagation()
+              setMenu(null)
+              ingestFile(node.path)
+            }}
+          >
+            <Network size={12} />
+            <span>{t('filetree.saveToGraph')}</span>
+          </button>
+        </div>
       )}
     </div>
   )

@@ -10,6 +10,28 @@ export interface AIProviderConfig {
   baseUrl?: string // For Ollama / LM Studio custom endpoints
 }
 
+export type InsightGraphDomain = 'default' | 'stock_analysis' | 'restaurant_analysis'
+
+export interface InsightGraphConfig {
+  enabled: boolean
+  neo4j: {
+    uri: string
+    user: string
+    password: string
+  }
+  domain: InsightGraphDomain
+}
+
+export const DEFAULT_INSIGHT_GRAPH_CONFIG: InsightGraphConfig = {
+  enabled: false,
+  neo4j: {
+    uri: 'bolt://localhost:7687',
+    user: 'neo4j',
+    password: '',
+  },
+  domain: 'default',
+}
+
 export const DEFAULT_MODELS: Record<AIProvider, string[]> = {
   openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
   anthropic: ['claude-sonnet-4-20250514', 'claude-haiku-4-20250414', 'claude-3-5-sonnet-20241022'],
@@ -37,6 +59,9 @@ interface SettingsStore {
   // Focus mode
   focusMode: boolean
 
+  // InsightGraph (optional RAG over a Neo4j knowledge graph)
+  insightGraph: InsightGraphConfig
+
   // Actions
   setLanguage: (lang: SupportedLanguage) => void
   setThemeId: (id: string) => void
@@ -46,6 +71,7 @@ interface SettingsStore {
   setProviderConfig: (provider: AIProvider, config: Partial<AIProviderConfig>) => void
   setActiveProvider: (provider: AIProvider | null) => void
   setFocusMode: (enabled: boolean) => void
+  setInsightGraphConfig: (config: Partial<InsightGraphConfig> & { neo4j?: Partial<InsightGraphConfig['neo4j']> }) => void
 
   // Persistence
   loadSettings: () => Promise<void>
@@ -59,6 +85,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   vibrancy: false,
   privacyMode: false,
   focusMode: false,
+  insightGraph: DEFAULT_INSIGHT_GRAPH_CONFIG,
 
   providers: {
     openai: { apiKey: '', model: 'gpt-4o', enabled: false },
@@ -123,6 +150,20 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
   setFocusMode: (focusMode) => set({ focusMode }),
 
+  setInsightGraphConfig: (config) => {
+    set((state) => ({
+      insightGraph: {
+        ...state.insightGraph,
+        ...config,
+        neo4j: {
+          ...state.insightGraph.neo4j,
+          ...(config.neo4j ?? {}),
+        },
+      },
+    }))
+    get().saveSettings()
+  },
+
   loadSettings: async () => {
     try {
       const raw = await window.electronAPI.loadSettings()
@@ -136,6 +177,14 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
           privacyMode: (s.privacyMode as boolean) ?? false,
           providers: { ...get().providers, ...(s.providers as Record<AIProvider, AIProviderConfig>) },
           activeProvider: (s.activeProvider as AIProvider | null) ?? null,
+          insightGraph: {
+            ...DEFAULT_INSIGHT_GRAPH_CONFIG,
+            ...((s.insightGraph as Partial<InsightGraphConfig>) ?? {}),
+            neo4j: {
+              ...DEFAULT_INSIGHT_GRAPH_CONFIG.neo4j,
+              ...(((s.insightGraph as Partial<InsightGraphConfig>)?.neo4j) ?? {}),
+            },
+          },
         })
       }
     } catch {
@@ -144,10 +193,10 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   },
 
   saveSettings: async () => {
-    const { language, themeId, themeMode, vibrancy, privacyMode, providers, activeProvider } = get()
+    const { language, themeId, themeMode, vibrancy, privacyMode, providers, activeProvider, insightGraph } = get()
     try {
       await window.electronAPI.saveSettings({
-        language, themeId, themeMode, vibrancy, privacyMode, providers, activeProvider,
+        language, themeId, themeMode, vibrancy, privacyMode, providers, activeProvider, insightGraph,
       })
     } catch {
       // Silently fail
