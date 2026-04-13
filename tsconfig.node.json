@@ -15,6 +15,7 @@
     "electron/**/*.ts",
     "app.config.ts",
     "forge.config.ts",
+    "build-config/**/*.ts",
     "vite.main.config.ts",
     "vite.preload.config.ts",
     "vite.renderer.config.ts"

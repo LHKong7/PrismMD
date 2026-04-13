@@ -1,20 +1,28 @@
 import type { ForgeConfig } from '@electron-forge/shared-types'
 import { VitePlugin } from '@electron-forge/plugin-vite'
-import { MakerDMG } from '@electron-forge/maker-dmg'
-import { MakerZIP } from '@electron-forge/maker-zip'
-import { MakerSquirrel } from '@electron-forge/maker-squirrel'
-import { MakerDeb } from '@electron-forge/maker-deb'
 import { appConfig } from './app.config'
+import { resolveProfile } from './build-config/profiles'
+
+/**
+ * Electron Forge configuration.
+ *
+ * App identity (name, bundle id, icon, file associations, …) is shared
+ * across every run. Anything that legitimately varies between
+ * `npm run dev` and `npm run package` / `npm run make` is pulled from the
+ * active build profile. See `build-config/profiles.ts`.
+ */
+const profile = resolveProfile()
+
+// Surface the active profile once at config-load so it's obvious which
+// variant Forge is about to use.
+// eslint-disable-next-line no-console
+console.log(`[forge] active build profile: ${profile.name}`)
 
 const config: ForgeConfig = {
   packagerConfig: {
-    asar: {
-      unpack: '**/node_modules/{chokidar,fsevents}/**',
-    },
     appBundleId: appConfig.appBundleId,
     name: appConfig.name,
     executableName: appConfig.executableName,
-    appCopyright: `Copyright © ${new Date().getFullYear()} ${appConfig.name}`,
     ...(appConfig.icon ? { icon: appConfig.icon } : {}),
     extendInfo: {
       CFBundleDocumentTypes: [
@@ -26,24 +34,11 @@ const config: ForgeConfig = {
         },
       ],
     },
+    // Profile-specific overrides win over any shared defaults above.
+    ...profile.packagerOverrides,
   },
-  makers: [
-    new MakerDMG({
-      ...(appConfig.icon ? { icon: `${appConfig.icon}.icns` } : {}),
-    }),
-    new MakerZIP({}, ['darwin']),
-    new MakerSquirrel({
-      name: appConfig.name,
-      ...(appConfig.icon ? { iconUrl: `${appConfig.icon}.ico`, setupIcon: `${appConfig.icon}.ico` } : {}),
-    }),
-    new MakerDeb({
-      options: {
-        categories: ['Utility'],
-        mimeType: ['text/markdown'],
-        ...(appConfig.icon ? { icon: `${appConfig.icon}.png` } : {}),
-      },
-    }),
-  ],
+  makers: profile.makers,
+  outDir: profile.outDir,
   plugins: [
     new VitePlugin({
       build: [
