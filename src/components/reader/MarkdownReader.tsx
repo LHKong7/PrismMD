@@ -1,9 +1,10 @@
-import { useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useFileStore } from '../../store/fileStore'
 import { useMarkdown } from '../../hooks/useMarkdown'
 import { useReadingProgress } from '../../hooks/useReadingProgress'
 import { useEntityLinking } from '../../hooks/useEntityLinking'
+import { useReaderDomStore } from '../../store/readerDomStore'
 import { DocSummary } from './DocSummary'
 import { ContradictionBanner } from '../graph/ContradictionBanner'
 import { FileText, FolderOpen, Upload } from 'lucide-react'
@@ -21,6 +22,14 @@ export function MarkdownReader() {
 
   useReadingProgress(scrollRef)
   useEntityLinking(markdownBodyRef)
+
+  // Publish the current markdown-body element so features outside this
+  // subtree (e.g. chat citations) can resolve evidence back to ranges.
+  const setMarkdownBody = useReaderDomStore((s) => s.setMarkdownBody)
+  useEffect(() => {
+    setMarkdownBody(markdownBodyRef.current)
+    return () => setMarkdownBody(null)
+  }, [setMarkdownBody, currentContent])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()

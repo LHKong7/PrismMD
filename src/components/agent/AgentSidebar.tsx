@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next'
 import { useAgentStore } from '../../store/agentStore'
 import { useFileStore } from '../../store/fileStore'
 import { useSettingsStore, DEFAULT_MODELS, type AIProvider } from '../../store/settingsStore'
-import { ChatMessage } from './ChatMessage'
+import { ChatMessage, renderWithCitations } from './ChatMessage'
+import { useReaderDomStore } from '../../store/readerDomStore'
 import { clsx } from 'clsx'
 
 export function AgentSidebar() {
@@ -16,6 +17,8 @@ export function AgentSidebar() {
   const messages = useAgentStore((s) => s.messages)
   const isStreaming = useAgentStore((s) => s.isStreaming)
   const streamingContent = useAgentStore((s) => s.streamingContent)
+  const pendingEvidence = useAgentStore((s) => s.pendingEvidence)
+  const scrollToEvidence = useReaderDomStore((s) => s.scrollToEvidence)
   const sendMessage = useAgentStore((s) => s.sendMessage)
   const stopGeneration = useAgentStore((s) => s.stopGeneration)
   const clearMessages = useAgentStore((s) => s.clearMessages)
@@ -156,7 +159,9 @@ export function AgentSidebar() {
                   <Bot size={14} style={{ color: 'var(--accent-color)' }} />
                 </div>
                 <div className="text-sm leading-relaxed whitespace-pre-wrap break-words" style={{ color: 'var(--text-secondary)' }}>
-                  {streamingContent}
+                  {renderWithCitations(streamingContent, pendingEvidence, (ev) =>
+                    scrollToEvidence(ev.text),
+                  )}
                   <span className="inline-block w-1.5 h-4 ml-0.5 animate-pulse" style={{ backgroundColor: 'var(--accent-color)' }} />
                 </div>
               </div>

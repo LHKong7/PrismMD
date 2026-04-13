@@ -94,6 +94,15 @@ export async function sendMessage(
 
   if (request.graphContext) {
     systemParts.push(`\n## Knowledge Graph Insights\n${request.graphContext}`)
+    // Explicit citation instruction — the renderer parses these exact
+    // `[N]` markers to render interactive superscripts.
+    systemParts.push(
+      '\nWhenever you use information from the Knowledge Graph Insights section, ' +
+        'cite it inline with the matching bracketed number(s), e.g. ' +
+        '"revenue grew 30% year over year [2]". Cite each claim at most once, ' +
+        'right after the sentence it supports, and never invent citation numbers ' +
+        'that were not listed in the Evidence block.',
+    )
   }
 
   systemParts.push('\nAnswer the user\'s questions based on the context above.')
