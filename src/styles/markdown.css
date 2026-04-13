@@ -163,3 +163,17 @@
 .markdown-body .katex {
   font-size: 1.05em;
 }
+
+/* Pulse animation used by citation scroll-into-view + any feature that
+   wants to briefly flash a passage. Colors ride the theme's accent var so
+   light/dark/custom themes all look right. */
+.prism-citation-pulse {
+  animation: prism-pulse 1.6s ease-out;
+  border-radius: 4px;
+}
+
+@keyframes prism-pulse {
+  0%   { background-color: color-mix(in srgb, var(--accent-color) 30%, transparent); }
+  60%  { background-color: color-mix(in srgb, var(--accent-color) 20%, transparent); }
+  100% { background-color: transparent; }
+}

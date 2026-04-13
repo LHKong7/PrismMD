@@ -202,6 +202,102 @@ export async function listReports(): Promise<Record<string, unknown>[]> {
   return ig.listReports()
 }
 
+export async function getReport(reportId: string): Promise<Record<string, unknown> | null> {
+  const ig = await getInstance()
+  return ig.getReport(reportId)
+}
+
+export async function findEntities(
+  query: { name?: string; type?: string; limit?: number } = {},
+): Promise<Record<string, unknown>[]> {
+  const ig = await getInstance()
+  return ig.findEntities(query)
+}
+
+export async function getEntity(entityId: string): Promise<Record<string, unknown> | null> {
+  const ig = await getInstance()
+  return ig.getEntity(entityId)
+}
+
+export async function getEntityProfile(entityName: string): Promise<Record<string, unknown>> {
+  const ig = await getInstance()
+  return ig.getEntityProfile(entityName)
+}
+
+export async function getClaimsAbout(entityName: string): Promise<Record<string, unknown>[]> {
+  const ig = await getInstance()
+  return ig.getClaimsAbout(entityName)
+}
+
+export async function getEntityMetrics(entityName: string): Promise<Record<string, unknown>[]> {
+  const ig = await getInstance()
+  return ig.getEntityMetrics(entityName)
+}
+
+export async function getMetricHistory(
+  metricName: string,
+  entityName?: string,
+): Promise<Record<string, unknown>[]> {
+  const ig = await getInstance()
+  return ig.getMetricHistory(metricName, entityName)
+}
+
+export async function findEvidenceForClaim(claimId: string): Promise<Record<string, unknown>[]> {
+  const ig = await getInstance()
+  return ig.findEvidenceForClaim(claimId)
+}
+
+export async function getSubgraph(
+  nodeId: string,
+  depth?: number,
+): Promise<{ nodes: unknown[]; edges: unknown[] }> {
+  const ig = await getInstance()
+  return ig.getSubgraph(nodeId, depth)
+}
+
+export async function getEntityRelationships(
+  entityName: string,
+): Promise<Record<string, unknown>[]> {
+  const ig = await getInstance()
+  return ig.getEntityRelationships(entityName)
+}
+
+export async function findPath(
+  entityA: string,
+  entityB: string,
+  maxDepth?: number,
+): Promise<{ nodes: unknown[]; edges: unknown[]; found: boolean }> {
+  const ig = await getInstance()
+  return ig.findPath(entityA, entityB, maxDepth)
+}
+
+export async function compareEntityAcrossReports(
+  entityName: string,
+): Promise<Record<string, unknown>> {
+  const ig = await getInstance()
+  return ig.compareEntityAcrossReports(entityName)
+}
+
+export async function findMetricTrend(
+  entityName: string,
+  metricName: string,
+): Promise<Record<string, unknown>> {
+  const ig = await getInstance()
+  return ig.findMetricTrend(entityName, metricName)
+}
+
+export async function findContradictions(
+  entityName: string,
+): Promise<Record<string, unknown>[]> {
+  const ig = await getInstance()
+  return ig.findContradictions(entityName)
+}
+
+export async function entityTimeline(entityName: string): Promise<Record<string, unknown>[]> {
+  const ig = await getInstance()
+  return ig.entityTimeline(entityName)
+}
+
 export function createSession(): Promise<string> {
   return getInstance().then((ig) => ig.createSession())
 }

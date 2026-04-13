@@ -1,5 +1,5 @@
 import { ipcMain } from 'electron'
-import { sendMessage, stopGeneration, testConnection } from '../services/aiService'
+import { sendMessage, sendOneShot, stopGeneration, testConnection } from '../services/aiService'
 import { saveMemory, getMemoryContext, clearMemory, extractSummaryFromConversation } from '../services/memoryService'
 import { getMainWindow } from '../main'
 
@@ -17,6 +17,21 @@ export function registerAgentHandlers() {
   ipcMain.handle('agent:test-connection', async (_event, provider: string, apiKey: string, baseUrl?: string) => {
     return testConnection(provider, apiKey, baseUrl)
   })
+
+  ipcMain.handle(
+    'agent:one-shot',
+    async (
+      _event,
+      request: { prompt: string; systemPrompt?: string; jsonSchema?: Record<string, unknown> },
+    ) => {
+      try {
+        const result = await sendOneShot(request)
+        return { ok: true as const, result }
+      } catch (err) {
+        return { ok: false as const, error: err instanceof Error ? err.message : String(err) }
+      }
+    },
+  )
 
   // Memory handlers
   ipcMain.handle('memory:save', async (_event, filePath: string, summary: string, topics: string[]) => {
