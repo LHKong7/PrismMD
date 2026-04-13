@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useUIStore, type GraphScope } from '../../store/uiStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
 import { useSettingsStore } from '../../store/settingsStore'
+import { useFileStore } from '../../store/fileStore'
 import { Loader2, Network, AlertCircle, Globe, FileText, Target, BookOpen } from 'lucide-react'
 import ForceGraph2D from 'react-force-graph-2d'
 // NOTE: the force-graph library extends the node objects with simulation
@@ -52,6 +53,7 @@ export function GraphView() {
   const insightGraphEnabled = useSettingsStore((s) => s.insightGraph.enabled)
   const reports = useInsightGraphStore((s) => s.reports)
   const refreshReports = useInsightGraphStore((s) => s.refreshReports)
+  const currentFilePath = useFileStore((s) => s.currentFilePath)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 800, height: 600 })
@@ -96,12 +98,37 @@ export function GraphView() {
             2,
           )) as typeof result
         } else if (scope === 'document') {
-          // MVP: there's no direct report→entities index yet, so we
-          // approximate "this document's neighborhood" by collecting all
-          // entities then trimming. The Document scope exists as a
-          // first-class option so B5 / B6 can plug a precise mapping in
-          // later without changing the UI.
-          result = (await window.electronAPI.insightGraphGlobalGraph(60)) as typeof result
+          // Resolve the Neo4j report matching the currently-open file (by
+          // filename — Neo4j stores `Report.source_filename`, and the SDK
+          // writes its own `report_id` that doesn't line up with the UUID
+          // the ingest response returns). Fall back to the most recent
+          // report, then to the bounded global graph.
+          const storeReports = useInsightGraphStore.getState().reports
+          const targetName = currentFilePath
+            ? currentFilePath.split(/[/\\]/).pop()
+            : undefined
+          const matched =
+            (targetName &&
+              storeReports.find(
+                (r) => r.filename === targetName || r.filePath === currentFilePath,
+              )) ||
+            storeReports[0]
+          if (matched?.reportId) {
+            const entitiesRes = await window.electronAPI.insightGraphEntitiesForReport(
+              matched.reportId,
+            )
+            if (entitiesRes.ok && entitiesRes.data.length > 0) {
+              result = (await window.electronAPI.insightGraphBuildSubgraphFromEntities(
+                entitiesRes.data,
+                { maxEntities: 120 },
+              )) as typeof result
+            } else if (!entitiesRes.ok) {
+              result = entitiesRes as typeof result
+            }
+          }
+          if (!result) {
+            result = (await window.electronAPI.insightGraphGlobalGraph(60)) as typeof result
+          }
         }
 
         if (cancelled) return
@@ -136,7 +163,7 @@ export function GraphView() {
     return () => {
       cancelled = true
     }
-  }, [scope, focusedEntity, insightGraphEnabled])
+  }, [scope, focusedEntity, insightGraphEnabled, reports, currentFilePath])
 
   // Make sure reports are fresh — helps the empty state tell the user
   // whether they've ingested anything yet.

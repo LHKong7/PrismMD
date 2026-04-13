@@ -149,19 +149,22 @@ export const useInsightGraphStore = create<InsightGraphStore>((set, get) => {
           return false
         }
         const result = res.result as Record<string, unknown>
-        const report: IngestedReport = {
-          reportId: String(result.reportId ?? ''),
-          filePath,
-          filename: filenameOf(filePath),
-          entities: Number(result.entities ?? 0),
-          claims: Number(result.claims ?? 0),
-          relationships: Number(result.relationships ?? 0),
-          ingestedAt: Date.now(),
-        }
-        set((state) => ({
-          reports: [report, ...state.reports.filter((r) => r.reportId !== report.reportId)],
-          ingest: { filePath, stage: 'completed', reportId: report.reportId },
-        }))
+        // NOTE: the SDK's `reportId` in the ingest response is a stage-token
+        // (randomUUID), NOT the `report_id` property written into Neo4j —
+        // the writer sets `Report.report_id` to `doc.id`, a different UUID.
+        // So we rehydrate the canonical reports from Neo4j and match by
+        // source filename instead of trusting the ingest-response id.
+        await get().refreshReports()
+        const match = get().reports.find((r) => r.filePath === filePath || r.filename === filenameOf(filePath))
+        const reportId = match?.reportId ?? ''
+        set({
+          ingest: {
+            filePath,
+            stage: 'completed',
+            reportId,
+          },
+        })
+        void result
         return true
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
@@ -177,17 +180,25 @@ export const useInsightGraphStore = create<InsightGraphStore>((set, get) => {
           set({ lastError: res.error })
           return
         }
-        const reports: IngestedReport[] = res.reports.map((r) => ({
-          reportId: String(r.reportId ?? r.id ?? ''),
-          filePath: (r.source_path as string | undefined) ?? (r.filePath as string | undefined),
-          filename:
-            (r.filename as string | undefined) ??
-            (r.source_path ? filenameOf(String(r.source_path)) : undefined),
-          entities: Number(r.entities ?? 0),
-          claims: Number(r.claims ?? 0),
-          relationships: Number(r.relationships ?? 0),
-          ingestedAt: Number(r.created_at ?? Date.now()),
-        }))
+        const reports: IngestedReport[] = res.reports.map((r) => {
+          const sourcePath =
+            (r.source_path as string | undefined) ?? (r.filePath as string | undefined)
+          const sourceFilename = r.source_filename as string | undefined
+          return {
+            // Neo4j stores the property as snake_case `report_id`; the SDK
+            // surfaces raw properties, so check that first.
+            reportId: String(r.report_id ?? r.reportId ?? r.id ?? ''),
+            filePath: sourcePath,
+            filename:
+              (r.filename as string | undefined) ??
+              sourceFilename ??
+              (sourcePath ? filenameOf(sourcePath) : undefined),
+            entities: Number(r.entities ?? 0),
+            claims: Number(r.claims ?? 0),
+            relationships: Number(r.relationships ?? 0),
+            ingestedAt: Number(r.created_at ?? Date.now()),
+          }
+        })
         set({ reports })
       } catch (err) {
         set({ lastError: err instanceof Error ? err.message : String(err) })
