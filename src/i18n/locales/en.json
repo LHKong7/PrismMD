@@ -150,7 +150,23 @@
       "refreshReports": "Refresh",
       "entities": "entities",
       "claims": "claims",
-      "relationships": "relationships"
+      "relationships": "relationships",
+      "entityLinking": "Link entities in text",
+      "entityLinkingDesc": "Underline known entity names in the reader. Click an underlined entity to open its profile in the side panel. Costs one DOM walk per document open."
+    },
+    "related": {
+      "noFile": "Open a document to see what's related.",
+      "notIngested": "Save this document to the Knowledge Graph to see related documents.",
+      "loading": "Finding related documents…",
+      "error": "Couldn't load related documents",
+      "none": "No other documents share entities with this one yet.",
+      "sharedCount": "Shares {{count}} entity",
+      "sharedCount_other": "Shares {{count}} entities"
+    },
+    "contradictionBanner": {
+      "title": "{{total}} contradictory claims found across {{entities}} entities",
+      "body": "Open an entity to see the conflicting statements side by side.",
+      "dismiss": "Dismiss"
     },
     "close": "Close"
   },

@@ -3,7 +3,9 @@ import { useTranslation } from 'react-i18next'
 import { useFileStore } from '../../store/fileStore'
 import { useMarkdown } from '../../hooks/useMarkdown'
 import { useReadingProgress } from '../../hooks/useReadingProgress'
+import { useEntityLinking } from '../../hooks/useEntityLinking'
 import { DocSummary } from './DocSummary'
+import { ContradictionBanner } from '../graph/ContradictionBanner'
 import { FileText, FolderOpen, Upload } from 'lucide-react'
 import '../../styles/markdown.css'
 import '../../styles/cjk.css'
@@ -15,8 +17,10 @@ export function MarkdownReader() {
   const openFolderDialog = useFileStore((s) => s.openFolderDialog)
   const { content, isProcessing } = useMarkdown(currentContent)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const markdownBodyRef = useRef<HTMLDivElement>(null)
 
   useReadingProgress(scrollRef)
+  useEntityLinking(markdownBodyRef)
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -109,8 +113,9 @@ export function MarkdownReader() {
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
+      <ContradictionBanner />
       <DocSummary />
-      <div className="markdown-body">
+      <div className="markdown-body" ref={markdownBodyRef}>
         {content}
       </div>
     </div>

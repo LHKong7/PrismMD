@@ -489,6 +489,86 @@ export async function getGlobalGraph(maxEntities = 80): Promise<RenderedGraph> {
   return buildSubgraphFromEntities(names, { maxEntities })
 }
 
+export interface RelatedReport {
+  reportId: string
+  title?: string
+  date?: string
+  sourcePath?: string
+  sharedEntities: string[]
+  sharedEntityCount: number
+}
+
+/**
+ * Entities belonging to a given report, fetched via a single Cypher
+ * round-trip. The SDK doesn't expose a "report → entities" index so we
+ * reach for a short-lived Neo4j driver using the same credentials the
+ * main `InsightGraph` instance would have configured.
+ *
+ * Using a side driver keeps concurrency safe — the live InsightGraph
+ * session stays dedicated to the pipeline — and avoids reaching into
+ * the SDK's private Neo4jConnection.
+ */
+async function withUserNeo4jSession<T>(fn: (session: ReturnType<ReturnType<typeof neo4j.driver>['session']>) => Promise<T>): Promise<T> {
+  const settings = getInsightGraphSettings()
+  if (!settings.enabled) {
+    throw new InsightGraphConfigError('Knowledge Graph is disabled in Settings.')
+  }
+  const driver = neo4j.driver(
+    settings.neo4j.uri,
+    neo4j.auth.basic(settings.neo4j.user, settings.neo4j.password),
+  )
+  const session = driver.session()
+  try {
+    return await fn(session)
+  } finally {
+    await session.close().catch(() => {})
+    await driver.close().catch(() => {})
+  }
+}
+
+export async function getEntitiesForReport(reportId: string): Promise<string[]> {
+  return withUserNeo4jSession(async (session) => {
+    const result = await session.run(
+      'MATCH (r:Report {report_id: $reportId})<-[:SOURCED_FROM]-(e:Entity) ' +
+        'RETURN DISTINCT coalesce(e.canonical_name, e.name) AS name',
+      { reportId },
+    )
+    return result.records
+      .map((r) => String(r.get('name') ?? ''))
+      .filter((n) => n.length > 0)
+  })
+}
+
+/**
+ * Reports that share at least one entity with the given report, sorted by
+ * overlap count. Powers the Related Rail (B4). Capped at 20 to keep the
+ * UI snappy — shared-entity overlap is the important signal, not a long
+ * tail.
+ */
+export async function getRelatedReports(reportId: string, limit = 20): Promise<RelatedReport[]> {
+  return withUserNeo4jSession(async (session) => {
+    const result = await session.run(
+      'MATCH (r1:Report {report_id: $reportId})<-[:SOURCED_FROM]-(e:Entity)-[:SOURCED_FROM]->(r2:Report) ' +
+        'WHERE r1 <> r2 ' +
+        'WITH r2, collect(DISTINCT coalesce(e.canonical_name, e.name)) AS names ' +
+        'RETURN r2.report_id AS reportId, r2.title AS title, r2.date AS date, ' +
+        '       r2.source_path AS sourcePath, names AS sharedEntities, ' +
+        '       size(names) AS sharedEntityCount ' +
+        'ORDER BY sharedEntityCount DESC ' +
+        'LIMIT $limit',
+      { reportId, limit: neo4j.int(limit) },
+    )
+    return result.records.map((r) => ({
+      reportId: String(r.get('reportId')),
+      title: (r.get('title') as string | null) ?? undefined,
+      date: (r.get('date') as string | null) ?? undefined,
+      sourcePath: (r.get('sourcePath') as string | null) ?? undefined,
+      sharedEntities: (r.get('sharedEntities') as string[]).filter(Boolean),
+      sharedEntityCount: Number(r.get('sharedEntityCount') ?? 0),
+    }))
+  })
+}
+
 export function createSession(): Promise<string> {
   return getInstance().then((ig) => ig.createSession())
 }

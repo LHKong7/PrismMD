@@ -593,6 +593,24 @@ function InsightGraphSettings() {
             <option value="restaurant_analysis">{t('settings.insightgraph.domainRestaurant')}</option>
           </select>
         </div>
+
+        {/* Entity linking toggle — opt-in per user choice during planning. */}
+        <label className="mt-3 flex items-start gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={insightGraph.entityLinking}
+            onChange={(e) => setConfig({ entityLinking: e.target.checked })}
+            className="mt-0.5 accent-[var(--accent-color)]"
+          />
+          <div>
+            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+              {t('settings.insightgraph.entityLinking')}
+            </p>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              {t('settings.insightgraph.entityLinkingDesc')}
+            </p>
+          </div>
+        </label>
       </div>
 
       {/* Reports */}

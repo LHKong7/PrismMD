@@ -5,6 +5,7 @@ import { useUIStore, type RightSidebarTab } from '../../store/uiStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { TableOfContents } from '../toc/TableOfContents'
 import { EntityPanel } from '../graph/EntityPanel'
+import { RelatedRail } from '../graph/RelatedRail'
 import type { TocEntry } from '../../lib/markdown/remarkToc'
 
 interface RightSidebarProps {
@@ -99,11 +100,7 @@ export function RightSidebar({ toc }: RightSidebarProps) {
             <EntityPanel />
           </div>
         )}
-        {activeTab === 'related' && graphEnabled && (
-          <p className="px-3 py-4 text-xs text-center" style={{ color: 'var(--text-muted)' }}>
-            {t('sidebar.relatedSoon')}
-          </p>
-        )}
+        {activeTab === 'related' && graphEnabled && <RelatedRail />}
       </div>
     </div>
   )

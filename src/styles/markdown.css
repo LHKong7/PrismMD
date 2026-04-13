@@ -177,3 +177,16 @@
   60%  { background-color: color-mix(in srgb, var(--accent-color) 20%, transparent); }
   100% { background-color: transparent; }
 }
+
+/* Opt-in entity linking (Settings → Knowledge Graph → Entity linking). */
+.ig-entity {
+  border-bottom: 1px dashed color-mix(in srgb, var(--accent-color) 60%, transparent);
+  cursor: pointer;
+  transition: background-color 120ms ease;
+  border-radius: 2px;
+}
+.ig-entity:hover,
+.ig-entity:focus-visible {
+  background-color: color-mix(in srgb, var(--accent-color) 18%, transparent);
+  outline: none;
+}

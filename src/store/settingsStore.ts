@@ -20,6 +20,12 @@ export interface InsightGraphConfig {
     password: string
   }
   domain: InsightGraphDomain
+  /**
+   * When true, the reader post-processes rendered markdown to wrap known
+   * entity names with clickable spans. Opt-in because it costs a DOM
+   * walk + trie build per document open.
+   */
+  entityLinking: boolean
 }
 
 export const DEFAULT_INSIGHT_GRAPH_CONFIG: InsightGraphConfig = {
@@ -30,6 +36,7 @@ export const DEFAULT_INSIGHT_GRAPH_CONFIG: InsightGraphConfig = {
     password: '',
   },
   domain: 'default',
+  entityLinking: false,
 }
 
 export const DEFAULT_MODELS: Record<AIProvider, string[]> = {

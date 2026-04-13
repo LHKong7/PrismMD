@@ -150,7 +150,23 @@
       "refreshReports": "刷新",
       "entities": "实体",
       "claims": "陈述",
-      "relationships": "关系"
+      "relationships": "关系",
+      "entityLinking": "在文中高亮实体",
+      "entityLinkingDesc": "自动在阅读器中为已知实体加下划线，点击即可在侧边栏打开其资料。每次打开文档时会做一次 DOM 扫描。"
+    },
+    "related": {
+      "noFile": "打开一篇文档查看相关内容。",
+      "notIngested": "先把这篇文档存入知识图谱，才能看到相关文档。",
+      "loading": "正在查找相关文档…",
+      "error": "无法加载相关文档",
+      "none": "尚无其它文档与之共享实体。",
+      "sharedCount": "共享 {{count}} 个实体",
+      "sharedCount_other": "共享 {{count}} 个实体"
+    },
+    "contradictionBanner": {
+      "title": "在 {{entities}} 个实体中发现 {{total}} 条矛盾陈述",
+      "body": "打开对应实体即可并排查看冲突的论述。",
+      "dismiss": "关闭"
     },
     "close": "关闭"
   },

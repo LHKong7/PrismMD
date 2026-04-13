@@ -22,6 +22,8 @@ import {
   getEntityEgoGraph,
   getGlobalGraph,
   buildSubgraphFromEntities,
+  getEntitiesForReport,
+  getRelatedReports,
   createSession,
   shutdown,
 } from '../services/insightGraphService'
@@ -134,6 +136,12 @@ export function registerInsightGraphHandlers() {
     'insightgraph:build-subgraph-from-entities',
     (_e, names: string[], opts?: { maxEntities?: number }) =>
       wrap(() => buildSubgraphFromEntities(names, opts)),
+  )
+  ipcMain.handle('insightgraph:entities-for-report', (_e, reportId: string) =>
+    wrap(() => getEntitiesForReport(reportId)),
+  )
+  ipcMain.handle('insightgraph:related-reports', (_e, reportId: string, limit?: number) =>
+    wrap(() => getRelatedReports(reportId, limit)),
   )
 
   ipcMain.handle('insightgraph:shutdown', async () => {

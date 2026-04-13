@@ -262,6 +262,27 @@ const electronAPI = {
       }
     | { ok: false; error: string }
   > => ipcRenderer.invoke('insightgraph:build-subgraph-from-entities', names, opts),
+  insightGraphEntitiesForReport: (
+    reportId: string,
+  ): Promise<{ ok: true; data: string[] } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('insightgraph:entities-for-report', reportId),
+  insightGraphRelatedReports: (
+    reportId: string,
+    limit?: number,
+  ): Promise<
+    | {
+        ok: true
+        data: Array<{
+          reportId: string
+          title?: string
+          date?: string
+          sourcePath?: string
+          sharedEntities: string[]
+          sharedEntityCount: number
+        }>
+      }
+    | { ok: false; error: string }
+  > => ipcRenderer.invoke('insightgraph:related-reports', reportId, limit),
 
   // Platform info
   platform: process.platform,

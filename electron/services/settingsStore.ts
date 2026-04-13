@@ -15,6 +15,7 @@ export interface InsightGraphSettings {
     password: string
   }
   domain: 'default' | 'stock_analysis' | 'restaurant_analysis'
+  entityLinking?: boolean
 }
 
 interface AppSettings {
@@ -36,6 +37,7 @@ const DEFAULT_INSIGHT_GRAPH: InsightGraphSettings = {
     password: '',
   },
   domain: 'default',
+  entityLinking: false,
 }
 
 const store = new Store<{ settings: AppSettings }>({
