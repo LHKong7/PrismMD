@@ -103,12 +103,13 @@ function filenameOf(fp: string): string {
 }
 
 export const useInsightGraphStore = create<InsightGraphStore>((set, get) => {
-  // Subscribe to progress events from the main process.
-  let subscribed = false
-  const ensureProgressListener = () => {
-    if (subscribed) return
-    subscribed = true
-    window.electronAPI.onInsightGraphProgress?.((ev) => {
+  // Subscribe to progress events from the main process at store creation so
+  // that stage transitions (including `'completed'`) are never missed even if
+  // ingest was kicked off through a code path that doesn't go through
+  // `ingestFile` (restored sessions, background workers, etc.). The
+  // `window.electronAPI` guard keeps us safe in non-Electron test harnesses.
+  if (typeof window !== 'undefined' && window.electronAPI?.onInsightGraphProgress) {
+    window.electronAPI.onInsightGraphProgress((ev) => {
       const stage = ev.stage as IngestStage
       set((state) => ({
         ingest: {
@@ -134,7 +135,6 @@ export const useInsightGraphStore = create<InsightGraphStore>((set, get) => {
     subgraphCache: {},
 
     ingestFile: async (filePath) => {
-      ensureProgressListener()
       set({
         ingest: { filePath, stage: 'parsing' },
         lastError: null,
