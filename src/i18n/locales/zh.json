@@ -118,6 +118,32 @@
     },
     "close": "关闭"
   },
+  "highlightPopover": {
+    "highlightAs": "标记为 {{color}}"
+  },
+  "docSummary": {
+    "title": "AI 摘要",
+    "loading": "正在生成摘要…",
+    "error": "无法生成摘要",
+    "parseError": "AI 返回格式无效",
+    "regenerate": "重新生成",
+    "dismiss": "在本文档中隐藏"
+  },
+  "selectionAI": {
+    "pending": "思考中…",
+    "error": "出错了，请重试",
+    "copy": "复制",
+    "copied": "已复制",
+    "saveNote": "保存为批注",
+    "sendToChat": "发送到对话",
+    "close": "关闭",
+    "action": {
+      "explain": "解释",
+      "translate": "翻译",
+      "simplify": "简化",
+      "findSimilar": "找相似"
+    }
+  },
   "agent": {
     "title": "AI 助手",
     "placeholder": "关于这篇文档，有什么想问的...",

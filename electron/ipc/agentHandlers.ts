@@ -1,6 +1,12 @@
 import { ipcMain } from 'electron'
 import { sendMessage, sendOneShot, stopGeneration, testConnection } from '../services/aiService'
 import { saveMemory, getMemoryContext, clearMemory, extractSummaryFromConversation } from '../services/memoryService'
+import {
+  getDocSummary,
+  setDocSummary,
+  clearDocSummaries,
+  type DocSummary,
+} from '../services/docSummaryService'
 import { getMainWindow } from '../main'
 
 export function registerAgentHandlers() {
@@ -48,5 +54,18 @@ export function registerAgentHandlers() {
 
   ipcMain.handle('memory:clear', async () => {
     return clearMemory()
+  })
+
+  // Per-document TL;DR cache
+  ipcMain.handle('doc-summary:get', async (_event, filePath: string) => {
+    return getDocSummary(filePath)
+  })
+
+  ipcMain.handle('doc-summary:set', async (_event, filePath: string, summary: DocSummary) => {
+    return setDocSummary(filePath, summary)
+  })
+
+  ipcMain.handle('doc-summary:clear', async () => {
+    return clearDocSummaries()
   })
 }

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useFileStore } from '../../store/fileStore'
 import { useMarkdown } from '../../hooks/useMarkdown'
 import { useReadingProgress } from '../../hooks/useReadingProgress'
+import { DocSummary } from './DocSummary'
 import { FileText, FolderOpen, Upload } from 'lucide-react'
 import '../../styles/markdown.css'
 import '../../styles/cjk.css'
@@ -108,6 +109,7 @@ export function MarkdownReader() {
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
+      <DocSummary />
       <div className="markdown-body">
         {content}
       </div>

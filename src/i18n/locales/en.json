@@ -118,6 +118,32 @@
     },
     "close": "Close"
   },
+  "highlightPopover": {
+    "highlightAs": "Highlight as {{color}}"
+  },
+  "docSummary": {
+    "title": "AI Summary",
+    "loading": "Summarizing this document…",
+    "error": "Couldn't generate a summary",
+    "parseError": "AI reply wasn't valid",
+    "regenerate": "Regenerate summary",
+    "dismiss": "Hide for this document"
+  },
+  "selectionAI": {
+    "pending": "Thinking…",
+    "error": "Something went wrong. Try again.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "saveNote": "Save as note",
+    "sendToChat": "Continue in chat",
+    "close": "Close",
+    "action": {
+      "explain": "Explain",
+      "translate": "Translate",
+      "simplify": "Simplify",
+      "findSimilar": "Find similar"
+    }
+  },
   "agent": {
     "title": "AI Assistant",
     "placeholder": "Ask about this document...",

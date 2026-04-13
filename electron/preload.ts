@@ -119,6 +119,17 @@ const electronAPI = {
   memoryClear: (): Promise<void> =>
     ipcRenderer.invoke('memory:clear'),
 
+  // Per-document TL;DR cache (used by DocSummary component)
+  docSummaryGet: (
+    filePath: string,
+  ): Promise<null | { tldr: string; questions: string[]; generatedAt: number; signature: string }> =>
+    ipcRenderer.invoke('doc-summary:get', filePath),
+  docSummarySet: (
+    filePath: string,
+    summary: { tldr: string; questions: string[]; generatedAt: number; signature: string },
+  ): Promise<void> => ipcRenderer.invoke('doc-summary:set', filePath, summary),
+  docSummaryClear: (): Promise<void> => ipcRenderer.invoke('doc-summary:clear'),
+
   // InsightGraph (optional knowledge-graph RAG)
   insightGraphTestNeo4j: (uri: string, user: string, password: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('insightgraph:test-neo4j', uri, user, password),
