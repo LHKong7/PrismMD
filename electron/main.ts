@@ -2,6 +2,7 @@ import { app, BrowserWindow } from 'electron'
 import path from 'path'
 import { registerIpcHandlers } from './ipc'
 import { appConfig } from '../app.config'
+import { shutdown as shutdownInsightGraph } from './services/insightGraphService'
 
 // Apply app identity from the central config
 app.setName(appConfig.name)
@@ -66,6 +67,16 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+let insightGraphShutdownStarted = false
+app.on('before-quit', (event) => {
+  if (insightGraphShutdownStarted) return
+  insightGraphShutdownStarted = true
+  event.preventDefault()
+  shutdownInsightGraph()
+    .catch(() => {})
+    .finally(() => app.exit(0))
 })
 
 app.on('activate', () => {

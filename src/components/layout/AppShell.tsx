@@ -6,6 +6,7 @@ import { RightSidebar } from './RightSidebar'
 import { MarkdownReader } from '../reader/MarkdownReader'
 import { ReadingProgress } from '../reader/ReadingProgress'
 import { AgentSidebar } from '../agent/AgentSidebar'
+import { GraphView } from '../graph/GraphView'
 
 export function AppShell() {
   const leftSidebarOpen = useUIStore((s) => s.leftSidebarOpen)
@@ -14,6 +15,7 @@ export function AppShell() {
   const rightSidebarPinned = useUIStore((s) => s.rightSidebarPinned)
   const setLeftSidebarOpen = useUIStore((s) => s.setLeftSidebarOpen)
   const setRightSidebarOpen = useUIStore((s) => s.setRightSidebarOpen)
+  const mainViewMode = useUIStore((s) => s.mainViewMode)
   const toc = useFileStore((s) => s.toc)
   const agentSidebarOpen = useAgentStore((s) => s.agentSidebarOpen)
 
@@ -44,7 +46,10 @@ export function AppShell() {
         />
       )}
 
-      {/* Main content */}
+      {/* Main content — swapped wholesale based on uiStore.mainViewMode.
+          Sidebars remain mounted regardless, so the file tree / agent /
+          TOC context is preserved when the user toggles between the
+          reader and the graph. */}
       <div
         className="flex-1 overflow-hidden"
         style={{
@@ -53,7 +58,7 @@ export function AppShell() {
           transition: 'margin 200ms ease-in-out',
         }}
       >
-        <MarkdownReader />
+        {mainViewMode === 'graph' ? <GraphView /> : <MarkdownReader />}
       </div>
 
       {/* Right sidebar (TOC) */}

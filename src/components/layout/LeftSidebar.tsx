@@ -1,19 +1,76 @@
-import { useState } from 'react'
-import { ChevronRight, FolderOpen, Pin, PinOff, Plus, X } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { ChevronRight, Database, FolderOpen, Loader2, Pin, PinOff, Plus, X } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useTranslation } from 'react-i18next'
 import { useFileStore } from '../../store/fileStore'
 import { useUIStore } from '../../store/uiStore'
+import { useSettingsStore } from '../../store/settingsStore'
+import { useInsightGraphStore } from '../../store/insightGraphStore'
 import { FileTree } from '../filetree/FileTree'
+import type { FileTreeNode } from '../../types/electron'
+
+const MD_EXT = /\.(md|markdown|mdx)$/i
+
+/** Walk the tree and collect absolute paths of every markdown file. */
+function collectMarkdownFiles(nodes: FileTreeNode[]): string[] {
+  const out: string[] = []
+  const visit = (n: FileTreeNode) => {
+    if (n.type === 'file' && MD_EXT.test(n.name)) out.push(n.path)
+    else if (n.children) n.children.forEach(visit)
+  }
+  nodes.forEach(visit)
+  return out
+}
 
 function FolderSection({ folderPath, folderName, tree, onClose }: {
   folderPath: string
   folderName: string
-  tree: import('../../types/electron').FileTreeNode[]
+  tree: FileTreeNode[]
   onClose: () => void
 }) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(true)
+  const insightGraphEnabled = useSettingsStore((s) => s.insightGraph.enabled)
+  const ingestFile = useInsightGraphStore((s) => s.ingestFile)
+
+  // Local ingestion progress for this folder. Kept local (not in zustand)
+  // because it's transient UI state tied to a button click and the store
+  // already owns per-file status globally.
+  const [ingestState, setIngestState] = useState<
+    | { kind: 'idle' }
+    | { kind: 'running'; done: number; total: number }
+    | { kind: 'done'; ingested: number; failed: number; at: number }
+  >({ kind: 'idle' })
+
+  const mdFiles = useMemo(() => collectMarkdownFiles(tree), [tree])
+
+  const handleBuildGraph = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!mdFiles.length || ingestState.kind === 'running') return
+
+    setIngestState({ kind: 'running', done: 0, total: mdFiles.length })
+    let failed = 0
+    for (let i = 0; i < mdFiles.length; i++) {
+      const ok = await ingestFile(mdFiles[i])
+      if (!ok) failed += 1
+      setIngestState({ kind: 'running', done: i + 1, total: mdFiles.length })
+    }
+    setIngestState({
+      kind: 'done',
+      ingested: mdFiles.length - failed,
+      failed,
+      at: Date.now(),
+    })
+    // Return to idle after a moment so the button is usable again.
+    setTimeout(() => setIngestState({ kind: 'idle' }), 4000)
+  }
+
+  const running = ingestState.kind === 'running'
+  const buildTitle = running
+    ? t('sidebar.ingestingGraph', { done: ingestState.done, total: ingestState.total })
+    : mdFiles.length > 0
+      ? t('sidebar.buildGraph', { count: mdFiles.length })
+      : t('sidebar.buildGraphEmpty')
 
   return (
     <div className="border-b" style={{ borderColor: 'var(--border-color)' }}>
@@ -36,13 +93,38 @@ function FolderSection({ folderPath, folderName, tree, onClose }: {
             {folderName}
           </span>
         </div>
-        <button
-          onClick={(e) => { e.stopPropagation(); onClose() }}
-          className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 transition-all"
-          title={t('sidebar.closeFolder')}
-        >
-          <X size={12} style={{ color: 'var(--text-muted)' }} />
-        </button>
+        <div className="flex items-center gap-0.5">
+          {insightGraphEnabled && (
+            <button
+              onClick={handleBuildGraph}
+              disabled={running || mdFiles.length === 0}
+              className={clsx(
+                'p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-all',
+                running ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
+                'disabled:cursor-not-allowed',
+              )}
+              title={buildTitle}
+            >
+              {running ? (
+                <Loader2 size={12} className="animate-spin" style={{ color: 'var(--accent-color)' }} />
+              ) : ingestState.kind === 'done' ? (
+                <Database
+                  size={12}
+                  style={{ color: ingestState.failed ? '#ef4444' : 'var(--accent-color)' }}
+                />
+              ) : (
+                <Database size={12} style={{ color: 'var(--text-muted)' }} />
+              )}
+            </button>
+          )}
+          <button
+            onClick={(e) => { e.stopPropagation(); onClose() }}
+            className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 transition-all"
+            title={t('sidebar.closeFolder')}
+          >
+            <X size={12} style={{ color: 'var(--text-muted)' }} />
+          </button>
+        </div>
       </div>
       {expanded && (
         <div className="pb-1">

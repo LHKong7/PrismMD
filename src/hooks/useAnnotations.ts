@@ -29,23 +29,27 @@ export function useAnnotations() {
     return () => clearTimeout(timer)
   }, [currentFilePath, annotations])
 
-  const addAnnotation = useCallback((text: string, color: AnnotationColor) => {
-    if (!currentFilePath) return
+  const addAnnotation = useCallback(
+    (text: string, color: AnnotationColor, note?: string) => {
+      if (!currentFilePath) return
 
-    const now = new Date().toISOString()
-    const annotation: Annotation = {
-      id: crypto.randomUUID(),
-      filePath: currentFilePath,
-      startOffset: 0,
-      endOffset: text.length,
-      selectedText: text,
-      color,
-      createdAt: now,
-      updatedAt: now,
-    }
+      const now = new Date().toISOString()
+      const annotation: Annotation = {
+        id: crypto.randomUUID(),
+        filePath: currentFilePath,
+        startOffset: 0,
+        endOffset: text.length,
+        selectedText: text,
+        color,
+        ...(note ? { note } : {}),
+        createdAt: now,
+        updatedAt: now,
+      }
 
-    setAnnotations((prev) => [...prev, annotation])
-  }, [currentFilePath])
+      setAnnotations((prev) => [...prev, annotation])
+    },
+    [currentFilePath],
+  )
 
   const removeAnnotation = useCallback((id: string) => {
     setAnnotations((prev) => prev.filter((a) => a.id !== id))

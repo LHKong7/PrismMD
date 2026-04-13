@@ -5,6 +5,7 @@ import { AppShell } from './components/layout/AppShell'
 import { StatusBar } from './components/layout/StatusBar'
 import { CommandPalette } from './components/commandpalette/CommandPalette'
 import { HighlightPopover } from './components/annotations/HighlightPopover'
+import { SelectionAIBubble } from './components/annotations/SelectionAIBubble'
 import { SettingsPanel } from './components/settings/SettingsPanel'
 import { GhostText } from './components/ghosttext/GhostText'
 import { FocusOverlay } from './components/focusmode/FocusOverlay'
@@ -45,6 +46,9 @@ function AppContent() {
       <StatusBar />
       <CommandPalette onOpenSettings={() => setSettingsOpen(true)} />
       <HighlightPopover onHighlight={addAnnotation} />
+      <SelectionAIBubble
+        onSaveAsNote={(text, note) => addAnnotation(text, 'yellow', note)}
+      />
       <GhostText />
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>

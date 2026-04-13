@@ -15,7 +15,13 @@
     "openFolder": "Open Folder",
     "addFolder": "Add Folder",
     "closeFolder": "Close Folder",
+    "buildGraph": "Build knowledge graph ({{count}} files)",
+    "buildGraphEmpty": "No markdown files to ingest",
+    "ingestingGraph": "Ingesting {{done}} / {{total}}…",
     "contents": "Contents",
+    "entity": "Entity",
+    "related": "Related",
+    "relatedSoon": "Related documents will appear here once documents share entities.",
     "noHeadings": "No headings found",
     "pinSidebar": "Pin sidebar",
     "unpinSidebar": "Unpin sidebar"
@@ -24,7 +30,38 @@
     "toggleFileTree": "Toggle file tree",
     "toggleOutline": "Toggle outline",
     "settings": "Settings",
-    "theme": "Theme"
+    "theme": "Theme",
+    "showGraph": "Show Knowledge Graph",
+    "showReader": "Back to reader"
+  },
+  "graphView": {
+    "title": "Knowledge Graph",
+    "scope": {
+      "global": "Global",
+      "document": "Document",
+      "entity": "Entity"
+    },
+    "loading": "Loading graph…",
+    "error": "Couldn't load graph",
+    "counts": "{{nodes}} nodes · {{edges}} edges",
+    "empty": {
+      "title": "No graph data yet",
+      "body": "Focus a node or switch scope to load a different view.",
+      "noReports": "Save a document to the Knowledge Graph to populate this view."
+    },
+    "disabled": {
+      "title": "Knowledge Graph is disabled",
+      "body": "Enable it in Settings → Knowledge Graph and configure a Neo4j connection to use this view."
+    }
+  },
+  "entityPanel": {
+    "empty": "Click a node in the graph, or a linked entity in a document, to open its profile here.",
+    "loading": "Loading entity details…",
+    "noData": "No data for this entity yet.",
+    "claims": "Claims",
+    "related": "Related Entities",
+    "timeline": "Timeline",
+    "contradictions": "Contradictions"
   },
   "commandPalette": {
     "placeholder": "Search files or commands...",
@@ -38,7 +75,10 @@
     "openSettings": "Open Settings",
     "toggleAgent": "Toggle AI Assistant",
     "toggleFocusMode": "Toggle Focus Mode",
-    "togglePrivacy": "Toggle Privacy Mode"
+    "togglePrivacy": "Toggle Privacy Mode",
+    "insightGraphIngest": "Save Document to Knowledge Graph",
+    "showGraph": "Show Knowledge Graph",
+    "showReader": "Back to Reader"
   },
   "settings": {
     "title": "Settings",
@@ -88,7 +128,82 @@
       "clearMemoryDesc": "Remove all stored conversation history and preferences.",
       "cleared": "Memory cleared"
     },
+    "insightgraph": {
+      "title": "Knowledge Graph",
+      "description": "Save documents as nodes in a Neo4j knowledge graph and ask questions across them. Uses your active AI provider for extraction. Requires a running Neo4j instance.",
+      "enable": "Enable Knowledge Graph",
+      "enableDesc": "Turn on graph-RAG features. When enabled, the AI assistant gets extra context from your ingested documents.",
+      "neo4j": "Neo4j Connection",
+      "uri": "Bolt URI",
+      "uriPlaceholder": "bolt://localhost:7687",
+      "user": "Username",
+      "userPlaceholder": "neo4j",
+      "password": "Password",
+      "passwordPlaceholder": "Enter password",
+      "testConnection": "Test Connection",
+      "connectionSuccess": "Connected!",
+      "connectionFailed": "Connection failed",
+      "domain": "Extraction Domain",
+      "domainDefault": "Default",
+      "domainStock": "Stock Analysis",
+      "domainRestaurant": "Restaurant Analysis",
+      "providerWarning": "Knowledge Graph uses your active AI provider. Anthropic and Google are not OpenAI-compatible — switch to OpenAI, Ollama, or Custom to use this feature.",
+      "reports": "Ingested Documents",
+      "noReports": "No documents ingested yet. Use the command palette or right-click a file in the explorer to save it to the graph.",
+      "refreshReports": "Refresh",
+      "entities": "entities",
+      "claims": "claims",
+      "relationships": "relationships",
+      "entityLinking": "Link entities in text",
+      "entityLinkingDesc": "Underline known entity names in the reader. Click an underlined entity to open its profile in the side panel. Costs one DOM walk per document open."
+    },
+    "related": {
+      "noFile": "Open a document to see what's related.",
+      "notIngested": "Save this document to the Knowledge Graph to see related documents.",
+      "loading": "Finding related documents…",
+      "error": "Couldn't load related documents",
+      "none": "No other documents share entities with this one yet.",
+      "sharedCount": "Shares {{count}} entity",
+      "sharedCount_other": "Shares {{count}} entities"
+    },
+    "contradictionBanner": {
+      "title": "{{total}} contradictory claims found across {{entities}} entities",
+      "body": "Open an entity to see the conflicting statements side by side.",
+      "dismiss": "Dismiss"
+    },
     "close": "Close"
+  },
+  "highlightPopover": {
+    "highlightAs": "Highlight as {{color}}"
+  },
+  "docSummary": {
+    "title": "AI Summary",
+    "loading": "Summarizing this document…",
+    "error": "Couldn't generate a summary",
+    "parseError": "AI reply wasn't valid",
+    "regenerate": "Regenerate summary",
+    "generate": "Generate AI summary",
+    "dismiss": "Hide for this document",
+    "buildGraph": "Build knowledge graph for this document",
+    "graphBuilding": "Building knowledge graph…",
+    "graphBuildDone": "Knowledge graph built",
+    "graphBuildView": "View graph",
+    "graphBuildFailed": "Failed to build knowledge graph"
+  },
+  "selectionAI": {
+    "pending": "Thinking…",
+    "error": "Something went wrong. Try again.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "saveNote": "Save as note",
+    "sendToChat": "Continue in chat",
+    "close": "Close",
+    "action": {
+      "explain": "Explain",
+      "translate": "Translate",
+      "simplify": "Simplify",
+      "findSimilar": "Find similar"
+    }
   },
   "agent": {
     "title": "AI Assistant",
@@ -115,6 +230,17 @@
     "noModel": "No AI model",
     "ready": "Ready",
     "privacyOn": "Privacy Mode",
-    "privacyOn": "Privacy Mode"
+    "ingest": {
+      "parsing": "Parsing document…",
+      "extracting": "Extracting entities…",
+      "resolving": "Resolving duplicates…",
+      "writing": "Writing to graph…",
+      "completed": "Saved to graph",
+      "failed": "Ingest failed"
+    }
+  },
+  "filetree": {
+    "saveToGraph": "Save to Knowledge Graph",
+    "savingToGraph": "Saving…"
   }
 }

@@ -1,7 +1,8 @@
-import { useState } from 'react'
-import { X, Check, Loader2, Globe, Palette, Bot, Eye, EyeOff, Shield, Trash2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { X, Check, Loader2, Globe, Palette, Bot, Eye, EyeOff, Shield, Trash2, Network, AlertTriangle, RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useSettingsStore, DEFAULT_MODELS, type AIProvider } from '../../store/settingsStore'
+import { useSettingsStore, DEFAULT_MODELS, type AIProvider, type InsightGraphDomain } from '../../store/settingsStore'
+import { useInsightGraphStore } from '../../store/insightGraphStore'
 import { themes } from '../../lib/theme/themes'
 import { LANGUAGES, changeLanguage, type SupportedLanguage } from '../../i18n'
 import { clsx } from 'clsx'
@@ -11,7 +12,7 @@ interface SettingsPanelProps {
   onClose: () => void
 }
 
-type Tab = 'language' | 'theme' | 'ai' | 'privacy'
+type Tab = 'language' | 'theme' | 'ai' | 'privacy' | 'insightgraph'
 
 export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const { t } = useTranslation()
@@ -40,6 +41,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
               { id: 'language' as Tab, icon: Globe, label: t('settings.language.title') },
               { id: 'theme' as Tab, icon: Palette, label: t('settings.theme.title') },
               { id: 'ai' as Tab, icon: Bot, label: t('settings.ai.title') },
+              { id: 'insightgraph' as Tab, icon: Network, label: t('settings.insightgraph.title') },
               { id: 'privacy' as Tab, icon: Shield, label: t('settings.privacy.title') },
             ]).map(({ id, icon: Icon, label }) => (
               <button
@@ -64,6 +66,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             {activeTab === 'language' && <LanguageSettings />}
             {activeTab === 'theme' && <ThemeSettings />}
             {activeTab === 'ai' && <AISettings />}
+            {activeTab === 'insightgraph' && <InsightGraphSettings />}
             {activeTab === 'privacy' && <PrivacySettings />}
           </div>
         </div>
@@ -414,6 +417,240 @@ function AIProviderCard({
               <option key={model} value={model}>{model}</option>
             ))}
           </select>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function InsightGraphSettings() {
+  const { t } = useTranslation()
+  const insightGraph = useSettingsStore((s) => s.insightGraph)
+  const setConfig = useSettingsStore((s) => s.setInsightGraphConfig)
+  const activeProvider = useSettingsStore((s) => s.activeProvider)
+
+  const reports = useInsightGraphStore((s) => s.reports)
+  const refreshReports = useInsightGraphStore((s) => s.refreshReports)
+
+  const [showPassword, setShowPassword] = useState(false)
+  const [testing, setTesting] = useState(false)
+  const [testResult, setTestResult] = useState<{ ok: boolean; error?: string } | null>(null)
+
+  useEffect(() => {
+    if (insightGraph.enabled) {
+      refreshReports()
+    }
+  }, [insightGraph.enabled, refreshReports])
+
+  const providerIncompatible = activeProvider === 'anthropic' || activeProvider === 'google'
+
+  const handleTest = async () => {
+    setTesting(true)
+    setTestResult(null)
+    try {
+      const res = await window.electronAPI.insightGraphTestNeo4j(
+        insightGraph.neo4j.uri,
+        insightGraph.neo4j.user,
+        insightGraph.neo4j.password,
+      )
+      setTestResult(res)
+    } catch (err) {
+      setTestResult({ ok: false, error: err instanceof Error ? err.message : String(err) })
+    }
+    setTesting(false)
+  }
+
+  return (
+    <div>
+      <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+        {t('settings.insightgraph.title')}
+      </h3>
+      <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+        {t('settings.insightgraph.description')}
+      </p>
+
+      {/* Enable toggle */}
+      <div
+        className="flex items-start gap-3 p-4 rounded-lg border mb-4"
+        style={{ borderColor: insightGraph.enabled ? 'var(--accent-color)' : 'var(--border-color)' }}
+      >
+        <input
+          type="checkbox"
+          checked={insightGraph.enabled}
+          onChange={(e) => setConfig({ enabled: e.target.checked })}
+          className="mt-0.5 accent-[var(--accent-color)]"
+        />
+        <div>
+          <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+            <Network size={14} className="inline mr-1" />
+            {t('settings.insightgraph.enable')}
+          </p>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+            {t('settings.insightgraph.enableDesc')}
+          </p>
+        </div>
+      </div>
+
+      {providerIncompatible && (
+        <div
+          className="flex items-start gap-2 p-3 rounded-lg border mb-4 text-xs"
+          style={{ borderColor: '#f59e0b', backgroundColor: '#f59e0b14', color: 'var(--text-primary)' }}
+        >
+          <AlertTriangle size={14} style={{ color: '#f59e0b' }} className="mt-0.5 flex-shrink-0" />
+          <span>{t('settings.insightgraph.providerWarning')}</span>
+        </div>
+      )}
+
+      {/* Neo4j */}
+      <div className="rounded-lg border p-4 mb-4" style={{ borderColor: 'var(--border-color)' }}>
+        <p className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>
+          {t('settings.insightgraph.neo4j')}
+        </p>
+
+        <div className="mb-3">
+          <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>
+            {t('settings.insightgraph.uri')}
+          </label>
+          <input
+            type="text"
+            value={insightGraph.neo4j.uri}
+            onChange={(e) => setConfig({ neo4j: { uri: e.target.value } })}
+            placeholder={t('settings.insightgraph.uriPlaceholder')}
+            className="w-full text-sm px-3 py-2 rounded-md border bg-transparent outline-none focus:border-[var(--accent-color)]"
+            style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+          />
+        </div>
+
+        <div className="mb-3">
+          <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>
+            {t('settings.insightgraph.user')}
+          </label>
+          <input
+            type="text"
+            value={insightGraph.neo4j.user}
+            onChange={(e) => setConfig({ neo4j: { user: e.target.value } })}
+            placeholder={t('settings.insightgraph.userPlaceholder')}
+            className="w-full text-sm px-3 py-2 rounded-md border bg-transparent outline-none focus:border-[var(--accent-color)]"
+            style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+          />
+        </div>
+
+        <div className="mb-3">
+          <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>
+            {t('settings.insightgraph.password')}
+          </label>
+          <div className="flex gap-2">
+            <div className="flex-1 relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={insightGraph.neo4j.password}
+                onChange={(e) => setConfig({ neo4j: { password: e.target.value } })}
+                placeholder={t('settings.insightgraph.passwordPlaceholder')}
+                className="w-full text-sm px-3 py-2 rounded-md border bg-transparent outline-none focus:border-[var(--accent-color)]"
+                style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+              />
+              <button
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1"
+                type="button"
+              >
+                {showPassword
+                  ? <EyeOff size={14} style={{ color: 'var(--text-muted)' }} />
+                  : <Eye size={14} style={{ color: 'var(--text-muted)' }} />}
+              </button>
+            </div>
+            <button
+              onClick={handleTest}
+              disabled={testing || !insightGraph.neo4j.uri}
+              className="text-xs px-3 py-2 rounded-md border transition-colors disabled:opacity-50"
+              style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+              type="button"
+            >
+              {testing ? <Loader2 size={14} className="animate-spin" /> : t('settings.insightgraph.testConnection')}
+            </button>
+          </div>
+          {testResult && (
+            <p className={`text-xs mt-1 ${testResult.ok ? 'text-green-500' : 'text-red-500'}`}>
+              {testResult.ok
+                ? t('settings.insightgraph.connectionSuccess')
+                : `${t('settings.insightgraph.connectionFailed')}${testResult.error ? ': ' + testResult.error : ''}`}
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>
+            {t('settings.insightgraph.domain')}
+          </label>
+          <select
+            value={insightGraph.domain}
+            onChange={(e) => setConfig({ domain: e.target.value as InsightGraphDomain })}
+            className="w-full text-sm px-3 py-2 rounded-md border bg-transparent outline-none"
+            style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+          >
+            <option value="default">{t('settings.insightgraph.domainDefault')}</option>
+            <option value="stock_analysis">{t('settings.insightgraph.domainStock')}</option>
+            <option value="restaurant_analysis">{t('settings.insightgraph.domainRestaurant')}</option>
+          </select>
+        </div>
+
+        {/* Entity linking toggle — opt-in per user choice during planning. */}
+        <label className="mt-3 flex items-start gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={insightGraph.entityLinking}
+            onChange={(e) => setConfig({ entityLinking: e.target.checked })}
+            className="mt-0.5 accent-[var(--accent-color)]"
+          />
+          <div>
+            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+              {t('settings.insightgraph.entityLinking')}
+            </p>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              {t('settings.insightgraph.entityLinkingDesc')}
+            </p>
+          </div>
+        </label>
+      </div>
+
+      {/* Reports */}
+      <div className="rounded-lg border p-4" style={{ borderColor: 'var(--border-color)' }}>
+        <div className="flex items-center justify-between mb-3">
+          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+            {t('settings.insightgraph.reports')}
+          </p>
+          <button
+            onClick={() => refreshReports()}
+            className="text-xs flex items-center gap-1 px-2 py-1 rounded border transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+            style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+            type="button"
+          >
+            <RefreshCw size={12} />
+            {t('settings.insightgraph.refreshReports')}
+          </button>
+        </div>
+        {reports.length === 0 ? (
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            {t('settings.insightgraph.noReports')}
+          </p>
+        ) : (
+          <ul className="space-y-2 max-h-48 overflow-y-auto">
+            {reports.map((r) => (
+              <li
+                key={r.reportId}
+                className="text-xs flex items-center justify-between gap-2 p-2 rounded border"
+                style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+              >
+                <span className="truncate flex-1" title={r.filePath ?? r.filename}>
+                  {r.filename ?? r.reportId}
+                </span>
+                <span className="flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
+                  {(r.entities ?? 0)} {t('settings.insightgraph.entities')} ·{' '}
+                  {(r.claims ?? 0)} {t('settings.insightgraph.claims')}
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
     </div>

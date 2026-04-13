@@ -1,5 +1,5 @@
 import { useState, useEffect, type CSSProperties } from 'react'
-import { Minus, Square, X, Palette, PanelLeft, PanelRight, Settings, Bot } from 'lucide-react'
+import { Minus, Square, X, Palette, PanelLeft, PanelRight, Settings, Bot, Network, BookOpen } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useUIStore } from '../../store/uiStore'
 import { useFileStore } from '../../store/fileStore'
@@ -19,10 +19,13 @@ export function TitleBar({ onOpenSettings }: TitleBarProps) {
   const [isMaximized, setIsMaximized] = useState(false)
   const toggleLeftSidebar = useUIStore((s) => s.toggleLeftSidebar)
   const toggleRightSidebar = useUIStore((s) => s.toggleRightSidebar)
+  const mainViewMode = useUIStore((s) => s.mainViewMode)
+  const toggleMainViewMode = useUIStore((s) => s.toggleMainViewMode)
   const currentFilePath = useFileStore((s) => s.currentFilePath)
   const themeId = useSettingsStore((s) => s.themeId)
   const setThemeId = useSettingsStore((s) => s.setThemeId)
   const setThemeMode = useSettingsStore((s) => s.setThemeMode)
+  const graphEnabled = useSettingsStore((s) => s.insightGraph.enabled)
   const toggleAgentSidebar = useAgentStore((s) => s.toggleAgentSidebar)
 
   const isMac = window.electronAPI.platform === 'darwin'
@@ -74,6 +77,19 @@ export function TitleBar({ onOpenSettings }: TitleBarProps) {
 
       {/* Right controls */}
       <div className="flex items-center gap-1 px-2" style={noDragStyle}>
+        {graphEnabled && (
+          <button
+            onClick={toggleMainViewMode}
+            className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+            title={mainViewMode === 'graph' ? t('titlebar.showReader') : t('titlebar.showGraph')}
+          >
+            {mainViewMode === 'graph' ? (
+              <BookOpen size={16} style={{ color: 'var(--accent-color)' }} />
+            ) : (
+              <Network size={16} style={{ color: 'var(--text-secondary)' }} />
+            )}
+          </button>
+        )}
         <button
           onClick={toggleAgentSidebar}
           className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"

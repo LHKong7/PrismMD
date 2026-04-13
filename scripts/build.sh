@@ -17,6 +17,7 @@ err()  { echo -e "${RED}[error]${NC} $*" >&2; }
 # ── Parse arguments ──────────────────────────────────────────────────────────
 MODE="make"          # default: produce installers
 PLATFORM=""          # default: current platform
+PROFILE="prod"       # default: production forge profile
 SKIP_TYPECHECK=false
 SKIP_INSTALL=false
 
@@ -28,6 +29,7 @@ Options:
   --package         Package the app without producing installers
   --make            Build platform installers (default)
   --platform <p>    Target platform: darwin, win32, linux
+  --profile <p>     Forge build profile: dev, prod (default: prod)
   --skip-typecheck  Skip TypeScript type checking
   --skip-install    Skip npm install
   -h, --help        Show this help
@@ -36,6 +38,7 @@ Examples:
   ./scripts/build.sh                    # Build installer for current platform
   ./scripts/build.sh --package          # Package only (no installer)
   ./scripts/build.sh --platform darwin  # Build macOS installer
+  ./scripts/build.sh --profile dev      # Use the dev forge profile
 EOF
   exit 0
 }
@@ -45,6 +48,7 @@ while [[ $# -gt 0 ]]; do
     --package)        MODE="package"; shift ;;
     --make)           MODE="make"; shift ;;
     --platform)       PLATFORM="$2"; shift 2 ;;
+    --profile)        PROFILE="$2"; shift 2 ;;
     --skip-typecheck) SKIP_TYPECHECK=true; shift ;;
     --skip-install)   SKIP_INSTALL=true; shift ;;
     -h|--help)        usage ;;
@@ -52,9 +56,15 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Propagate to forge.config.ts (it would otherwise fall back to "dev" since
+# invoking `npx electron-forge` directly bypasses `npm run` and leaves
+# npm_lifecycle_event empty).
+export APP_PROFILE="$PROFILE"
+
 # ── Preflight checks ────────────────────────────────────────────────────────
 log "PrismMD build script"
 log "Mode: $MODE"
+log "Profile: $PROFILE"
 log "Platform: ${PLATFORM:-$(node -p 'process.platform')}"
 
 if ! command -v node &>/dev/null; then

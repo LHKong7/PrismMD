@@ -83,6 +83,7 @@ const electronAPI = {
     messages: Array<{ role: string; content: string }>
     documentContext?: string
     memoryContext?: string
+    graphContext?: string
   }): Promise<{ provider: string; model: string }> =>
     ipcRenderer.invoke('agent:send-message', request),
   onAgentStream: (callback: (chunk: string) => void): (() => void) => {
@@ -94,6 +95,20 @@ const electronAPI = {
   testAgentConnection: (provider: string, apiKey: string, baseUrl?: string): Promise<boolean> =>
     ipcRenderer.invoke('agent:test-connection', provider, apiKey, baseUrl),
 
+  /**
+   * Fire-and-wait AI call. Used by selection AI actions, doc TL;DRs,
+   * quiz generation — anything that wants a single synchronous reply
+   * instead of a streamed chat.
+   */
+  sendAgentOneShot: (request: {
+    prompt: string
+    systemPrompt?: string
+    jsonSchema?: Record<string, unknown>
+  }): Promise<
+    | { ok: true; result: { provider: string; model: string; reply: string; json?: unknown } }
+    | { ok: false; error: string }
+  > => ipcRenderer.invoke('agent:one-shot', request),
+
   // Memory
   memorySave: (filePath: string, summary: string, topics: string[]): Promise<void> =>
     ipcRenderer.invoke('memory:save', filePath, summary, topics),
@@ -103,6 +118,171 @@ const electronAPI = {
     ipcRenderer.invoke('memory:extract-summary', messages),
   memoryClear: (): Promise<void> =>
     ipcRenderer.invoke('memory:clear'),
+
+  // Per-document TL;DR cache (used by DocSummary component)
+  docSummaryGet: (
+    filePath: string,
+  ): Promise<null | { tldr: string; questions: string[]; generatedAt: number; signature: string }> =>
+    ipcRenderer.invoke('doc-summary:get', filePath),
+  docSummarySet: (
+    filePath: string,
+    summary: { tldr: string; questions: string[]; generatedAt: number; signature: string },
+  ): Promise<void> => ipcRenderer.invoke('doc-summary:set', filePath, summary),
+  docSummaryClear: (): Promise<void> => ipcRenderer.invoke('doc-summary:clear'),
+
+  // InsightGraph (optional knowledge-graph RAG)
+  insightGraphTestNeo4j: (uri: string, user: string, password: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('insightgraph:test-neo4j', uri, user, password),
+  insightGraphIngest: (
+    filePath: string,
+  ): Promise<{ ok: true; result: Record<string, unknown> } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('insightgraph:ingest', filePath),
+  insightGraphQuery: (
+    question: string,
+    sessionId?: string,
+  ): Promise<{ ok: true; result: Record<string, unknown> } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('insightgraph:query', question, sessionId),
+  insightGraphListReports: (): Promise<
+    { ok: true; reports: Record<string, unknown>[] } | { ok: false; error: string }
+  > => ipcRenderer.invoke('insightgraph:list-reports'),
+  insightGraphCreateSession: (): Promise<{ ok: true; sessionId: string } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('insightgraph:create-session'),
+  onInsightGraphProgress: (callback: (event: { stage: string; reportId?: string; [k: string]: unknown }) => void): (() => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, ev: { stage: string; reportId?: string }) => callback(ev)
+    ipcRenderer.on('insightgraph:progress', handler)
+    return () => ipcRenderer.removeListener('insightgraph:progress', handler)
+  },
+
+  // Read-only graph queries. All share the same `{ ok, data | error }`
+  // envelope as the handlers above.
+  insightGraphGetReport: (
+    reportId: string,
+  ): Promise<{ ok: true; data: Record<string, unknown> | null } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('insightgraph:get-report', reportId),
+  insightGraphFindEntities: (
+    query?: { name?: string; type?: string; limit?: number },
+  ): Promise<{ ok: true; data: Record<string, unknown>[] } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('insightgraph:find-entities', query ?? {}),
+  insightGraphGetEntity: (
+    entityId: string,
+  ): Promise<{ ok: true; data: Record<string, unknown> | null } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('insightgraph:get-entity', entityId),
+  insightGraphGetEntityProfile: (
+    name: string,
+  ): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('insightgraph:get-entity-profile', name),
+  insightGraphGetClaimsAbout: (
+    name: string,
+  ): Promise<{ ok: true; data: Record<string, unknown>[] } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('insightgraph:get-claims-about', name),
+  insightGraphGetEntityMetrics: (
+    name: string,
+  ): Promise<{ ok: true; data: Record<string, unknown>[] } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('insightgraph:get-entity-metrics', name),
+  insightGraphGetMetricHistory: (
+    metric: string,
+    entity?: string,
+  ): Promise<{ ok: true; data: Record<string, unknown>[] } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('insightgraph:get-metric-history', metric, entity),
+  insightGraphFindEvidenceForClaim: (
+    claimId: string,
+  ): Promise<{ ok: true; data: Record<string, unknown>[] } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('insightgraph:find-evidence-for-claim', claimId),
+  insightGraphGetSubgraph: (
+    nodeId: string,
+    depth?: number,
+  ): Promise<{ ok: true; data: { nodes: unknown[]; edges: unknown[] } } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('insightgraph:get-subgraph', nodeId, depth),
+  insightGraphGetEntityRelationships: (
+    name: string,
+  ): Promise<{ ok: true; data: Record<string, unknown>[] } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('insightgraph:get-entity-relationships', name),
+  insightGraphFindPath: (
+    entityA: string,
+    entityB: string,
+    maxDepth?: number,
+  ): Promise<
+    | { ok: true; data: { nodes: unknown[]; edges: unknown[]; found: boolean } }
+    | { ok: false; error: string }
+  > => ipcRenderer.invoke('insightgraph:find-path', entityA, entityB, maxDepth),
+  insightGraphCompareEntityAcrossReports: (
+    name: string,
+  ): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('insightgraph:compare-entity-across-reports', name),
+  insightGraphFindMetricTrend: (
+    entity: string,
+    metric: string,
+  ): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('insightgraph:find-metric-trend', entity, metric),
+  insightGraphFindContradictions: (
+    name: string,
+  ): Promise<{ ok: true; data: Record<string, unknown>[] } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('insightgraph:find-contradictions', name),
+  insightGraphEntityTimeline: (
+    name: string,
+  ): Promise<{ ok: true; data: Record<string, unknown>[] } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('insightgraph:entity-timeline', name),
+
+  // Composite graph shapes for GraphView.
+  insightGraphGlobalGraph: (
+    maxEntities?: number,
+  ): Promise<
+    | {
+        ok: true
+        data: {
+          nodes: Array<{ id: string; name: string; type?: string } & Record<string, unknown>>
+          edges: Array<{ id: string; source: string; target: string; type?: string } & Record<string, unknown>>
+        }
+      }
+    | { ok: false; error: string }
+  > => ipcRenderer.invoke('insightgraph:global-graph', maxEntities),
+  insightGraphEntityEgoGraph: (
+    entityName: string,
+    depth?: number,
+  ): Promise<
+    | {
+        ok: true
+        data: {
+          nodes: Array<{ id: string; name: string; type?: string } & Record<string, unknown>>
+          edges: Array<{ id: string; source: string; target: string; type?: string } & Record<string, unknown>>
+        }
+      }
+    | { ok: false; error: string }
+  > => ipcRenderer.invoke('insightgraph:entity-ego-graph', entityName, depth),
+  insightGraphBuildSubgraphFromEntities: (
+    names: string[],
+    opts?: { maxEntities?: number },
+  ): Promise<
+    | {
+        ok: true
+        data: {
+          nodes: Array<{ id: string; name: string; type?: string } & Record<string, unknown>>
+          edges: Array<{ id: string; source: string; target: string; type?: string } & Record<string, unknown>>
+        }
+      }
+    | { ok: false; error: string }
+  > => ipcRenderer.invoke('insightgraph:build-subgraph-from-entities', names, opts),
+  insightGraphEntitiesForReport: (
+    reportId: string,
+  ): Promise<{ ok: true; data: string[] } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('insightgraph:entities-for-report', reportId),
+  insightGraphRelatedReports: (
+    reportId: string,
+    limit?: number,
+  ): Promise<
+    | {
+        ok: true
+        data: Array<{
+          reportId: string
+          title?: string
+          date?: string
+          sourcePath?: string
+          sharedEntities: string[]
+          sharedEntityCount: number
+        }>
+      }
+    | { ok: false; error: string }
+  > => ipcRenderer.invoke('insightgraph:related-reports', reportId, limit),
 
   // Platform info
   platform: process.platform,

@@ -30,6 +30,7 @@
     "openai": "^6.34.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-force-graph-2d": "^1.29.1",
     "react-i18next": "^17.0.2",
     "rehype-highlight": "^7.0.1",
     "rehype-katex": "^7.0.1",
