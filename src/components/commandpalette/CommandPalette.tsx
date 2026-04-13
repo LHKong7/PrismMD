@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Command } from 'cmdk'
-import { FileText, Sun, Moon, Monitor, Settings, Bot, Shield, Eye, Network } from 'lucide-react'
+import { FileText, Sun, Moon, Monitor, Settings, Bot, Shield, Eye, Network, BookOpen } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useUIStore } from '../../store/uiStore'
 import { useFileStore } from '../../store/fileStore'
@@ -30,6 +30,8 @@ export function CommandPalette({ onOpenSettings }: CommandPaletteProps) {
   const toggleAgentSidebar = useAgentStore((s) => s.toggleAgentSidebar)
   const insightGraphEnabled = useSettingsStore((s) => s.insightGraph.enabled)
   const ingestFile = useInsightGraphStore((s) => s.ingestFile)
+  const mainViewMode = useUIStore((s) => s.mainViewMode)
+  const toggleMainViewMode = useUIStore((s) => s.toggleMainViewMode)
   const [search, setSearch] = useState('')
 
   useEffect(() => {
@@ -136,6 +138,21 @@ export function CommandPalette({ onOpenSettings }: CommandPaletteProps) {
                   style={{ color: 'var(--text-secondary)' }}
                 >
                   <Network size={14} /><span>{t('commandPalette.insightGraphIngest')}</span>
+                </Command.Item>
+              )}
+              {insightGraphEnabled && (
+                <Command.Item
+                  value="Toggle Knowledge Graph View"
+                  onSelect={() => { toggleMainViewMode(); setOpen(false) }}
+                  className={cls}
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  {mainViewMode === 'graph' ? <BookOpen size={14} /> : <Network size={14} />}
+                  <span>
+                    {mainViewMode === 'graph'
+                      ? t('commandPalette.showReader')
+                      : t('commandPalette.showGraph')}
+                  </span>
                 </Command.Item>
               )}
             </Command.Group>

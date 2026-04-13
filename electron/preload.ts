@@ -223,6 +223,46 @@ const electronAPI = {
   ): Promise<{ ok: true; data: Record<string, unknown>[] } | { ok: false; error: string }> =>
     ipcRenderer.invoke('insightgraph:entity-timeline', name),
 
+  // Composite graph shapes for GraphView.
+  insightGraphGlobalGraph: (
+    maxEntities?: number,
+  ): Promise<
+    | {
+        ok: true
+        data: {
+          nodes: Array<{ id: string; name: string; type?: string } & Record<string, unknown>>
+          edges: Array<{ id: string; source: string; target: string; type?: string } & Record<string, unknown>>
+        }
+      }
+    | { ok: false; error: string }
+  > => ipcRenderer.invoke('insightgraph:global-graph', maxEntities),
+  insightGraphEntityEgoGraph: (
+    entityName: string,
+    depth?: number,
+  ): Promise<
+    | {
+        ok: true
+        data: {
+          nodes: Array<{ id: string; name: string; type?: string } & Record<string, unknown>>
+          edges: Array<{ id: string; source: string; target: string; type?: string } & Record<string, unknown>>
+        }
+      }
+    | { ok: false; error: string }
+  > => ipcRenderer.invoke('insightgraph:entity-ego-graph', entityName, depth),
+  insightGraphBuildSubgraphFromEntities: (
+    names: string[],
+    opts?: { maxEntities?: number },
+  ): Promise<
+    | {
+        ok: true
+        data: {
+          nodes: Array<{ id: string; name: string; type?: string } & Record<string, unknown>>
+          edges: Array<{ id: string; source: string; target: string; type?: string } & Record<string, unknown>>
+        }
+      }
+    | { ok: false; error: string }
+  > => ipcRenderer.invoke('insightgraph:build-subgraph-from-entities', names, opts),
+
   // Platform info
   platform: process.platform,
 }

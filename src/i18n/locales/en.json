@@ -16,6 +16,9 @@
     "addFolder": "Add Folder",
     "closeFolder": "Close Folder",
     "contents": "Contents",
+    "entity": "Entity",
+    "related": "Related",
+    "relatedSoon": "Related documents will appear here once documents share entities.",
     "noHeadings": "No headings found",
     "pinSidebar": "Pin sidebar",
     "unpinSidebar": "Unpin sidebar"
@@ -24,7 +27,38 @@
     "toggleFileTree": "Toggle file tree",
     "toggleOutline": "Toggle outline",
     "settings": "Settings",
-    "theme": "Theme"
+    "theme": "Theme",
+    "showGraph": "Show Knowledge Graph",
+    "showReader": "Back to reader"
+  },
+  "graphView": {
+    "title": "Knowledge Graph",
+    "scope": {
+      "global": "Global",
+      "document": "Document",
+      "entity": "Entity"
+    },
+    "loading": "Loading graph…",
+    "error": "Couldn't load graph",
+    "counts": "{{nodes}} nodes · {{edges}} edges",
+    "empty": {
+      "title": "No graph data yet",
+      "body": "Focus a node or switch scope to load a different view.",
+      "noReports": "Save a document to the Knowledge Graph to populate this view."
+    },
+    "disabled": {
+      "title": "Knowledge Graph is disabled",
+      "body": "Enable it in Settings → Knowledge Graph and configure a Neo4j connection to use this view."
+    }
+  },
+  "entityPanel": {
+    "empty": "Click a node in the graph, or a linked entity in a document, to open its profile here.",
+    "loading": "Loading entity details…",
+    "noData": "No data for this entity yet.",
+    "claims": "Claims",
+    "related": "Related Entities",
+    "timeline": "Timeline",
+    "contradictions": "Contradictions"
   },
   "commandPalette": {
     "placeholder": "Search files or commands...",
@@ -39,7 +73,9 @@
     "toggleAgent": "Toggle AI Assistant",
     "toggleFocusMode": "Toggle Focus Mode",
     "togglePrivacy": "Toggle Privacy Mode",
-    "insightGraphIngest": "Save Document to Knowledge Graph"
+    "insightGraphIngest": "Save Document to Knowledge Graph",
+    "showGraph": "Show Knowledge Graph",
+    "showReader": "Back to Reader"
   },
   "settings": {
     "title": "Settings",

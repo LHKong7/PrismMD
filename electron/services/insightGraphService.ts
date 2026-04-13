@@ -298,6 +298,197 @@ export async function entityTimeline(entityName: string): Promise<Record<string,
   return ig.entityTimeline(entityName)
 }
 
+/**
+ * Normalized graph shape consumed by GraphView. The SDK's raw `node` /
+ * `relationship` records are Neo4j-ish and vary shape-to-shape; we collapse
+ * them here to a predictable `{ nodes, edges }` so the renderer only has
+ * to handle one schema.
+ */
+export interface RenderedGraphNode {
+  id: string
+  name: string
+  type?: string
+  [key: string]: unknown
+}
+
+export interface RenderedGraphEdge {
+  id: string
+  source: string
+  target: string
+  type?: string
+  [key: string]: unknown
+}
+
+export interface RenderedGraph {
+  nodes: RenderedGraphNode[]
+  edges: RenderedGraphEdge[]
+}
+
+/**
+ * Best-effort extraction of a stable identifier, label and type from an
+ * arbitrary record returned by the Neo4j-backed SDK. The SDK emits three
+ * slightly different shapes depending on whether an item was returned via
+ * `findEntities`, part of a `getSubgraph` result, or nested in a
+ * relationship payload; this helper hides that variation from callers.
+ */
+function normalizeEntity(raw: Record<string, unknown> | unknown): RenderedGraphNode | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+  const props = (r.properties as Record<string, unknown> | undefined) ?? r
+  const name =
+    (props.name as string | undefined) ??
+    (props.entityName as string | undefined) ??
+    (r.name as string | undefined)
+  const id =
+    (r.id as string | number | undefined)?.toString() ??
+    (props.id as string | number | undefined)?.toString() ??
+    (props.entityId as string | undefined) ??
+    (name ? `name:${name}` : undefined)
+  if (!id || !name) return null
+  const type =
+    (props.type as string | undefined) ??
+    (r.type as string | undefined) ??
+    (Array.isArray(r.labels) ? (r.labels as string[])[0] : undefined)
+  return { id, name, type, ...props }
+}
+
+function normalizeEdge(
+  raw: Record<string, unknown> | unknown,
+  fallbackSource?: string,
+): RenderedGraphEdge | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as Record<string, unknown>
+
+  // Shape 1: `getSubgraph` returns proper Neo4j edge objects with `start` /
+  // `end` numeric ids. Shape 2: `getEntityRelationships` returns rows where
+  // the current entity is implicit and the peer is in a named field.
+  const src =
+    (r.source as string | number | undefined)?.toString() ??
+    (r.start as string | number | undefined)?.toString() ??
+    (r.startNodeId as string | number | undefined)?.toString() ??
+    fallbackSource
+  const tgt =
+    (r.target as string | number | undefined)?.toString() ??
+    (r.end as string | number | undefined)?.toString() ??
+    (r.endNodeId as string | number | undefined)?.toString() ??
+    (r.relatedEntityId as string | undefined) ??
+    (typeof r.relatedEntity === 'string' ? (r.relatedEntity as string) : undefined) ??
+    (typeof r.relatedEntityName === 'string' ? `name:${r.relatedEntityName}` : undefined)
+  if (!src || !tgt) return null
+  const type =
+    (r.type as string | undefined) ??
+    (r.relationshipType as string | undefined) ??
+    (r.label as string | undefined)
+  const id =
+    (r.id as string | number | undefined)?.toString() ??
+    `${src}→${tgt}:${type ?? ''}`
+  return { id, source: src, target: tgt, type, ...r }
+}
+
+/**
+ * Build a unified graph by unioning `getEntityRelationships` results for
+ * every name in `entityNames`. Used by both the **Global** scope (walks the
+ * top-N entities by findEntities) and a downstream "Document" scope once
+ * we can map a report to its entities.
+ *
+ * The SDK has no "all edges" endpoint, so we take the per-entity
+ * neighborhoods and deduplicate. This caps at `maxEntities` to keep the
+ * canvas responsive — a 1000-node force layout tanks in an Electron
+ * window.
+ */
+export async function buildSubgraphFromEntities(
+  entityNames: string[],
+  opts: { maxEntities?: number } = {},
+): Promise<RenderedGraph> {
+  const cap = opts.maxEntities ?? 120
+  const names = Array.from(new Set(entityNames)).slice(0, cap)
+
+  const nodes = new Map<string, RenderedGraphNode>()
+  const edges = new Map<string, RenderedGraphEdge>()
+
+  const ig = await getInstance()
+
+  // Seed nodes with the entities themselves so isolated entities still
+  // appear (some may have no relationships yet).
+  const entities = await ig.findEntities({ limit: Math.max(cap, names.length) })
+  for (const e of entities) {
+    const node = normalizeEntity(e)
+    if (node && names.includes(node.name)) nodes.set(node.id, node)
+  }
+
+  for (const name of names) {
+    let rows: Record<string, unknown>[] = []
+    try {
+      rows = await ig.getEntityRelationships(name)
+    } catch {
+      continue
+    }
+    // Seed source node if findEntities missed it.
+    if (!Array.from(nodes.values()).some((n) => n.name === name)) {
+      const seed = normalizeEntity({ name })
+      if (seed) nodes.set(seed.id, seed)
+    }
+    const sourceId =
+      Array.from(nodes.values()).find((n) => n.name === name)?.id ?? `name:${name}`
+
+    for (const row of rows) {
+      // Row may carry both the peer entity and the edge — handle both.
+      const peer = normalizeEntity(row.relatedEntity ?? row.peer ?? row)
+      if (peer) nodes.set(peer.id, peer)
+      const edge = normalizeEdge(row, sourceId)
+      if (edge) edges.set(edge.id, edge)
+    }
+  }
+
+  return { nodes: Array.from(nodes.values()), edges: Array.from(edges.values()) }
+}
+
+/**
+ * Convenience wrapper for the Entity scope: find the focused entity's id
+ * and call `getSubgraph` at the requested depth. Falls back to the
+ * relationships-union path when the entity isn't yet indexed with a
+ * dedicated id (common on fresh ingests).
+ */
+export async function getEntityEgoGraph(
+  entityName: string,
+  depth = 2,
+): Promise<RenderedGraph> {
+  const ig = await getInstance()
+  const entities = await ig.findEntities({ name: entityName, limit: 1 })
+  const first = entities[0] ? normalizeEntity(entities[0]) : null
+
+  if (first?.id && !first.id.startsWith('name:')) {
+    try {
+      const sg = await ig.getSubgraph(first.id, depth)
+      const nodes = (sg.nodes as unknown[])
+        .map(normalizeEntity)
+        .filter((n): n is RenderedGraphNode => n !== null)
+      const edges = (sg.edges as unknown[])
+        .map((e) => normalizeEdge(e))
+        .filter((e): e is RenderedGraphEdge => e !== null)
+      return { nodes, edges }
+    } catch {
+      // fall through to the union path
+    }
+  }
+
+  return buildSubgraphFromEntities([entityName])
+}
+
+/**
+ * Global scope — the top-N most referenced entities and their immediate
+ * neighborhoods. Bounded so we don't freeze the renderer.
+ */
+export async function getGlobalGraph(maxEntities = 80): Promise<RenderedGraph> {
+  const ig = await getInstance()
+  const all = await ig.findEntities({ limit: maxEntities })
+  const names = all
+    .map(normalizeEntity)
+    .filter((n): n is RenderedGraphNode => n !== null)
+    .map((n) => n.name)
+  return buildSubgraphFromEntities(names, { maxEntities })
+}
+
 export function createSession(): Promise<string> {
   return getInstance().then((ig) => ig.createSession())
 }

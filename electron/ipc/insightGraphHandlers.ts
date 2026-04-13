@@ -19,6 +19,9 @@ import {
   findMetricTrend,
   findContradictions,
   entityTimeline,
+  getEntityEgoGraph,
+  getGlobalGraph,
+  buildSubgraphFromEntities,
   createSession,
   shutdown,
 } from '../services/insightGraphService'
@@ -116,6 +119,22 @@ export function registerInsightGraphHandlers() {
     wrap(() => findContradictions(name)),
   )
   ipcMain.handle('insightgraph:entity-timeline', (_e, name: string) => wrap(() => entityTimeline(name)))
+
+  // Composite graph shapes consumed by GraphView. These chain SDK calls
+  // in-process (fewer IPC round-trips) and return a normalized
+  // { nodes, edges } envelope the renderer can hand directly to
+  // react-force-graph-2d.
+  ipcMain.handle('insightgraph:global-graph', (_e, maxEntities?: number) =>
+    wrap(() => getGlobalGraph(maxEntities)),
+  )
+  ipcMain.handle('insightgraph:entity-ego-graph', (_e, entityName: string, depth?: number) =>
+    wrap(() => getEntityEgoGraph(entityName, depth)),
+  )
+  ipcMain.handle(
+    'insightgraph:build-subgraph-from-entities',
+    (_e, names: string[], opts?: { maxEntities?: number }) =>
+      wrap(() => buildSubgraphFromEntities(names, opts)),
+  )
 
   ipcMain.handle('insightgraph:shutdown', async () => {
     await shutdown()

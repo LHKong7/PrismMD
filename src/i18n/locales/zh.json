@@ -16,6 +16,9 @@
     "addFolder": "添加文件夹",
     "closeFolder": "关闭文件夹",
     "contents": "目录大纲",
+    "entity": "实体",
+    "related": "相关",
+    "relatedSoon": "当多篇文档共享实体时，这里会显示相关文档。",
     "noHeadings": "未找到标题",
     "pinSidebar": "固定侧栏",
     "unpinSidebar": "取消固定"
@@ -24,7 +27,38 @@
     "toggleFileTree": "切换文件树",
     "toggleOutline": "切换大纲",
     "settings": "设置",
-    "theme": "主题"
+    "theme": "主题",
+    "showGraph": "打开知识图谱",
+    "showReader": "返回阅读器"
+  },
+  "graphView": {
+    "title": "知识图谱",
+    "scope": {
+      "global": "全局",
+      "document": "文档",
+      "entity": "实体"
+    },
+    "loading": "加载图谱中…",
+    "error": "图谱加载失败",
+    "counts": "{{nodes}} 节点 · {{edges}} 边",
+    "empty": {
+      "title": "暂无图谱数据",
+      "body": "点击节点或切换作用域查看其它视图。",
+      "noReports": "先把一篇文档存入知识图谱，此处就会有内容。"
+    },
+    "disabled": {
+      "title": "知识图谱未启用",
+      "body": "在 设置 → 知识图谱 中启用并配置 Neo4j 连接后即可使用。"
+    }
+  },
+  "entityPanel": {
+    "empty": "点击图谱中的节点，或文档中链接的实体，在此查看其详情。",
+    "loading": "加载实体详情…",
+    "noData": "暂无该实体的数据。",
+    "claims": "主张",
+    "related": "相关实体",
+    "timeline": "时间线",
+    "contradictions": "矛盾之处"
   },
   "commandPalette": {
     "placeholder": "搜索文件或命令...",
@@ -39,7 +73,9 @@
     "toggleAgent": "切换 AI 助手",
     "toggleFocusMode": "切换专注模式",
     "togglePrivacy": "切换隐私模式",
-    "insightGraphIngest": "将当前文档存入知识图谱"
+    "insightGraphIngest": "将当前文档存入知识图谱",
+    "showGraph": "打开知识图谱",
+    "showReader": "返回阅读器"
   },
   "settings": {
     "title": "设置",
