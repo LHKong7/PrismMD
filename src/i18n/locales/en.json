@@ -15,6 +15,9 @@
     "openFolder": "Open Folder",
     "addFolder": "Add Folder",
     "closeFolder": "Close Folder",
+    "buildGraph": "Build knowledge graph ({{count}} files)",
+    "buildGraphEmpty": "No markdown files to ingest",
+    "ingestingGraph": "Ingesting {{done}} / {{total}}…",
     "contents": "Contents",
     "entity": "Entity",
     "related": "Related",
@@ -179,7 +182,13 @@
     "error": "Couldn't generate a summary",
     "parseError": "AI reply wasn't valid",
     "regenerate": "Regenerate summary",
-    "dismiss": "Hide for this document"
+    "generate": "Generate AI summary",
+    "dismiss": "Hide for this document",
+    "buildGraph": "Build knowledge graph for this document",
+    "graphBuilding": "Building knowledge graph…",
+    "graphBuildDone": "Knowledge graph built",
+    "graphBuildView": "View graph",
+    "graphBuildFailed": "Failed to build knowledge graph"
   },
   "selectionAI": {
     "pending": "Thinking…",

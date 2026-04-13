@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Sparkles, RefreshCw, X, ChevronRight, Loader2 } from 'lucide-react'
+import { Sparkles, RefreshCw, X, ChevronRight, Loader2, Network } from 'lucide-react'
 import { useFileStore } from '../../store/fileStore'
 import { useAgentStore } from '../../store/agentStore'
 import { useSettingsStore } from '../../store/settingsStore'
+import { useInsightGraphStore } from '../../store/insightGraphStore'
+import { useUIStore } from '../../store/uiStore'
 
 interface CachedSummary {
   tldr: string
@@ -40,8 +42,22 @@ export function DocSummary() {
   const currentFilePath = useFileStore((s) => s.currentFilePath)
   const currentContent = useFileStore((s) => s.currentContent)
   const activeProvider = useSettingsStore((s) => s.activeProvider)
+  const neo4jUri = useSettingsStore((s) => s.insightGraph.neo4j.uri)
   const toggleAgentSidebar = useAgentStore((s) => s.setAgentSidebarOpen)
   const sendMessage = useAgentStore((s) => s.sendMessage)
+  const ingestStatus = useInsightGraphStore((s) => s.ingest)
+  const ingestFile = useInsightGraphStore((s) => s.ingestFile)
+  const setGraphScope = useUIStore((s) => s.setGraphScope)
+  const setMainViewMode = useUIStore((s) => s.setMainViewMode)
+
+  const graphGateOpen = Boolean(activeProvider) && Boolean(neo4jUri?.trim())
+  const ingestIsForCurrent = ingestStatus.filePath === currentFilePath
+  const ingestStage = ingestIsForCurrent ? ingestStatus.stage : 'idle'
+  const ingestInFlight =
+    ingestStage === 'parsing' ||
+    ingestStage === 'extracting' ||
+    ingestStage === 'resolving' ||
+    ingestStage === 'writing'
 
   const [summary, setSummary] = useState<CachedSummary | null>(null)
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
@@ -51,24 +67,34 @@ export function DocSummary() {
   // Guard against stale responses if the user switches files mid-request.
   const lastRequestedFile = useRef<string | null>(null)
 
-  const load = async (force = false) => {
+  /**
+   * Look up a cached summary for the current file without ever calling the
+   * LLM. Used on file open so we don't auto-generate uninvited.
+   */
+  const loadFromCache = async () => {
     if (!currentFilePath || !currentContent) return
     const fileAtRequest = currentFilePath
     const signature = signatureForContent(currentContent)
     lastRequestedFile.current = fileAtRequest
-
-    // 1. Try the cache unless forced.
-    if (!force) {
-      try {
-        const cached = await window.electronAPI.docSummaryGet(fileAtRequest)
-        if (cached && cached.signature === signature) {
-          if (lastRequestedFile.current === fileAtRequest) setSummary(cached)
-          return
-        }
-      } catch {
-        // Cache read failed — fall through and regenerate.
+    try {
+      const cached = await window.electronAPI.docSummaryGet(fileAtRequest)
+      if (cached && cached.signature === signature) {
+        if (lastRequestedFile.current === fileAtRequest) setSummary(cached)
       }
+    } catch {
+      // Cache read failed — stay silent; the user can manually regenerate.
     }
+  }
+
+  /**
+   * Generate a fresh summary via the LLM. Only triggered by explicit user
+   * action (the Regenerate button) — never automatically on file open.
+   */
+  const generate = async () => {
+    if (!currentFilePath || !currentContent) return
+    const fileAtRequest = currentFilePath
+    const signature = signatureForContent(currentContent)
+    lastRequestedFile.current = fileAtRequest
 
     if (!activeProvider) {
       // No provider configured — don't annoy the user with an error; just
@@ -128,14 +154,14 @@ export function DocSummary() {
     }
   }
 
-  // Load (from cache or AI) whenever the open file changes. Reset the
-  // dismiss state so each new doc starts fresh.
+  // On file change, only hydrate from cache — never auto-generate. The
+  // user explicitly opts in by clicking Regenerate.
   useEffect(() => {
     setSummary(null)
     setStatus('idle')
     setError(null)
     if (!currentFilePath || !currentContent) return
-    load(false).catch(() => {})
+    loadFromCache().catch(() => {})
     // We deliberately only depend on the file path, not the content — we
     // don't want every keystroke (if files become editable) to retrigger.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -144,14 +170,42 @@ export function DocSummary() {
   if (!currentFilePath) return null
   if (dismissedFor === currentFilePath) return null
 
+  const [graphStatusDismissed, setGraphStatusDismissed] = useState(false)
+
+  // Reset the transient graph status dismissal when a new ingest starts
+  // for this file, or when the file changes.
+  useEffect(() => {
+    setGraphStatusDismissed(false)
+  }, [currentFilePath, ingestStage])
+
+  // Auto-hide completed / failed status after 8s so the card doesn't
+  // stay cluttered indefinitely.
+  useEffect(() => {
+    if (!ingestIsForCurrent) return
+    if (ingestStage !== 'completed' && ingestStage !== 'failed') return
+    const id = setTimeout(() => setGraphStatusDismissed(true), 8000)
+    return () => clearTimeout(id)
+  }, [ingestIsForCurrent, ingestStage])
+
+  const handleBuildGraph = () => {
+    if (!currentFilePath || !graphGateOpen || ingestInFlight) return
+    ingestFile(currentFilePath).catch(() => {})
+  }
+
+  const handleViewGraph = () => {
+    setGraphScope('document')
+    setMainViewMode('graph')
+  }
+
   const handleAsk = (question: string) => {
     toggleAgentSidebar(true)
     sendMessage(question, currentContent ?? undefined, currentFilePath ?? undefined)
   }
 
   const isEmpty = !summary && status !== 'loading' && status !== 'error'
+  // If there's no cache and no active AI provider, stay fully hidden — the
+  // user has nothing they can do with this card.
   if (isEmpty && !activeProvider) return null
-  if (isEmpty) return null // No cached summary and not actively loading — stay quiet.
 
   return (
     <div
@@ -170,11 +224,21 @@ export function DocSummary() {
           <span>{t('docSummary.title')}</span>
         </div>
         <div className="flex items-center gap-1">
+          {graphGateOpen && (
+            <button
+              onClick={handleBuildGraph}
+              disabled={ingestInFlight}
+              className="p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-50"
+              title={t('docSummary.buildGraph')}
+            >
+              <Network size={12} className={ingestInFlight ? 'animate-pulse' : undefined} />
+            </button>
+          )}
           <button
-            onClick={() => load(true)}
+            onClick={() => generate().catch(() => {})}
             disabled={status === 'loading'}
             className="p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-50"
-            title={t('docSummary.regenerate')}
+            title={summary ? t('docSummary.regenerate') : t('docSummary.generate')}
           >
             <RefreshCw size={12} className={status === 'loading' ? 'animate-spin' : undefined} />
           </button>
@@ -189,6 +253,55 @@ export function DocSummary() {
       </div>
 
       <div className="px-4 py-3">
+        {ingestIsForCurrent && !graphStatusDismissed && (
+          <>
+            {ingestInFlight && (
+              <div
+                className="flex items-center gap-2 pb-2 text-xs"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                <Loader2 size={12} className="animate-spin" />
+                <span>
+                  {t(`statusBar.ingest.${ingestStage}`, t('docSummary.graphBuilding'))}
+                </span>
+              </div>
+            )}
+            {ingestStage === 'completed' && (
+              <div
+                className="flex items-center justify-between gap-2 pb-2 text-xs"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                <div className="flex items-center gap-1.5">
+                  <Network size={12} style={{ color: 'var(--accent-color)' }} />
+                  <span>{t('docSummary.graphBuildDone')}</span>
+                </div>
+                <button
+                  onClick={handleViewGraph}
+                  className="px-2 py-0.5 rounded hover:bg-black/5 dark:hover:bg-white/10"
+                  style={{ color: 'var(--accent-color)' }}
+                >
+                  {t('docSummary.graphBuildView')}
+                </button>
+              </div>
+            )}
+            {ingestStage === 'failed' && (
+              <div className="text-xs text-red-500 pb-2">
+                {t('docSummary.graphBuildFailed')}
+                {ingestStatus.error ? `: ${ingestStatus.error}` : ''}
+              </div>
+            )}
+          </>
+        )}
+        {isEmpty && (
+          <button
+            onClick={() => generate().catch(() => {})}
+            className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded text-sm transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            <Sparkles size={13} style={{ color: 'var(--accent-color)' }} />
+            <span>{t('docSummary.generate')}</span>
+          </button>
+        )}
         {status === 'loading' && !summary && (
           <div className="flex items-center gap-2 py-2 text-sm" style={{ color: 'var(--text-muted)' }}>
             <Loader2 size={14} className="animate-spin" />

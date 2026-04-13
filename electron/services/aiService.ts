@@ -32,7 +32,8 @@ function buildAgent(
   apiKey: string,
   model: string,
   baseUrl?: string,
-  systemPrompt?: string
+  systemPrompt?: string,
+  maxToolRounds: number = 1
 ): AgentInstance {
   const llmConfig: LLMConfig = { apiKey, model }
 
@@ -53,7 +54,7 @@ function buildAgent(
     .setIncludeBuiltinTools(false)
     .enableStreaming()
     .enableContext()
-    .setMaxToolRounds(1)
+    .setMaxToolRounds(maxToolRounds)
 
   if (systemPrompt) {
     builder.setSystemPrompt(systemPrompt)
@@ -192,10 +193,21 @@ export async function sendOneShot(request: {
   }
   const systemPrompt = systemParts.length > 0 ? systemParts.join('\n\n') : undefined
 
-  const agent = buildAgent(provider, apiKey, model, baseUrl, systemPrompt)
+  // Give one-shot calls a larger tool-round budget than streaming chat so
+  // the agent has room to produce a final answer (streaming chat never
+  // triggers tools; one-shot with a JSON schema occasionally spends a
+  // round before emitting the final reply).
+  const agent = buildAgent(provider, apiKey, model, baseUrl, systemPrompt, 8)
   try {
     const result = await agent.chat(request.prompt)
     const reply = result.reply ?? ''
+
+    // borderless-agent returns this sentinel string when it gives up before
+    // the model produced a usable reply. Surface it as a typed error instead
+    // of letting the caller choke on JSON.parse.
+    if (reply.startsWith('Stopped:')) {
+      throw new Error(reply.trim())
+    }
 
     let json: unknown | undefined
     if (request.jsonSchema) {

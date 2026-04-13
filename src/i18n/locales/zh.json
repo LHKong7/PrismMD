@@ -15,6 +15,9 @@
     "openFolder": "打开文件夹",
     "addFolder": "添加文件夹",
     "closeFolder": "关闭文件夹",
+    "buildGraph": "构建知识图谱（{{count}} 个文件）",
+    "buildGraphEmpty": "没有可索引的 Markdown 文件",
+    "ingestingGraph": "正在索引 {{done}} / {{total}}…",
     "contents": "目录大纲",
     "entity": "实体",
     "related": "相关",
@@ -179,7 +182,13 @@
     "error": "无法生成摘要",
     "parseError": "AI 返回格式无效",
     "regenerate": "重新生成",
-    "dismiss": "在本文档中隐藏"
+    "generate": "生成 AI 摘要",
+    "dismiss": "在本文档中隐藏",
+    "buildGraph": "为该文档构建知识图谱",
+    "graphBuilding": "正在构建知识图谱…",
+    "graphBuildDone": "知识图谱已构建",
+    "graphBuildView": "查看图谱",
+    "graphBuildFailed": "构建知识图谱失败"
   },
   "selectionAI": {
     "pending": "思考中…",
