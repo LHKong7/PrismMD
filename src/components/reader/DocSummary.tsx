@@ -43,6 +43,7 @@ export function DocSummary() {
   const currentContent = useFileStore((s) => s.currentContent)
   const activeProvider = useSettingsStore((s) => s.activeProvider)
   const neo4jUri = useSettingsStore((s) => s.insightGraph.neo4j.uri)
+  const insightGraphEnabled = useSettingsStore((s) => s.insightGraph.enabled)
   const toggleAgentSidebar = useAgentStore((s) => s.setAgentSidebarOpen)
   const sendMessage = useAgentStore((s) => s.sendMessage)
   const ingestStatus = useInsightGraphStore((s) => s.ingest)
@@ -50,7 +51,8 @@ export function DocSummary() {
   const setGraphScope = useUIStore((s) => s.setGraphScope)
   const setMainViewMode = useUIStore((s) => s.setMainViewMode)
 
-  const graphGateOpen = Boolean(activeProvider) && Boolean(neo4jUri?.trim())
+  const graphGateOpen =
+    insightGraphEnabled && Boolean(activeProvider) && Boolean(neo4jUri?.trim())
   const ingestIsForCurrent = ingestStatus.filePath === currentFilePath
   const ingestStage = ingestIsForCurrent ? ingestStatus.stage : 'idle'
   const ingestInFlight =
