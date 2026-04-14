@@ -286,6 +286,21 @@ const electronAPI = {
     | { ok: false; error: string }
   > => ipcRenderer.invoke('insightgraph:related-reports', reportId, limit),
 
+  // External plugin loading (reads <userData>/plugins/<id>/).
+  pluginsDiscover: (): Promise<
+    | { ok: true; plugins: Array<{
+          manifest: { id: string; name: string; version: string; description?: string; main?: string }
+          source: string
+          dir: string
+        }>
+        errors: Array<{ dir: string; error: string }>
+      }
+    | { ok: false; error: string }
+  > => ipcRenderer.invoke('plugins:discover'),
+  pluginsGetDir: (): Promise<string> => ipcRenderer.invoke('plugins:get-dir'),
+  pluginsOpenDir: (): Promise<{ ok: true } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('plugins:open-dir'),
+
   // Platform info
   platform: process.platform,
 }

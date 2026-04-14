@@ -14,6 +14,7 @@ import { useFileWatcher } from './hooks/useFileWatcher'
 import { useAutoHide } from './hooks/useAutoHide'
 import { useAnnotations } from './hooks/useAnnotations'
 import { useSettingsStore } from './store/settingsStore'
+import { bootstrapExternalPlugins } from './lib/plugins/externalLoader'
 import { initI18n } from './i18n'
 
 initI18n()
@@ -26,6 +27,12 @@ function AppContent() {
   const loadSettings = useSettingsStore((s) => s.loadSettings)
 
   useEffect(() => { loadSettings() }, [loadSettings])
+
+  // Load on-disk plugins once the IPC bridge is up. Safe to await inside
+  // useEffect — `bootstrapExternalPlugins` is idempotent.
+  useEffect(() => {
+    void bootstrapExternalPlugins()
+  }, [])
 
   // Ctrl/Cmd + , : settings
   useEffect(() => {

@@ -70,6 +70,28 @@ export interface ElectronAPI {
 
   // Platform
   platform: string
+
+  // Plugins
+  pluginsDiscover: () => Promise<
+    | {
+        ok: true
+        plugins: Array<{
+          manifest: {
+            id: string
+            name: string
+            version: string
+            description?: string
+            main?: string
+          }
+          source: string
+          dir: string
+        }>
+        errors: Array<{ dir: string; error: string }>
+      }
+    | { ok: false; error: string }
+  >
+  pluginsGetDir: () => Promise<string>
+  pluginsOpenDir: () => Promise<{ ok: true } | { ok: false; error: string }>
 }
 
 declare global {

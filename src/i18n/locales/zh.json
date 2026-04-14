@@ -154,6 +154,17 @@
       "clearMemoryDesc": "删除所有存储的对话历史与偏好。",
       "cleared": "记忆已清除"
     },
+    "plugins": {
+      "title": "插件",
+      "subtitle": "用社区贡献的命令、侧栏面板、Markdown 渲染器扩展 PrismMD。",
+      "trustWarning": "插件拥有与 PrismMD 相同的会话权限，请只安装你信任的插件。",
+      "folderLabel": "插件目录",
+      "openFolder": "打开目录",
+      "reload": "重新加载",
+      "builtin": "内置",
+      "external": "第三方",
+      "externalEmpty": "还没有第三方插件。把插件文件夹放进上面的目录，然后点重新加载。"
+    },
     "insightgraph": {
       "title": "知识图谱",
       "description": "将文档存入 Neo4j 知识图谱，并跨文档提问。使用当前激活的 AI 服务进行抽取，需要本地或远程的 Neo4j 实例。",

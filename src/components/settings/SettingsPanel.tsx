@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
-import { X, Check, Loader2, Globe, Palette, Bot, Eye, EyeOff, Shield, Trash2, Network, AlertTriangle, RefreshCw } from 'lucide-react'
+import { X, Check, Loader2, Globe, Palette, Bot, Eye, EyeOff, Shield, Trash2, Network, AlertTriangle, RefreshCw, Puzzle, FolderOpen, CircleAlert } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useSettingsStore, DEFAULT_MODELS, type AIProvider, type InsightGraphDomain } from '../../store/settingsStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
+import { usePluginManager } from '../../lib/plugins/host'
+import { reloadExternalPlugins } from '../../lib/plugins/externalLoader'
 import { themes } from '../../lib/theme/themes'
 import { LANGUAGES, changeLanguage, type SupportedLanguage } from '../../i18n'
 import { clsx } from 'clsx'
@@ -12,7 +14,7 @@ interface SettingsPanelProps {
   onClose: () => void
 }
 
-type Tab = 'language' | 'theme' | 'ai' | 'privacy' | 'insightgraph'
+type Tab = 'language' | 'theme' | 'ai' | 'privacy' | 'insightgraph' | 'plugins'
 
 export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const { t } = useTranslation()
@@ -42,6 +44,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
               { id: 'theme' as Tab, icon: Palette, label: t('settings.theme.title') },
               { id: 'ai' as Tab, icon: Bot, label: t('settings.ai.title') },
               { id: 'insightgraph' as Tab, icon: Network, label: t('settings.insightgraph.title') },
+              { id: 'plugins' as Tab, icon: Puzzle, label: t('settings.plugins.title') },
               { id: 'privacy' as Tab, icon: Shield, label: t('settings.privacy.title') },
             ]).map(({ id, icon: Icon, label }) => (
               <button
@@ -67,6 +70,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             {activeTab === 'theme' && <ThemeSettings />}
             {activeTab === 'ai' && <AISettings />}
             {activeTab === 'insightgraph' && <InsightGraphSettings />}
+            {activeTab === 'plugins' && <PluginsSettings />}
             {activeTab === 'privacy' && <PrivacySettings />}
           </div>
         </div>
@@ -653,6 +657,170 @@ function InsightGraphSettings() {
           </ul>
         )}
       </div>
+    </div>
+  )
+}
+
+/**
+ * Plugin management pane. Lists every loaded plugin (built-in + external),
+ * surfaces load errors, and exposes a "Open plugin folder" shortcut so
+ * users know where to drop new plugins.
+ */
+function PluginsSettings() {
+  const { t } = useTranslation()
+  const loaded = usePluginManager((s) => s.loaded)
+  const [pluginDir, setPluginDir] = useState('')
+  const [reloading, setReloading] = useState(false)
+
+  useEffect(() => {
+    void window.electronAPI.pluginsGetDir().then(setPluginDir)
+  }, [])
+
+  const entries = Object.values(loaded)
+  const builtIn = entries.filter((e) => e.plugin.id.startsWith('prismmd.'))
+  const external = entries.filter((e) => !e.plugin.id.startsWith('prismmd.'))
+
+  const handleReload = async () => {
+    setReloading(true)
+    try {
+      await reloadExternalPlugins()
+    } finally {
+      setReloading(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+          {t('settings.plugins.title')}
+        </h3>
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          {t('settings.plugins.subtitle')}
+        </p>
+      </div>
+
+      {/* Trust warning for external plugins. */}
+      <div
+        className="flex items-start gap-2 p-3 rounded border text-xs"
+        style={{ borderColor: 'var(--border-color)' }}
+      >
+        <CircleAlert size={14} className="flex-shrink-0 mt-0.5 text-amber-500" />
+        <span style={{ color: 'var(--text-secondary)' }}>
+          {t('settings.plugins.trustWarning')}
+        </span>
+      </div>
+
+      {/* Plugin folder shortcut. */}
+      <div
+        className="flex items-center justify-between p-3 rounded border"
+        style={{ borderColor: 'var(--border-color)' }}
+      >
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+            {t('settings.plugins.folderLabel')}
+          </div>
+          <div
+            className="text-[11px] font-mono truncate mt-0.5"
+            style={{ color: 'var(--text-muted)' }}
+            title={pluginDir}
+          >
+            {pluginDir || '…'}
+          </div>
+        </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            onClick={() => window.electronAPI.pluginsOpenDir()}
+            className="flex items-center gap-1 text-xs px-2 py-1 rounded border hover:bg-black/5 dark:hover:bg-white/5"
+            style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+          >
+            <FolderOpen size={12} />
+            {t('settings.plugins.openFolder')}
+          </button>
+          <button
+            onClick={handleReload}
+            disabled={reloading}
+            className="flex items-center gap-1 text-xs px-2 py-1 rounded border hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-50"
+            style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+          >
+            {reloading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+            {t('settings.plugins.reload')}
+          </button>
+        </div>
+      </div>
+
+      <PluginList title={t('settings.plugins.builtin')} entries={builtIn} />
+      <PluginList
+        title={t('settings.plugins.external')}
+        entries={external}
+        emptyMessage={t('settings.plugins.externalEmpty')}
+      />
+    </div>
+  )
+}
+
+function PluginList({
+  title,
+  entries,
+  emptyMessage,
+}: {
+  title: string
+  entries: ReturnType<typeof usePluginManager>['loaded'][string][]
+  emptyMessage?: string
+}) {
+  return (
+    <div>
+      <h4 className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
+        {title}
+      </h4>
+      {entries.length === 0 ? (
+        emptyMessage && (
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            {emptyMessage}
+          </p>
+        )
+      ) : (
+        <ul className="space-y-2">
+          {entries.map(({ plugin, error }) => (
+            <li
+              key={plugin.id}
+              className="p-3 rounded border"
+              style={{ borderColor: 'var(--border-color)' }}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                    {plugin.name}
+                    <span
+                      className="ml-2 text-[10px] font-mono"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      v{plugin.version}
+                    </span>
+                  </div>
+                  {plugin.description && (
+                    <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                      {plugin.description}
+                    </div>
+                  )}
+                  <div className="text-[10px] font-mono mt-1" style={{ color: 'var(--text-muted)' }}>
+                    {plugin.id}
+                  </div>
+                </div>
+              </div>
+              {error && (
+                <div
+                  className="mt-2 flex items-start gap-2 text-xs p-2 rounded"
+                  style={{ backgroundColor: 'rgba(239,68,68,0.08)', color: '#ef4444' }}
+                >
+                  <AlertTriangle size={12} className="flex-shrink-0 mt-0.5" />
+                  <span className="font-mono break-all">{error}</span>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

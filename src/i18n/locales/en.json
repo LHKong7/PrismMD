@@ -154,6 +154,17 @@
       "clearMemoryDesc": "Remove all stored conversation history and preferences.",
       "cleared": "Memory cleared"
     },
+    "plugins": {
+      "title": "Plugins",
+      "subtitle": "Extend PrismMD with community-contributed commands, sidebar panels, and markdown renderers.",
+      "trustWarning": "Plugins run with full access to your PrismMD session. Only install plugins you trust.",
+      "folderLabel": "Plugin folder",
+      "openFolder": "Open folder",
+      "reload": "Reload",
+      "builtin": "Built-in",
+      "external": "External",
+      "externalEmpty": "No external plugins found. Drop a plugin folder into the location above, then click Reload."
+    },
     "insightgraph": {
       "title": "Knowledge Graph",
       "description": "Save documents as nodes in a Neo4j knowledge graph and ask questions across them. Uses your active AI provider for extraction. Requires a running Neo4j instance.",
