@@ -36,6 +36,7 @@
     "@tanstack/react-table": "^8.20.5",
     "@tanstack/react-virtual": "^3.10.8",
     "papaparse": "^5.4.1",
+    "pdfjs-dist": "^4.10.38",
     "xlsx": "^0.18.5",
     "rehype-highlight": "^7.0.1",
     "rehype-katex": "^7.0.1",

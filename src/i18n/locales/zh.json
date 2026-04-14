@@ -29,8 +29,10 @@
       "emptySheet": "这张工作表是空的。"
     },
     "pdf": {
-      "placeholderTitle": "PDF 视图即将上线",
-      "placeholderBody": "安装 pdfjs-dist 后会自动启用。"
+      "errorTitle": "无法渲染该 PDF",
+      "prev": "上一页",
+      "next": "下一页",
+      "pageOf": "第 {{page}} / {{total}} 页"
     }
   },
   "sidebar": {

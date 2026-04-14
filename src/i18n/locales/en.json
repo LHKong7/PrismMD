@@ -29,8 +29,10 @@
       "emptySheet": "This sheet is empty."
     },
     "pdf": {
-      "placeholderTitle": "PDF viewer coming up",
-      "placeholderBody": "The PDF viewer will be enabled once pdfjs-dist is installed on this branch."
+      "errorTitle": "Couldn't render this PDF",
+      "prev": "Previous page",
+      "next": "Next page",
+      "pageOf": "Page {{page}} / {{total}}"
     }
   },
   "sidebar": {
