@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { useFileStore } from '../../store/fileStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
-import { Bot, Globe, Shield, Network, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { useBatchIngestStore } from '../../store/batchIngestStore'
+import { Bot, Globe, Shield, Network, Loader2, AlertCircle, CheckCircle2, X } from 'lucide-react'
 
 export function StatusBar() {
   const { t } = useTranslation()
@@ -29,6 +30,20 @@ export function StatusBar() {
     ingest.stage !== 'idle' && ingest.stage !== 'completed' && ingest.stage !== 'failed'
   const ingestFilename = ingest.filePath ? ingest.filePath.split(/[/\\]/).pop() : null
 
+  // Batch-ingest progress (right-click → "Ingest whole folder" or the
+  // Build-Graph button). When a batch is running, its progress is the
+  // headline status — the per-file ingest stage lives *inside* the
+  // batch so we don't need to show both.
+  const batchStatus = useBatchIngestStore((s) => s.status)
+  const batchDone = useBatchIngestStore((s) => s.done.length)
+  const batchFailed = useBatchIngestStore((s) => s.failed.length)
+  const batchTotal = useBatchIngestStore((s) => s.total)
+  const cancelBatch = useBatchIngestStore((s) => s.cancel)
+  const resetBatch = useBatchIngestStore((s) => s.reset)
+  const batchProgress = batchTotal > 0
+    ? Math.min(100, Math.round(((batchDone + batchFailed) / batchTotal) * 100))
+    : 0
+
   return (
     <div
       className="flex items-center justify-between px-3 h-6 text-[11px] select-none flex-shrink-0 border-t"
@@ -53,24 +68,75 @@ export function StatusBar() {
           </div>
         )}
 
-        {ingestActive && (
-          <div className="flex items-center gap-1" style={{ color: 'var(--accent-color)' }} title={ingestFilename ?? ''}>
+        {/* Batch ingest takes precedence — when a queue is running we
+            hide the single-file stage so the user sees one coherent
+            progress indicator. */}
+        {batchStatus === 'running' ? (
+          <div className="flex items-center gap-2" style={{ color: 'var(--accent-color)' }}>
             <Loader2 size={11} className="animate-spin" />
             <Network size={11} />
-            <span>{t(`statusBar.ingest.${ingest.stage}`)}</span>
+            <span>
+              {t('batchIngest.running', {
+                done: batchDone + batchFailed,
+                total: batchTotal,
+              })}
+            </span>
+            <div
+              className="h-1 w-24 rounded overflow-hidden"
+              style={{ backgroundColor: 'var(--border-color)' }}
+            >
+              <div
+                className="h-full transition-[width] duration-150"
+                style={{ width: `${batchProgress}%`, backgroundColor: 'var(--accent-color)' }}
+              />
+            </div>
+            <button
+              onClick={cancelBatch}
+              className="p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10"
+              title={t('batchIngest.cancel')}
+            >
+              <X size={10} />
+            </button>
           </div>
-        )}
-        {ingest.stage === 'completed' && (
-          <div className="flex items-center gap-1 text-green-500" title={ingestFilename ?? ''}>
+        ) : batchStatus === 'done' && batchTotal > 0 ? (
+          <div
+            className={`flex items-center gap-1 ${batchFailed > 0 ? 'text-amber-500' : 'text-green-500'}`}
+          >
             <CheckCircle2 size={11} />
-            <span>{t('statusBar.ingest.completed')}</span>
+            <span>
+              {t('batchIngest.completed', { ok: batchDone, failed: batchFailed })}
+            </span>
+            <button
+              onClick={resetBatch}
+              className="p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10"
+              title={t('batchIngest.dismiss')}
+              style={{ color: 'var(--text-muted)' }}
+            >
+              <X size={10} />
+            </button>
           </div>
-        )}
-        {ingest.stage === 'failed' && (
-          <div className="flex items-center gap-1 text-red-500" title={ingest.error ?? ''}>
-            <AlertCircle size={11} />
-            <span>{t('statusBar.ingest.failed')}</span>
-          </div>
+        ) : (
+          <>
+            {ingestActive && (
+              <div className="flex items-center gap-1" style={{ color: 'var(--accent-color)' }} title={ingestFilename ?? ''}>
+                <Loader2 size={11} className="animate-spin" />
+                <Network size={11} />
+                <span>{t(`statusBar.ingest.${ingest.stage}`)}</span>
+              </div>
+            )}
+            {ingest.stage === 'completed' && (
+              <div className="flex items-center gap-1 text-green-500" title={ingestFilename ?? ''}>
+                <CheckCircle2 size={11} />
+                <span>{t('statusBar.ingest.completed')}</span>
+              </div>
+            )}
+            {ingest.stage === 'failed' && (
+              <div className="flex items-center gap-1 text-red-500" title={ingest.error ?? ''}>
+                <AlertCircle size={11} />
+                <span>{t('statusBar.ingest.failed')}</span>
+              </div>
+            )}
+          </>
         )}
 
       </div>

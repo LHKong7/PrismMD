@@ -267,6 +267,13 @@
   },
   "filetree": {
     "saveToGraph": "存入知识图谱",
+    "ingestFolder": "整个文件夹入图谱（{{count}} 个文件）",
     "savingToGraph": "保存中…"
+  },
+  "batchIngest": {
+    "running": "正在摄入 {{done}} / {{total}}",
+    "completed": "摄入完成：成功 {{ok}} / 失败 {{failed}}",
+    "cancel": "取消批处理",
+    "dismiss": "关闭"
   }
 }

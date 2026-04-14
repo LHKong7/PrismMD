@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { useFileStore } from '../../store/fileStore'
 import { useUIStore } from '../../store/uiStore'
 import { useSettingsStore } from '../../store/settingsStore'
-import { useInsightGraphStore } from '../../store/insightGraphStore'
+import { useBatchIngestStore } from '../../store/batchIngestStore'
 import { FileTree } from '../filetree/FileTree'
 import type { FileTreeNode } from '../../types/electron'
 import { isSupported } from '../../lib/fileFormat'
@@ -35,43 +35,23 @@ function FolderSection({ folderPath, folderName, tree, onClose }: {
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(true)
   const insightGraphEnabled = useSettingsStore((s) => s.insightGraph.enabled)
-  const ingestFile = useInsightGraphStore((s) => s.ingestFile)
-
-  // Local ingestion progress for this folder. Kept local (not in zustand)
-  // because it's transient UI state tied to a button click and the store
-  // already owns per-file status globally.
-  const [ingestState, setIngestState] = useState<
-    | { kind: 'idle' }
-    | { kind: 'running'; done: number; total: number }
-    | { kind: 'done'; ingested: number; failed: number; at: number }
-  >({ kind: 'idle' })
+  const startBatchIngest = useBatchIngestStore((s) => s.startBatchIngest)
+  const batchStatus = useBatchIngestStore((s) => s.status)
+  const batchDone = useBatchIngestStore((s) => s.done.length)
+  const batchFailed = useBatchIngestStore((s) => s.failed.length)
+  const batchTotal = useBatchIngestStore((s) => s.total)
 
   const ingestableFiles = useMemo(() => collectIngestableFiles(tree), [tree])
 
-  const handleBuildGraph = async (e: React.MouseEvent) => {
+  const handleBuildGraph = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!ingestableFiles.length || ingestState.kind === 'running') return
-
-    setIngestState({ kind: 'running', done: 0, total: ingestableFiles.length })
-    let failed = 0
-    for (let i = 0; i < ingestableFiles.length; i++) {
-      const ok = await ingestFile(ingestableFiles[i])
-      if (!ok) failed += 1
-      setIngestState({ kind: 'running', done: i + 1, total: ingestableFiles.length })
-    }
-    setIngestState({
-      kind: 'done',
-      ingested: ingestableFiles.length - failed,
-      failed,
-      at: Date.now(),
-    })
-    // Return to idle after a moment so the button is usable again.
-    setTimeout(() => setIngestState({ kind: 'idle' }), 4000)
+    if (!ingestableFiles.length || batchStatus === 'running') return
+    void startBatchIngest(ingestableFiles)
   }
 
-  const running = ingestState.kind === 'running'
+  const running = batchStatus === 'running'
   const buildTitle = running
-    ? t('sidebar.ingestingGraph', { done: ingestState.done, total: ingestState.total })
+    ? t('sidebar.ingestingGraph', { done: batchDone + batchFailed, total: batchTotal })
     : ingestableFiles.length > 0
       ? t('sidebar.buildGraph', { count: ingestableFiles.length })
       : t('sidebar.buildGraphEmpty')
@@ -111,10 +91,10 @@ function FolderSection({ folderPath, folderName, tree, onClose }: {
             >
               {running ? (
                 <Loader2 size={12} className="animate-spin" style={{ color: 'var(--accent-color)' }} />
-              ) : ingestState.kind === 'done' ? (
+              ) : batchStatus === 'done' && batchTotal > 0 ? (
                 <Database
                   size={12}
-                  style={{ color: ingestState.failed ? '#ef4444' : 'var(--accent-color)' }}
+                  style={{ color: batchFailed > 0 ? '#ef4444' : 'var(--accent-color)' }}
                 />
               ) : (
                 <Database size={12} style={{ color: 'var(--text-muted)' }} />

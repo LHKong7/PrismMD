@@ -14,8 +14,9 @@ import type { FileTreeNode } from '../../types/electron'
 import { useFileStore } from '../../store/fileStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
+import { useBatchIngestStore } from '../../store/batchIngestStore'
 import { FileTree } from './FileTree'
-import { detectFormat, type FileFormat } from '../../lib/fileFormat'
+import { detectFormat, isSupported, type FileFormat } from '../../lib/fileFormat'
 
 interface FileTreeNodeItemProps {
   node: FileTreeNode
@@ -33,6 +34,21 @@ function iconForFormat(format: FileFormat | null) {
   }
 }
 
+/**
+ * Collect every ingestable descendant file under a directory node so the
+ * folder right-click can kick off a batch without walking the tree a
+ * second time up in the renderer store.
+ */
+function collectIngestableDescendants(node: FileTreeNode): string[] {
+  const out: string[] = []
+  const visit = (n: FileTreeNode) => {
+    if (n.type === 'file' && isSupported(n.path)) out.push(n.path)
+    else if (n.children) n.children.forEach(visit)
+  }
+  visit(node)
+  return out
+}
+
 export function FileTreeNodeItem({ node, depth }: FileTreeNodeItemProps) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(depth === 0)
@@ -41,12 +57,21 @@ export function FileTreeNodeItem({ node, depth }: FileTreeNodeItemProps) {
   const openFile = useFileStore((s) => s.openFile)
   const insightGraphEnabled = useSettingsStore((s) => s.insightGraph.enabled)
   const ingestFile = useInsightGraphStore((s) => s.ingestFile)
+  const startBatchIngest = useBatchIngestStore((s) => s.startBatchIngest)
 
   const isActive = node.type === 'file' && node.path === currentFilePath
   const paddingLeft = 8 + depth * 16
   const fileFormat = node.type === 'file' ? detectFormat(node.path) : null
-  // Any supported ingestable format (SDK handles md / pdf / csv / json / xlsx).
-  const canIngest = insightGraphEnabled && fileFormat !== null
+  // Files: any supported format the SDK can ingest.
+  // Directories: any descendant file that qualifies.
+  const ingestableFolderFiles =
+    node.type === 'directory' && insightGraphEnabled
+      ? collectIngestableDescendants(node)
+      : []
+  const canIngest =
+    insightGraphEnabled &&
+    (fileFormat !== null || ingestableFolderFiles.length > 0)
+
   const FormatIcon = iconForFormat(fileFormat)
 
   const handleClick = () => {
@@ -117,7 +142,7 @@ export function FileTreeNodeItem({ node, depth }: FileTreeNodeItemProps) {
 
       {menu && canIngest && (
         <div
-          className="fixed z-50 min-w-[200px] rounded-md border shadow-lg py-1 text-xs"
+          className="fixed z-50 min-w-[220px] rounded-md border shadow-lg py-1 text-xs"
           style={{
             left: menu.x,
             top: menu.y,
@@ -126,17 +151,31 @@ export function FileTreeNodeItem({ node, depth }: FileTreeNodeItemProps) {
             color: 'var(--text-secondary)',
           }}
         >
-          <button
-            className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-black/5 dark:hover:bg-white/5"
-            onClick={(e) => {
-              e.stopPropagation()
-              setMenu(null)
-              ingestFile(node.path)
-            }}
-          >
-            <Network size={12} />
-            <span>{t('filetree.saveToGraph')}</span>
-          </button>
+          {node.type === 'file' ? (
+            <button
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-black/5 dark:hover:bg-white/5"
+              onClick={(e) => {
+                e.stopPropagation()
+                setMenu(null)
+                void ingestFile(node.path)
+              }}
+            >
+              <Network size={12} />
+              <span>{t('filetree.saveToGraph')}</span>
+            </button>
+          ) : (
+            <button
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-black/5 dark:hover:bg-white/5"
+              onClick={(e) => {
+                e.stopPropagation()
+                setMenu(null)
+                void startBatchIngest(ingestableFolderFiles)
+              }}
+            >
+              <Network size={12} />
+              <span>{t('filetree.ingestFolder', { count: ingestableFolderFiles.length })}</span>
+            </button>
+          )}
         </div>
       )}
     </div>

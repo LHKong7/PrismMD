@@ -267,6 +267,13 @@
   },
   "filetree": {
     "saveToGraph": "Save to Knowledge Graph",
-    "savingToGraph": "Saving…"
+    "savingToGraph": "Saving…",
+    "ingestFolder": "Ingest whole folder into Graph ({{count}} files)"
+  },
+  "batchIngest": {
+    "running": "Ingesting {{done}} / {{total}}",
+    "completed": "Ingest done: {{ok}} ok, {{failed}} failed",
+    "cancel": "Cancel batch",
+    "dismiss": "Dismiss"
   }
 }
