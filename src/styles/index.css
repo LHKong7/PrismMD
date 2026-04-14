@@ -44,6 +44,32 @@
   --progress-bar: #7aa2f7;
 }
 
+/* Visible keyboard focus ring for all interactive elements. We disable
+ * the default browser outline only when the mouse is driving focus
+ * (:focus without -visible) so that clicking a button doesn't leave a
+ * ring behind, but Tab / Shift-Tab / arrow navigation always shows
+ * one. Earlier revisions had no ring at all, which made the app
+ * almost unusable with a keyboard. */
+button:focus,
+a:focus,
+[role='button']:focus,
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+}
+button:focus-visible,
+a:focus-visible,
+[role='button']:focus-visible,
+[role='menuitem']:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--accent-color);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 * {
   margin: 0;
   padding: 0;

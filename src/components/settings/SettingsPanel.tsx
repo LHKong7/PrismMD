@@ -328,7 +328,7 @@ function AIProviderCard({
             color: isActive ? '#fff' : 'var(--text-secondary)',
           }}
         >
-          {isActive ? 'Active' : 'Activate'}
+          {isActive ? t('settings.ai.active') : t('settings.ai.activate')}
         </button>
       </div>
 
@@ -525,9 +525,24 @@ function InsightGraphSettings() {
             value={insightGraph.neo4j.uri}
             onChange={(e) => setConfig({ neo4j: { uri: e.target.value } })}
             placeholder={t('settings.insightgraph.uriPlaceholder')}
+            aria-invalid={!!insightGraph.neo4j.uri && !isValidNeo4jUri(insightGraph.neo4j.uri)}
             className="w-full text-sm px-3 py-2 rounded-md border bg-transparent outline-none focus:border-[var(--accent-color)]"
-            style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+            style={{
+              // Swap to red when the user has typed something that clearly
+              // isn't a Bolt URI — prevents the "Test Connection" round-trip
+              // from failing with a confusing driver error.
+              borderColor:
+                insightGraph.neo4j.uri && !isValidNeo4jUri(insightGraph.neo4j.uri)
+                  ? '#ef4444'
+                  : 'var(--border-color)',
+              color: 'var(--text-primary)',
+            }}
           />
+          {insightGraph.neo4j.uri && !isValidNeo4jUri(insightGraph.neo4j.uri) && (
+            <p className="text-xs text-red-500 mt-1">
+              {t('settings.insightgraph.uriInvalid')}
+            </p>
+          )}
         </div>
 
         <div className="mb-3">
@@ -570,7 +585,7 @@ function InsightGraphSettings() {
             </div>
             <button
               onClick={handleTest}
-              disabled={testing || !insightGraph.neo4j.uri}
+              disabled={testing || !insightGraph.neo4j.uri || !isValidNeo4jUri(insightGraph.neo4j.uri)}
               className="text-xs px-3 py-2 rounded-md border transition-colors disabled:opacity-50"
               style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
               type="button"
@@ -1038,7 +1053,12 @@ function AboutSettings() {
       case 'downloading': return t('settings.about.statusDownloading')
       case 'downloaded': return t('settings.about.statusDownloaded', { version: nextVersion ?? '' })
       case 'not-available': return t('settings.about.statusLatest')
-      case 'error': return t('settings.about.statusError', { error: error ?? '' })
+      case 'error':
+        // `error === 'offline'` is a sentinel the store sets when the
+        // browser reports we're offline — swap in the localised copy
+        // instead of leaking the raw updater error.
+        if (error === 'offline') return t('settings.about.statusOffline')
+        return t('settings.about.statusError', { error: error ?? '' })
       default: return t('settings.about.statusIdle')
     }
   })()
@@ -1121,6 +1141,16 @@ function AboutSettings() {
       )}
     </div>
   )
+}
+
+/**
+ * Accept any scheme the official Neo4j driver supports:
+ * `bolt`, `bolt+s`, `bolt+ssc`, `neo4j`, `neo4j+s`, `neo4j+ssc`. Anything
+ * else (e.g. `http://`, bare hostname, typos) is caught before the
+ * driver's opaque error bubbles up.
+ */
+function isValidNeo4jUri(uri: string): boolean {
+  return /^(bolt|neo4j)(\+s|\+ssc)?:\/\/[^\s/]+(:\d+)?\/?$/i.test(uri.trim())
 }
 
 function formatRelativeTime(ms: number, t: (key: string, vars?: Record<string, unknown>) => string): string {

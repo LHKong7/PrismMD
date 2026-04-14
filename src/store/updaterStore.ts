@@ -61,6 +61,18 @@ export const useUpdaterStore = create<UpdaterState>((set) => ({
   setCurrentVersion: (v) => set({ currentVersion: v }),
 
   checkNow: async () => {
+    // Short-circuit on offline rather than firing the updater (which
+    // would just time out with a generic network error). Surfacing an
+    // explicit "offline" state lets the UI swap in the localised
+    // message instead of whatever squirrel/update-electron-app emits.
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      set({
+        kind: 'error',
+        error: 'offline',
+        lastEventAt: Date.now(),
+      })
+      return
+    }
     set({ kind: 'checking', lastEventAt: Date.now() })
     try {
       await window.electronAPI.updaterCheckNow()

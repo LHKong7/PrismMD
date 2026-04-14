@@ -26,6 +26,35 @@ export function stopGeneration() {
 }
 
 /**
+ * Race a yielded value (e.g. a `for await` iteration) against the abort
+ * signal so the user's "Stop" click interrupts even when the upstream
+ * LLM is stalled waiting for the next SSE chunk. Without this, the
+ * `for await` loop sits on `stream.next()` until the network delivers
+ * another token — which can take 30s+ on flaky connections, long after
+ * the user asked to cancel.
+ */
+function raceAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(new DOMException('Aborted', 'AbortError'))
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => {
+      signal.removeEventListener('abort', onAbort)
+      reject(new DOMException('Aborted', 'AbortError'))
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+    promise.then(
+      (v) => {
+        signal.removeEventListener('abort', onAbort)
+        resolve(v)
+      },
+      (err) => {
+        signal.removeEventListener('abort', onAbort)
+        reject(err)
+      },
+    )
+  })
+}
+
+/**
  * Register discovered MCP tools on the agent builder.
  *
  * `borderless-agent`'s exact tool-registration API isn't documented in the
@@ -37,16 +66,34 @@ export function stopGeneration() {
  * Tool names are prefixed `<serverId>__<toolName>` so two MCP servers
  * exposing the same name (both "search", for example) don't collide.
  */
-async function attachMcpTools(builder: AgentBuilder): Promise<number> {
+export interface AttachMcpResult {
+  attached: number
+  discovered: number
+  /**
+   * Populated when MCP discovery returned tools but the underlying
+   * agent framework doesn't expose a known registration method. The
+   * caller forwards this to the renderer so users see why tool use
+   * quietly stopped working instead of guessing.
+   */
+  warning?: string
+}
+
+async function attachMcpTools(builder: AgentBuilder): Promise<AttachMcpResult> {
   let attached = 0
   let discovered: Awaited<ReturnType<typeof discoverAllMcpTools>> = []
   try {
     discovered = await discoverAllMcpTools()
   } catch (err) {
     console.warn('[mcp] tool discovery failed:', err)
-    return 0
+    return {
+      attached: 0,
+      discovered: 0,
+      warning: `MCP tool discovery failed: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    }
   }
-  if (discovered.length === 0) return 0
+  if (discovered.length === 0) return { attached: 0, discovered: 0 }
 
   type LooseBuilder = AgentBuilder & Record<string, unknown>
   const loose = builder as LooseBuilder
@@ -60,12 +107,11 @@ async function attachMcpTools(builder: AgentBuilder): Promise<number> {
     (typeof loose.withTool === 'function' && 'withTool') ||
     null
   if (!registrar) {
-    console.warn(
-      '[mcp] borderless-agent exposes no addTool/registerTool/withTool; ' +
-        `skipping ${discovered.length} MCP tool(s). Tool use will resume ` +
-        "once the agent's tool API is wired.",
-    )
-    return 0
+    const msg =
+      `borderless-agent exposes no addTool/registerTool/withTool; ` +
+      `skipped ${discovered.length} MCP tool(s).`
+    console.warn(`[mcp] ${msg}`)
+    return { attached: 0, discovered: discovered.length, warning: msg }
   }
 
   for (const { serverId, tool, qualifiedName } of discovered) {
@@ -87,7 +133,7 @@ async function attachMcpTools(builder: AgentBuilder): Promise<number> {
       console.warn(`[mcp] failed to register tool "${qualifiedName}":`, err)
     }
   }
-  return attached
+  return { attached, discovered: discovered.length }
 }
 
 /**
@@ -106,7 +152,7 @@ async function buildAgent(
   systemPrompt?: string,
   maxToolRounds: number = 1,
   attachTools: boolean = true,
-): Promise<AgentInstance> {
+): Promise<{ agent: AgentInstance; mcpWarning?: string; mcpAttached: number }> {
   const llmConfig: LLMConfig = { apiKey, model }
 
   // Ollama uses an OpenAI-compatible endpoint at /v1
@@ -139,16 +185,20 @@ async function buildAgent(
     builder.setSystemPrompt(systemPrompt)
   }
 
+  let mcpWarning: string | undefined
+  let mcpAttached = 0
   if (mcpEnabled) {
-    const attached = await attachMcpTools(builder)
-    if (attached > 0) {
+    const res = await attachMcpTools(builder)
+    mcpAttached = res.attached
+    mcpWarning = res.warning
+    if (res.attached > 0) {
       // Nudge the model to actually use them — some models otherwise
       // ignore tools unless told they exist.
       builder.setSystemPrompt(
         [
           systemPrompt ?? '',
           '',
-          `You have access to ${attached} MCP tool(s). Call them when ` +
+          `You have access to ${res.attached} MCP tool(s). Call them when ` +
             'the user asks for information you don\'t already have in the ' +
             'provided context.',
         ]
@@ -158,7 +208,7 @@ async function buildAgent(
     }
   }
 
-  return builder.build()
+  return { agent: builder.build(), mcpWarning, mcpAttached }
 }
 
 export async function sendMessage(
@@ -220,23 +270,57 @@ export async function sendMessage(
   }
 
   // Build agent with the active provider
-  const agent = await buildAgent(provider, apiKey, model, baseUrl, systemPrompt)
+  const { agent, mcpWarning } = await buildAgent(provider, apiKey, model, baseUrl, systemPrompt)
+
+  // Surface MCP attachment problems before streaming starts so the
+  // renderer can show a non-blocking warning banner — previously these
+  // only went to the main-process console and the user had no idea
+  // tool use had silently dropped.
+  if (mcpWarning) {
+    mainWindow.webContents.send('agent:mcp-warning', mcpWarning)
+  }
 
   currentAbortController = new AbortController()
   const signal = currentAbortController.signal
 
   try {
+    // Note: we race the stream iterator against the abort signal so
+    // "Stop" actually interrupts even when the LLM is stalled waiting
+    // for the next chunk (see raceAbort's comment).
     const stream = agent.stream(lastMessage.content, history)
+    const iterator = stream[Symbol.asyncIterator]()
 
-    for await (const chunk of stream) {
+    while (true) {
       if (signal.aborted) break
-      if (chunk.delta) {
-        mainWindow.webContents.send('agent:stream-chunk', chunk.delta)
+      let step: IteratorResult<{ delta?: string }>
+      try {
+        step = await raceAbort(iterator.next(), signal)
+      } catch (err) {
+        if ((err as { name?: string })?.name === 'AbortError') break
+        throw err
+      }
+      if (step.done) break
+      if (step.value?.delta) {
+        mainWindow.webContents.send('agent:stream-chunk', step.value.delta)
       }
     }
+  } catch (err) {
+    // Main source of "frozen chat" bugs pre-fix: the stream throws,
+    // the finally block swallows everything, and the renderer sits
+    // spinning forever. Always push the error through to the UI so
+    // the user can see what went wrong and retry.
+    const message = err instanceof Error ? err.message : String(err)
+    mainWindow.webContents.send('agent:stream-error', message)
+    // Don't rethrow — the renderer already has the error and throwing
+    // here would turn a handled UI error into an unhandled IPC reject
+    // on top of it.
   } finally {
     currentAbortController = null
-    await agent.close()
+    try {
+      await agent.close()
+    } catch (err) {
+      console.warn('[agent] close failed:', err)
+    }
   }
 
   return { provider, model }
@@ -295,7 +379,7 @@ export async function sendOneShot(request: {
   // the agent has room to produce a final answer (streaming chat never
   // triggers tools; one-shot with a JSON schema occasionally spends a
   // round before emitting the final reply).
-  const agent = await buildAgent(provider, apiKey, model, baseUrl, systemPrompt, 8)
+  const { agent } = await buildAgent(provider, apiKey, model, baseUrl, systemPrompt, 8)
   try {
     const result = await agent.chat(request.prompt)
     const reply = result.reply ?? ''
@@ -337,7 +421,7 @@ export async function testConnection(
 
     // Connection test — skip MCP tool attach so a broken server can't
     // block the test handshake.
-    const agent = await buildAgent(provider, apiKey, model, baseUrl, undefined, 1, false)
+    const { agent } = await buildAgent(provider, apiKey, model, baseUrl, undefined, 1, false)
 
     const result = await agent.chat('hi')
     await agent.close()

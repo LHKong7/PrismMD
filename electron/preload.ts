@@ -93,6 +93,16 @@ const electronAPI = {
     ipcRenderer.on('agent:stream-chunk', handler)
     return () => ipcRenderer.removeListener('agent:stream-chunk', handler)
   },
+  onAgentStreamError: (callback: (error: string) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, error: string) => callback(error)
+    ipcRenderer.on('agent:stream-error', handler)
+    return () => ipcRenderer.removeListener('agent:stream-error', handler)
+  },
+  onAgentMcpWarning: (callback: (message: string) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, message: string) => callback(message)
+    ipcRenderer.on('agent:mcp-warning', handler)
+    return () => ipcRenderer.removeListener('agent:mcp-warning', handler)
+  },
   stopAgentGeneration: (): void => { ipcRenderer.send('agent:stop') },
   testAgentConnection: (provider: string, apiKey: string, baseUrl?: string): Promise<boolean> =>
     ipcRenderer.invoke('agent:test-connection', provider, apiKey, baseUrl),

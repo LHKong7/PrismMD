@@ -15,12 +15,14 @@ import { useFileStore } from '../../store/fileStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
 import { useBatchIngestStore } from '../../store/batchIngestStore'
-import { FileTree } from './FileTree'
 import { detectFormat, isSupported, type FileFormat } from '../../lib/fileFormat'
 
 interface FileTreeNodeItemProps {
   node: FileTreeNode
   depth: number
+  hasChildren: boolean
+  expanded: boolean
+  onToggle: (path: string) => void
 }
 
 function iconForFormat(format: FileFormat | null) {
@@ -49,9 +51,13 @@ function collectIngestableDescendants(node: FileTreeNode): string[] {
   return out
 }
 
-export function FileTreeNodeItem({ node, depth }: FileTreeNodeItemProps) {
+/**
+ * Single tree row. Expand/collapse state is lifted to the parent
+ * `FileTree` so virtualization can unmount rows without losing it —
+ * this component is stateless w.r.t. expansion.
+ */
+export function FileTreeNodeItem({ node, depth, hasChildren: _hasChildren, expanded, onToggle }: FileTreeNodeItemProps) {
   const { t } = useTranslation()
-  const [expanded, setExpanded] = useState(depth === 0)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const currentFilePath = useFileStore((s) => s.currentFilePath)
   const openFile = useFileStore((s) => s.openFile)
@@ -62,8 +68,6 @@ export function FileTreeNodeItem({ node, depth }: FileTreeNodeItemProps) {
   const isActive = node.type === 'file' && node.path === currentFilePath
   const paddingLeft = 8 + depth * 16
   const fileFormat = node.type === 'file' ? detectFormat(node.path) : null
-  // Files: any supported format the SDK can ingest.
-  // Directories: any descendant file that qualifies.
   const ingestableFolderFiles =
     node.type === 'directory' && insightGraphEnabled
       ? collectIngestableDescendants(node)
@@ -76,7 +80,7 @@ export function FileTreeNodeItem({ node, depth }: FileTreeNodeItemProps) {
 
   const handleClick = () => {
     if (node.type === 'directory') {
-      setExpanded(!expanded)
+      onToggle(node.path)
     } else {
       openFile(node.path)
     }
@@ -86,6 +90,25 @@ export function FileTreeNodeItem({ node, depth }: FileTreeNodeItemProps) {
     if (!canIngest) return
     e.preventDefault()
     setMenu({ x: e.clientX, y: e.clientY })
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    // Keyboard-equivalent of the right-click context menu. Shift+F10 is
+    // the platform-standard shortcut; the dedicated ContextMenu key
+    // (a.k.a. "menu key") fires the same.
+    if (canIngest && ((e.shiftKey && e.key === 'F10') || e.key === 'ContextMenu')) {
+      e.preventDefault()
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+      setMenu({ x: rect.left + 8, y: rect.bottom })
+      return
+    }
+    if (node.type === 'directory' && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+      // Expand / collapse with arrow keys for keyboard users.
+      if ((e.key === 'ArrowRight' && !expanded) || (e.key === 'ArrowLeft' && expanded)) {
+        e.preventDefault()
+        onToggle(node.path)
+      }
+    }
   }
 
   useEffect(() => {
@@ -108,9 +131,12 @@ export function FileTreeNodeItem({ node, depth }: FileTreeNodeItemProps) {
       <button
         onClick={handleClick}
         onContextMenu={handleContextMenu}
+        onKeyDown={handleKeyDown}
+        aria-expanded={node.type === 'directory' ? expanded : undefined}
         className={clsx(
           'w-full flex items-center gap-1.5 py-1 px-1 text-left text-sm transition-colors',
           'hover:bg-black/5 dark:hover:bg-white/5',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-color)]',
           isActive && 'bg-black/10 dark:bg-white/10'
         )}
         style={{
@@ -136,10 +162,6 @@ export function FileTreeNodeItem({ node, depth }: FileTreeNodeItemProps) {
         <span className="truncate">{node.name}</span>
       </button>
 
-      {node.type === 'directory' && expanded && node.children && (
-        <FileTree nodes={node.children} depth={depth + 1} />
-      )}
-
       {menu && canIngest && (
         <div
           className="fixed z-50 min-w-[220px] rounded-md border shadow-lg py-1 text-xs"
@@ -150,27 +172,30 @@ export function FileTreeNodeItem({ node, depth }: FileTreeNodeItemProps) {
             borderColor: 'var(--border-color)',
             color: 'var(--text-secondary)',
           }}
+          role="menu"
         >
           {node.type === 'file' ? (
             <button
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-black/5 dark:hover:bg-white/5"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-black/5 dark:hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-[var(--accent-color)]"
               onClick={(e) => {
                 e.stopPropagation()
                 setMenu(null)
                 void ingestFile(node.path)
               }}
+              role="menuitem"
             >
               <Network size={12} />
               <span>{t('filetree.saveToGraph')}</span>
             </button>
           ) : (
             <button
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-black/5 dark:hover:bg-white/5"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-black/5 dark:hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-[var(--accent-color)]"
               onClick={(e) => {
                 e.stopPropagation()
                 setMenu(null)
                 void startBatchIngest(ingestableFolderFiles)
               }}
+              role="menuitem"
             >
               <Network size={12} />
               <span>{t('filetree.ingestFolder', { count: ingestableFolderFiles.length })}</span>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState, type RefObject } from 'react'
 import { ChevronRight, Database, FolderOpen, Loader2, Pin, PinOff, Plus, X } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useTranslation } from 'react-i18next'
@@ -26,11 +26,12 @@ function collectIngestableFiles(nodes: FileTreeNode[]): string[] {
   return out
 }
 
-function FolderSection({ folderPath, folderName, tree, onClose }: {
+function FolderSection({ folderPath, folderName, tree, onClose, scrollParentRef }: {
   folderPath: string
   folderName: string
   tree: FileTreeNode[]
   onClose: () => void
+  scrollParentRef: RefObject<HTMLElement>
 }) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(true)
@@ -112,7 +113,7 @@ function FolderSection({ folderPath, folderName, tree, onClose }: {
       </div>
       {expanded && (
         <div className="pb-1">
-          <FileTree nodes={tree} />
+          <FileTree nodes={tree} scrollParentRef={scrollParentRef} />
         </div>
       )}
     </div>
@@ -126,6 +127,11 @@ export function LeftSidebar() {
   const openFolderDialog = useFileStore((s) => s.openFolderDialog)
   const leftSidebarPinned = useUIStore((s) => s.leftSidebarPinned)
   const pinLeftSidebar = useUIStore((s) => s.pinLeftSidebar)
+  // The overflow-y-auto container serves as the scroll parent for all
+  // FileTree virtualizers so huge folders don't spawn a DOM node per
+  // file. We pass the ref down instead of letting FileTree introduce
+  // its own scroller (nested scrollers fragment navigation).
+  const scrollParentRef = useRef<HTMLDivElement>(null)
 
   return (
     <div
@@ -165,7 +171,7 @@ export function LeftSidebar() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto" ref={scrollParentRef}>
         {openFolders.length > 0 ? (
           openFolders.map((folder) => (
             <FolderSection
@@ -174,6 +180,7 @@ export function LeftSidebar() {
               folderName={folder.name}
               tree={folder.tree}
               onClose={() => closeFolder(folder.path)}
+              scrollParentRef={scrollParentRef}
             />
           ))
         ) : (

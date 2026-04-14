@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
-import { Send, Square, Trash2, Bot, ChevronDown, Brain } from 'lucide-react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { Send, Square, Trash2, Bot, ChevronDown, Brain, AlertTriangle, X, ArrowDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAgentStore } from '../../store/agentStore'
 import { useFileStore } from '../../store/fileStore'
@@ -13,11 +13,23 @@ export function AgentSidebar() {
   const [input, setInput] = useState('')
   const [showModelPicker, setShowModelPicker] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  /**
+   * Smart auto-scroll: only pin to the bottom when the user is already
+   * near the bottom. If they scroll up to read history we stop pinning
+   * and surface a "new messages" chip so they can opt back in.
+   * Previously the stream force-scrolled on every chunk, hijacking the
+   * user's scroll mid-read.
+   */
+  const [stickToBottom, setStickToBottom] = useState(true)
+  const [hasNewWhileDetached, setHasNewWhileDetached] = useState(false)
 
   const messages = useAgentStore((s) => s.messages)
   const isStreaming = useAgentStore((s) => s.isStreaming)
   const streamingContent = useAgentStore((s) => s.streamingContent)
   const pendingEvidence = useAgentStore((s) => s.pendingEvidence)
+  const mcpWarning = useAgentStore((s) => s.mcpWarning)
+  const dismissMcpWarning = useAgentStore((s) => s.dismissMcpWarning)
   const scrollToEvidence = useReaderDomStore((s) => s.scrollToEvidence)
   const sendMessage = useAgentStore((s) => s.sendMessage)
   const stopGeneration = useAgentStore((s) => s.stopGeneration)
@@ -30,10 +42,31 @@ export function AgentSidebar() {
   const setActiveProvider = useSettingsStore((s) => s.setActiveProvider)
   const setProviderConfig = useSettingsStore((s) => s.setProviderConfig)
 
-  // Auto-scroll
+  const onScroll = useCallback(() => {
+    const el = scrollRef.current
+    if (!el) return
+    // 40px slack keeps "is at bottom" forgiving for sub-pixel rendering.
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40
+    setStickToBottom(atBottom)
+    if (atBottom) setHasNewWhileDetached(false)
+  }, [])
+
+  // Auto-scroll — only when the user hasn't scrolled away from the
+  // bottom. When detached, we mark "new messages" so they can tap the
+  // overlay to catch up.
   useEffect(() => {
+    if (stickToBottom) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    } else if (messages.length > 0 || streamingContent) {
+      setHasNewWhileDetached(true)
+    }
+  }, [messages, streamingContent, stickToBottom])
+
+  const jumpToLatest = () => {
+    setStickToBottom(true)
+    setHasNewWhileDetached(false)
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, streamingContent])
+  }
 
   const handleSend = () => {
     const trimmed = input.trim()
@@ -69,16 +102,52 @@ export function AgentSidebar() {
           <div className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px]" style={{ color: 'var(--text-muted)' }}>
             <Brain size={10} />
           </div>
-          <button onClick={clearMessages} className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors" title={t('agent.clear')}>
+          <button
+            onClick={clearMessages}
+            className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-[var(--accent-color)] transition-colors"
+            title={t('agent.clear')}
+            aria-label={t('agent.clear')}
+          >
             <Trash2 size={13} style={{ color: 'var(--text-muted)' }} />
           </button>
         </div>
       </div>
 
-      {/* Privacy badge */}
+      {/* Privacy badge — tooltip explains which providers are blocked so
+          users aren't left guessing which ones are still usable. */}
       {privacyMode && (
-        <div className="px-3 py-1.5 text-[10px] font-semibold text-center" style={{ backgroundColor: '#ef44441a', color: '#ef4444' }}>
-          Privacy Mode - Local Models Only
+        <div
+          className="px-3 py-1.5 text-[10px] font-semibold text-center"
+          style={{ backgroundColor: '#ef44441a', color: '#ef4444' }}
+          title={t('agent.privacyBadgeTooltip')}
+        >
+          {t('agent.privacyBadge')}
+        </div>
+      )}
+
+      {/* MCP warning — surfaces when the main process couldn't attach
+          MCP tools (previously silent). Dismissible so it doesn't become
+          permanent chrome. */}
+      {mcpWarning && (
+        <div
+          className="flex items-start gap-2 px-3 py-2 text-[11px] border-b"
+          style={{
+            backgroundColor: '#f59e0b14',
+            color: '#b45309',
+            borderColor: 'var(--border-color)',
+          }}
+          role="alert"
+        >
+          <AlertTriangle size={12} className="mt-0.5 flex-shrink-0" />
+          <span className="flex-1">{mcpWarning}</span>
+          <button
+            onClick={dismissMcpWarning}
+            className="p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-[var(--accent-color)]"
+            aria-label={t('common.dismiss')}
+            title={t('common.dismiss')}
+          >
+            <X size={11} />
+          </button>
         </div>
       )}
 
@@ -141,7 +210,21 @@ export function AgentSidebar() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto relative" ref={scrollRef} onScroll={onScroll}>
+        {hasNewWhileDetached && (
+          <button
+            onClick={jumpToLatest}
+            className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-medium shadow-md focus-visible:ring-2 focus-visible:ring-[var(--accent-color)]"
+            style={{
+              backgroundColor: 'var(--accent-color)',
+              color: '#fff',
+            }}
+            aria-label={t('agent.jumpToLatest')}
+          >
+            <ArrowDown size={12} />
+            {t('agent.newMessages')}
+          </button>
+        )}
         {messages.length === 0 && !isStreaming ? (
           <div className="flex items-center justify-center h-full px-4">
             <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>

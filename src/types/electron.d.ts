@@ -59,6 +59,8 @@ export interface ElectronAPI {
     memoryContext?: string
   }) => Promise<{ provider: string; model: string }>
   onAgentStream: (callback: (chunk: string) => void) => () => void
+  onAgentStreamError: (callback: (error: string) => void) => () => void
+  onAgentMcpWarning: (callback: (message: string) => void) => () => void
   stopAgentGeneration: () => void
   testAgentConnection: (provider: string, apiKey: string, baseUrl?: string) => Promise<boolean>
 

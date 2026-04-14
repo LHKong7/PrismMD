@@ -1,6 +1,9 @@
-import { useMemo } from 'react'
-import { Bot, User } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Bot, User, AlertCircle, RotateCcw, Copy, Check } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import type { ChatMessage as ChatMessageType, CitationEvidence } from '../../store/agentStore'
+import { useAgentStore } from '../../store/agentStore'
+import { useFileStore } from '../../store/fileStore'
 import { useReaderDomStore } from '../../store/readerDomStore'
 
 interface ChatMessageProps {
@@ -83,8 +86,14 @@ function CitationSuperscript({
 }
 
 export function ChatMessage({ message }: ChatMessageProps) {
+  const { t } = useTranslation()
   const isUser = message.role === 'user'
+  const isError = !isUser && message.status === 'error'
   const scrollToEvidence = useReaderDomStore((s) => s.scrollToEvidence)
+  const retryMessage = useAgentStore((s) => s.retryMessage)
+  const currentContent = useFileStore((s) => s.currentContent)
+  const currentFilePath = useFileStore((s) => s.currentFilePath)
+  const [copied, setCopied] = useState(false)
 
   const body = useMemo(() => {
     if (isUser) return message.content
@@ -93,15 +102,40 @@ export function ChatMessage({ message }: ChatMessageProps) {
     })
   }, [message.content, message.evidence, isUser, scrollToEvidence])
 
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(message.content)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // Clipboard can fail in restricted contexts — silently ignore,
+      // the user will retry.
+    }
+  }
+
   return (
-    <div className={`flex gap-2.5 px-4 py-3 ${isUser ? '' : 'bg-black/[0.02] dark:bg-white/[0.02]'}`}>
+    <div
+      className={`group flex gap-2.5 px-4 py-3 ${
+        isError
+          ? 'bg-red-500/[0.06]'
+          : isUser
+            ? ''
+            : 'bg-black/[0.02] dark:bg-white/[0.02]'
+      }`}
+    >
       <div
         className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5"
         style={{
-          backgroundColor: isUser ? 'var(--accent-color)' : 'var(--bg-secondary)',
+          backgroundColor: isError
+            ? '#ef4444'
+            : isUser
+              ? 'var(--accent-color)'
+              : 'var(--bg-secondary)',
         }}
       >
-        {isUser ? (
+        {isError ? (
+          <AlertCircle size={14} color="#fff" />
+        ) : isUser ? (
           <User size={14} color="#fff" />
         ) : (
           <Bot size={14} style={{ color: 'var(--accent-color)' }} />
@@ -110,20 +144,68 @@ export function ChatMessage({ message }: ChatMessageProps) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
           <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
-            {isUser ? 'You' : 'AI'}
+            {isUser ? t('chat.you') : t('chat.assistant')}
           </span>
           {message.model && (
             <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>
               {message.model}
             </span>
           )}
+          {isError && (
+            <span className="text-[10px] font-semibold text-red-500">
+              {t('chat.errorLabel')}
+            </span>
+          )}
+          {!isUser && !isError && message.content && (
+            // Copy button is always rendered but only visually revealed on
+            // hover/focus to avoid adding noise to the transcript. `sr-only`
+            // ensures it's still reachable with screen readers and keyboard.
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="ml-auto opacity-0 group-hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-[var(--accent-color)] p-0.5 rounded transition-opacity"
+              aria-label={t('chat.copyMessage')}
+              title={t('chat.copyMessage')}
+            >
+              {copied ? (
+                <Check size={12} className="text-green-500" />
+              ) : (
+                <Copy size={12} style={{ color: 'var(--text-muted)' }} />
+              )}
+            </button>
+          )}
         </div>
         <div
           className="text-sm leading-relaxed whitespace-pre-wrap break-words"
-          style={{ color: 'var(--text-secondary)' }}
+          style={{ color: isError ? '#ef4444' : 'var(--text-secondary)' }}
         >
           {body}
         </div>
+
+        {isError && message.errorRetryPrompt && (
+          <div className="mt-2">
+            <button
+              type="button"
+              onClick={() =>
+                void retryMessage(
+                  message.id,
+                  currentContent ?? undefined,
+                  currentFilePath ?? undefined,
+                )
+              }
+              className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border focus-visible:ring-2 focus-visible:ring-[var(--accent-color)]"
+              style={{
+                borderColor: '#ef4444',
+                color: '#ef4444',
+                backgroundColor: '#ef44441a',
+              }}
+              aria-label={t('chat.retry')}
+            >
+              <RotateCcw size={12} />
+              {t('chat.retry')}
+            </button>
+          </div>
+        )}
 
         {/* Sources footer — also clickable, so users can navigate from
             citation numbers they couldn't find inline. */}
@@ -136,7 +218,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
               className="font-semibold mb-1 uppercase tracking-wider text-[10px]"
               style={{ color: 'var(--text-muted)' }}
             >
-              Sources
+              {t('chat.sources')}
             </div>
             <ol className="space-y-0.5">
               {message.evidence.map((ev) => (

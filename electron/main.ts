@@ -78,16 +78,30 @@ app.on('window-all-closed', () => {
 })
 
 let servicesShutdownStarted = false
+/** Hard ceiling for shutdown — beyond this we give up and exit so the
+ * user isn't staring at a dock icon waiting on a hung MCP subprocess. */
+const SHUTDOWN_TIMEOUT_MS = 5000
+
 app.on('before-quit', (event) => {
   if (servicesShutdownStarted) return
   servicesShutdownStarted = true
   event.preventDefault()
   // Tear down both long-running services in parallel so the user
-  // isn't stuck waiting on one blocking the other on app close.
-  Promise.all([
+  // isn't stuck waiting on one blocking the other on app close. The
+  // timeout race exists because a misbehaving MCP subprocess (not
+  // SIGTERM-responsive) would otherwise keep the main process alive
+  // forever, leaving orphan children in the user's process tree.
+  const shutdown = Promise.all([
     shutdownInsightGraph().catch(() => {}),
     shutdownMcpServers().catch(() => {}),
-  ]).finally(() => app.exit(0))
+  ])
+  const timeout = new Promise<void>((resolve) =>
+    setTimeout(() => {
+      console.warn(`[app] shutdown timed out after ${SHUTDOWN_TIMEOUT_MS}ms — force-exiting`)
+      resolve()
+    }, SHUTDOWN_TIMEOUT_MS),
+  )
+  Promise.race([shutdown, timeout]).finally(() => app.exit(0))
 })
 
 app.on('activate', () => {

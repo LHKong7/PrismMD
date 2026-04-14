@@ -69,6 +69,11 @@
     },
     "loading": "加载图谱中…",
     "error": "图谱加载失败",
+    "errorAuth": "认证失败——请检查 Neo4j 用户名和密码。",
+    "errorUnreachable": "无法连接 Neo4j——请检查 Bolt 地址及数据库是否运行。",
+    "errorTimeout": "请求超时。",
+    "errorOffline": "当前似乎离线。",
+    "autoScopedToGlobal": "当前文档没有实体，已切换到全局图谱视图。",
     "counts": "{{nodes}} 节点 · {{edges}} 边",
     "empty": {
       "title": "暂无图谱数据",
@@ -137,6 +142,8 @@
       "testConnection": "测试",
       "connectionSuccess": "连接成功！",
       "connectionFailed": "连接失败",
+      "active": "已激活",
+      "activate": "激活",
       "localNote": "无需 API 密钥，请确保 Ollama 正在本地运行。",
       "custom": "自定义服务商",
       "customBaseUrlPlaceholder": "https://api.example.com/v1",
@@ -176,6 +183,7 @@
       "statusDownloaded": "更新 {{version}} 已准备好安装。",
       "statusLatest": "已是最新版本。",
       "statusError": "检查更新失败：{{error}}",
+      "statusOffline": "当前似乎离线，请连接网络后重试。",
       "lastChecked": "最近检查：{{time}}",
       "checkNow": "立即检查",
       "restartNow": "重启并安装",
@@ -213,6 +221,7 @@
       "testConnection": "测试连接",
       "connectionSuccess": "连接成功！",
       "connectionFailed": "连接失败",
+      "uriInvalid": "请输入合法的 Bolt URI，例如 bolt://localhost:7687",
       "domain": "抽取领域",
       "domainDefault": "默认",
       "domainStock": "股票分析",
@@ -286,6 +295,10 @@
     "thinking": "思考中...",
     "error": "发生错误，请检查 API 密钥后重试。",
     "memoryEnabled": "记忆已启用",
+    "privacyBadge": "隐私模式 — 仅本地模型",
+    "privacyBadgeTooltip": "开启隐私模式后，云端服务商（OpenAI、Anthropic、Google、自定义）会被禁用，仅允许 Ollama。",
+    "newMessages": "有新消息",
+    "jumpToLatest": "跳到最新消息",
     "contextMenu": {
       "explain": "解释这段",
       "translate": "翻译",
@@ -324,5 +337,17 @@
     "completed": "摄入完成：成功 {{ok}} / 失败 {{failed}}",
     "cancel": "取消批处理",
     "dismiss": "关闭"
+  },
+  "chat": {
+    "you": "你",
+    "assistant": "AI",
+    "sources": "来源",
+    "errorLabel": "错误",
+    "retry": "重试",
+    "copyMessage": "复制这条消息"
+  },
+  "common": {
+    "dismiss": "关闭",
+    "close": "关闭"
   }
 }

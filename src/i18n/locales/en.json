@@ -69,6 +69,11 @@
     },
     "loading": "Loading graph…",
     "error": "Couldn't load graph",
+    "errorAuth": "Authentication failed — check your Neo4j credentials.",
+    "errorUnreachable": "Neo4j is unreachable — check the Bolt URI and that the database is running.",
+    "errorTimeout": "Request timed out.",
+    "errorOffline": "You appear to be offline.",
+    "autoScopedToGlobal": "No entities for this document — switched to Global scope.",
     "counts": "{{nodes}} nodes · {{edges}} edges",
     "empty": {
       "title": "No graph data yet",
@@ -137,6 +142,8 @@
       "testConnection": "Test",
       "connectionSuccess": "Connection successful!",
       "connectionFailed": "Connection failed",
+      "active": "Active",
+      "activate": "Activate",
       "localNote": "No API key needed. Ensure Ollama is running locally.",
       "custom": "Custom Provider",
       "customBaseUrlPlaceholder": "https://api.example.com/v1",
@@ -176,6 +183,7 @@
       "statusDownloaded": "Update {{version}} ready to install.",
       "statusLatest": "You're on the latest version.",
       "statusError": "Update check failed: {{error}}",
+      "statusOffline": "You appear to be offline — connect to the internet and try again.",
       "lastChecked": "Last checked {{time}}",
       "checkNow": "Check now",
       "restartNow": "Restart & install",
@@ -213,6 +221,7 @@
       "testConnection": "Test Connection",
       "connectionSuccess": "Connected!",
       "connectionFailed": "Connection failed",
+      "uriInvalid": "Enter a valid Bolt URI, e.g. bolt://localhost:7687",
       "domain": "Extraction Domain",
       "domainDefault": "Default",
       "domainStock": "Stock Analysis",
@@ -286,6 +295,10 @@
     "thinking": "Thinking...",
     "error": "An error occurred. Please check your API key and try again.",
     "memoryEnabled": "Memory active",
+    "privacyBadge": "Privacy Mode — Local Models Only",
+    "privacyBadgeTooltip": "Cloud providers (OpenAI, Anthropic, Google, Custom) are disabled while Privacy Mode is on. Only Ollama is available.",
+    "newMessages": "New messages",
+    "jumpToLatest": "Jump to latest message",
     "contextMenu": {
       "explain": "Explain this",
       "translate": "Translate",
@@ -324,5 +337,17 @@
     "completed": "Ingest done: {{ok}} ok, {{failed}} failed",
     "cancel": "Cancel batch",
     "dismiss": "Dismiss"
+  },
+  "chat": {
+    "you": "You",
+    "assistant": "AI",
+    "sources": "Sources",
+    "errorLabel": "Error",
+    "retry": "Retry",
+    "copyMessage": "Copy message"
+  },
+  "common": {
+    "dismiss": "Dismiss",
+    "close": "Close"
   }
 }

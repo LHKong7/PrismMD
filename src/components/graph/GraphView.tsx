@@ -61,6 +61,10 @@ export function GraphView() {
   // auto-switch to Global so the newly-built graph is visible instead of
   // an empty Document view.
   const autoScopedRef = useRef(false)
+  // When autoScopedRef fires we also flip this so the user sees a
+  // dismissible banner — otherwise the scope change happens silently
+  // and the user has no idea why they're suddenly in Global.
+  const [autoScopeNotice, setAutoScopeNotice] = useState(false)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 800, height: 600 })
@@ -207,6 +211,9 @@ export function GraphView() {
     if (!matched && reports.length > 0) {
       autoScopedRef.current = true
       setScope('global')
+      setAutoScopeNotice(true)
+      // Auto-dismiss the notice so the user isn't left with stale chrome.
+      window.setTimeout(() => setAutoScopeNotice(false), 6000)
     }
   }, [ingestStage, scope, reports, currentFilePath, setScope])
 
@@ -270,12 +277,35 @@ export function GraphView() {
       </div>
 
       {/* Canvas */}
+      {autoScopeNotice && (
+        <div
+          className="flex items-center gap-2 px-3 py-1.5 text-[11px] border-b"
+          style={{
+            borderColor: 'var(--border-color)',
+            backgroundColor: 'color-mix(in srgb, var(--accent-color) 10%, transparent)',
+            color: 'var(--text-primary)',
+          }}
+          role="status"
+        >
+          <Globe size={11} style={{ color: 'var(--accent-color)' }} />
+          <span className="flex-1">{t('graphView.autoScopedToGlobal')}</span>
+          <button
+            onClick={() => setAutoScopeNotice(false)}
+            className="p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-[var(--accent-color)]"
+            aria-label={t('common.dismiss')}
+            title={t('common.dismiss')}
+          >
+            <span aria-hidden>×</span>
+          </button>
+        </div>
+      )}
+
       <div ref={containerRef} className="flex-1 relative overflow-hidden">
         {status === 'loading' && <GraphStatus icon={<Loader2 size={14} className="animate-spin" />} label={t('graphView.loading')} />}
         {status === 'error' && (
           <GraphStatus
             icon={<AlertCircle size={14} className="text-red-500" />}
-            label={`${t('graphView.error')}${error ? `: ${error}` : ''}`}
+            label={classifyGraphError(error, t)}
             tone="error"
           />
         )}
@@ -385,6 +415,40 @@ function GraphStatus({
       </div>
     </div>
   )
+}
+
+/**
+ * Turn a raw Neo4j / SDK error string into an actionable, translated
+ * message. Keeps the original as a fallback so power users can still
+ * see the underlying cause.
+ */
+function classifyGraphError(raw: string | null, t: (key: string, vars?: Record<string, unknown>) => string): string {
+  const base = t('graphView.error')
+  if (!raw) return base
+  const msg = raw.toLowerCase()
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return `${base}: ${t('graphView.errorOffline')}`
+  }
+  if (
+    msg.includes('authentication') ||
+    msg.includes('unauthorized') ||
+    msg.includes('neo.clienterror.security')
+  ) {
+    return `${base}: ${t('graphView.errorAuth')}`
+  }
+  if (
+    msg.includes('econnrefused') ||
+    msg.includes('connection refused') ||
+    msg.includes('could not perform discovery') ||
+    msg.includes('service unavailable') ||
+    msg.includes('routing')
+  ) {
+    return `${base}: ${t('graphView.errorUnreachable')}`
+  }
+  if (msg.includes('timeout') || msg.includes('timed out')) {
+    return `${base}: ${t('graphView.errorTimeout')}`
+  }
+  return `${base}: ${raw}`
 }
 
 /**
