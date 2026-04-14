@@ -9,6 +9,7 @@ import { SelectionAIBubble } from './components/annotations/SelectionAIBubble'
 import { SettingsPanel } from './components/settings/SettingsPanel'
 import { GhostText } from './components/ghosttext/GhostText'
 import { FocusOverlay } from './components/focusmode/FocusOverlay'
+import { PluginNotificationHost } from './components/plugins/PluginNotificationHost'
 import { useFileWatcher } from './hooks/useFileWatcher'
 import { useAutoHide } from './hooks/useAutoHide'
 import { useAnnotations } from './hooks/useAnnotations'
@@ -51,6 +52,7 @@ function AppContent() {
       />
       <GhostText />
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <PluginNotificationHost />
     </div>
   )
 }
