@@ -18,12 +18,15 @@
       "parseError": "这个 JSON 文件解析失败"
     },
     "csv": {
-      "placeholderTitle": "CSV 视图即将上线",
-      "placeholderBody": "安装表格相关依赖后会自动启用。"
+      "emptyTitle": "没有可显示的内容",
+      "emptyBody": "这个 CSV 文件是空的。",
+      "parseWarning": "CSV 解析出现警告：{{error}}",
+      "summary": "{{rows}} 行 × {{cols}} 列"
     },
     "xlsx": {
-      "placeholderTitle": "表格视图即将上线",
-      "placeholderBody": "安装 SheetJS 后会自动启用。"
+      "parseErrorTitle": "无法读取该工作簿",
+      "parseErrorBody": "文件可能被加密或已损坏。",
+      "emptySheet": "这张工作表是空的。"
     },
     "pdf": {
       "placeholderTitle": "PDF 视图即将上线",

@@ -18,12 +18,15 @@
       "parseError": "This JSON file isn't valid"
     },
     "csv": {
-      "placeholderTitle": "CSV viewer coming up",
-      "placeholderBody": "The tabular viewer will be enabled once the table dependencies are installed on this branch."
+      "emptyTitle": "Nothing to show",
+      "emptyBody": "This CSV file is empty.",
+      "parseWarning": "CSV parsed with warnings: {{error}}",
+      "summary": "{{rows}} rows × {{cols}} columns"
     },
     "xlsx": {
-      "placeholderTitle": "Spreadsheet viewer coming up",
-      "placeholderBody": "The XLSX viewer will be enabled once SheetJS is installed on this branch."
+      "parseErrorTitle": "Couldn't read this workbook",
+      "parseErrorBody": "The file may be password-protected or corrupted.",
+      "emptySheet": "This sheet is empty."
     },
     "pdf": {
       "placeholderTitle": "PDF viewer coming up",
