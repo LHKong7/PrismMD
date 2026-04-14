@@ -15,6 +15,7 @@ export default defineConfig({
       // must not be bundled into the main-process chunk.
       external: [
         'fsevents',
+        'borderless-agent',
         '@insightgraph/sdk-embedded',
         '@insightgraph/core',
         '@insightgraph/agent-runtime',

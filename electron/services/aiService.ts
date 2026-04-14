@@ -1,6 +1,19 @@
-import { AgentBuilder } from 'borderless-agent'
-import type { AgentInstance, LLMConfig } from 'borderless-agent'
+import type { AgentBuilder as AgentBuilderType, AgentInstance, LLMConfig } from 'borderless-agent'
 import { BrowserWindow } from 'electron'
+
+// borderless-agent is pure ESM; the Electron main bundle is CJS, so a
+// top-level `import` would compile to `require()` and crash with
+// ERR_REQUIRE_ESM. We externalize the package in vite.main.config.ts and
+// load it lazily via dynamic import — Node's ESM loader handles that fine
+// from a CJS caller. Cached because the dynamic import is only resolved
+// once per process.
+let agentModulePromise: Promise<typeof import('borderless-agent')> | null = null
+async function loadAgentModule(): Promise<typeof import('borderless-agent')> {
+  if (!agentModulePromise) {
+    agentModulePromise = import('borderless-agent')
+  }
+  return agentModulePromise
+}
 import { getActiveProvider, loadSettings } from './settingsStore'
 import { callTool as callMcpTool, discoverAll as discoverAllMcpTools } from './mcpService'
 
@@ -78,7 +91,7 @@ export interface AttachMcpResult {
   warning?: string
 }
 
-async function attachMcpTools(builder: AgentBuilder): Promise<AttachMcpResult> {
+async function attachMcpTools(builder: AgentBuilderType): Promise<AttachMcpResult> {
   let attached = 0
   let discovered: Awaited<ReturnType<typeof discoverAllMcpTools>> = []
   try {
@@ -95,7 +108,7 @@ async function attachMcpTools(builder: AgentBuilder): Promise<AttachMcpResult> {
   }
   if (discovered.length === 0) return { attached: 0, discovered: 0 }
 
-  type LooseBuilder = AgentBuilder & Record<string, unknown>
+  type LooseBuilder = AgentBuilderType & Record<string, unknown>
   const loose = builder as LooseBuilder
 
   // Pick the first available tool-registration method. Recorded here
@@ -170,6 +183,7 @@ async function buildAgent(
   const settings = loadSettings()
   const mcpEnabled = settings.mcp.enabled && attachTools
 
+  const { AgentBuilder } = await loadAgentModule()
   const builder = new AgentBuilder()
     .setLLM(llmConfig)
     .setIncludeBuiltinTools(false)
