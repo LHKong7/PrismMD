@@ -14,7 +14,18 @@ const IGNORED_DIRS = new Set([
   'dist-electron', '.next', '.nuxt',
 ])
 
-const MD_EXTENSIONS = new Set(['.md', '.markdown', '.mdx'])
+// Formats the "Library" can browse + render in the reader. The knowledge-
+// graph SDK ingest endpoint accepts this same set. Kept lowercase and
+// including the leading dot so `path.extname(…).toLowerCase()` comparisons
+// are direct. Mirrored on the renderer in `src/lib/fileFormat.ts` — keep
+// the two in sync when adding a format.
+const SUPPORTED_EXTENSIONS = new Set([
+  '.md', '.markdown', '.mdx',
+  '.pdf',
+  '.csv',
+  '.json',
+  '.xlsx', '.xls',
+])
 
 export async function buildFileTree(dirPath: string): Promise<FileTreeNode[]> {
   const entries = await fs.readdir(dirPath, { withFileTypes: true })
@@ -36,7 +47,7 @@ export async function buildFileTree(dirPath: string): Promise<FileTreeNode[]> {
           children,
         })
       }
-    } else if (entry.isFile() && MD_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) {
+    } else if (entry.isFile() && SUPPORTED_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) {
       nodes.push({
         name: entry.name,
         path: fullPath,

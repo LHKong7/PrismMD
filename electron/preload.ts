@@ -21,12 +21,14 @@ export interface Annotation {
 
 const electronAPI = {
   // File operations
-  openFileDialog: (): Promise<{ path: string; content: string } | null> =>
+  openFileDialog: (): Promise<{ path: string } | null> =>
     ipcRenderer.invoke('dialog:open-file'),
   openFolderDialog: (): Promise<string | null> =>
     ipcRenderer.invoke('dialog:open-folder'),
   readFile: (filePath: string): Promise<string> =>
     ipcRenderer.invoke('fs:read-file', filePath),
+  readFileBytes: (filePath: string): Promise<ArrayBuffer> =>
+    ipcRenderer.invoke('fs:read-file-bytes', filePath),
   readDirectory: (dirPath: string): Promise<FileTreeNode[]> =>
     ipcRenderer.invoke('fs:read-directory', dirPath),
 
@@ -35,8 +37,8 @@ const electronAPI = {
   unwatchFile: (filePath: string): void => { ipcRenderer.send('fs:unwatch-file', filePath) },
   watchDirectory: (dirPath: string): void => { ipcRenderer.send('fs:watch-directory', dirPath) },
   unwatchDirectory: (dirPath: string): void => { ipcRenderer.send('fs:unwatch-directory', dirPath) },
-  onFileChanged: (callback: (filePath: string, content: string) => void): (() => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, filePath: string, content: string) => callback(filePath, content)
+  onFileChanged: (callback: (filePath: string) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, filePath: string) => callback(filePath)
     ipcRenderer.on('fs:file-changed', handler)
     return () => ipcRenderer.removeListener('fs:file-changed', handler)
   },

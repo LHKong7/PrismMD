@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react'
-import { ChevronRight, FileText, Folder, Network } from 'lucide-react'
+import {
+  ChevronRight,
+  FileText,
+  FileSpreadsheet,
+  FileJson,
+  File as FileIcon,
+  Folder,
+  Network,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { clsx } from 'clsx'
 import type { FileTreeNode } from '../../types/electron'
@@ -7,12 +15,22 @@ import { useFileStore } from '../../store/fileStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
 import { FileTree } from './FileTree'
-
-const MARKDOWN_EXTS = /\.(md|mdx|markdown)$/i
+import { detectFormat, type FileFormat } from '../../lib/fileFormat'
 
 interface FileTreeNodeItemProps {
   node: FileTreeNode
   depth: number
+}
+
+function iconForFormat(format: FileFormat | null) {
+  switch (format) {
+    case 'markdown': return FileText
+    case 'pdf':      return FileIcon
+    case 'csv':      return FileSpreadsheet
+    case 'xlsx':     return FileSpreadsheet
+    case 'json':     return FileJson
+    default:         return FileText
+  }
 }
 
 export function FileTreeNodeItem({ node, depth }: FileTreeNodeItemProps) {
@@ -26,8 +44,10 @@ export function FileTreeNodeItem({ node, depth }: FileTreeNodeItemProps) {
 
   const isActive = node.type === 'file' && node.path === currentFilePath
   const paddingLeft = 8 + depth * 16
-  const isMarkdownFile = node.type === 'file' && MARKDOWN_EXTS.test(node.name)
-  const canIngest = insightGraphEnabled && isMarkdownFile
+  const fileFormat = node.type === 'file' ? detectFormat(node.path) : null
+  // Any supported ingestable format (SDK handles md / pdf / csv / json / xlsx).
+  const canIngest = insightGraphEnabled && fileFormat !== null
+  const FormatIcon = iconForFormat(fileFormat)
 
   const handleClick = () => {
     if (node.type === 'directory') {
@@ -85,7 +105,7 @@ export function FileTreeNodeItem({ node, depth }: FileTreeNodeItemProps) {
         ) : (
           <>
             <span style={{ width: 14 }} />
-            <FileText size={14} className="flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
+            <FormatIcon size={14} className="flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
           </>
         )}
         <span className="truncate">{node.name}</span>

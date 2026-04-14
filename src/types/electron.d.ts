@@ -19,9 +19,10 @@ export interface Annotation {
 
 export interface ElectronAPI {
   // File operations
-  openFileDialog: () => Promise<{ path: string; content: string } | null>
+  openFileDialog: () => Promise<{ path: string } | null>
   openFolderDialog: () => Promise<string | null>
   readFile: (filePath: string) => Promise<string>
+  readFileBytes: (filePath: string) => Promise<ArrayBuffer>
   readDirectory: (dirPath: string) => Promise<FileTreeNode[]>
 
   // File watching
@@ -29,7 +30,7 @@ export interface ElectronAPI {
   unwatchFile: (filePath: string) => void
   watchDirectory: (dirPath: string) => void
   unwatchDirectory: (dirPath: string) => void
-  onFileChanged: (callback: (filePath: string, content: string) => void) => () => void
+  onFileChanged: (callback: (filePath: string) => void) => () => void
   onDirectoryChanged: (callback: (dirPath: string) => void) => () => void
 
   // Annotations

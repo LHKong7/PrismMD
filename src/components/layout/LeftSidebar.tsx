@@ -8,14 +8,18 @@ import { useSettingsStore } from '../../store/settingsStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
 import { FileTree } from '../filetree/FileTree'
 import type { FileTreeNode } from '../../types/electron'
+import { isSupported } from '../../lib/fileFormat'
 
-const MD_EXT = /\.(md|markdown|mdx)$/i
-
-/** Walk the tree and collect absolute paths of every markdown file. */
-function collectMarkdownFiles(nodes: FileTreeNode[]): string[] {
+/**
+ * Walk the tree and collect paths of every file the knowledge-graph SDK
+ * can ingest (markdown, PDF, CSV, JSON, XLSX). The tree itself is already
+ * filtered to supported extensions on the main-process side, but we guard
+ * here defensively in case of stray nodes.
+ */
+function collectIngestableFiles(nodes: FileTreeNode[]): string[] {
   const out: string[] = []
   const visit = (n: FileTreeNode) => {
-    if (n.type === 'file' && MD_EXT.test(n.name)) out.push(n.path)
+    if (n.type === 'file' && isSupported(n.path)) out.push(n.path)
     else if (n.children) n.children.forEach(visit)
   }
   nodes.forEach(visit)
@@ -42,22 +46,22 @@ function FolderSection({ folderPath, folderName, tree, onClose }: {
     | { kind: 'done'; ingested: number; failed: number; at: number }
   >({ kind: 'idle' })
 
-  const mdFiles = useMemo(() => collectMarkdownFiles(tree), [tree])
+  const ingestableFiles = useMemo(() => collectIngestableFiles(tree), [tree])
 
   const handleBuildGraph = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!mdFiles.length || ingestState.kind === 'running') return
+    if (!ingestableFiles.length || ingestState.kind === 'running') return
 
-    setIngestState({ kind: 'running', done: 0, total: mdFiles.length })
+    setIngestState({ kind: 'running', done: 0, total: ingestableFiles.length })
     let failed = 0
-    for (let i = 0; i < mdFiles.length; i++) {
-      const ok = await ingestFile(mdFiles[i])
+    for (let i = 0; i < ingestableFiles.length; i++) {
+      const ok = await ingestFile(ingestableFiles[i])
       if (!ok) failed += 1
-      setIngestState({ kind: 'running', done: i + 1, total: mdFiles.length })
+      setIngestState({ kind: 'running', done: i + 1, total: ingestableFiles.length })
     }
     setIngestState({
       kind: 'done',
-      ingested: mdFiles.length - failed,
+      ingested: ingestableFiles.length - failed,
       failed,
       at: Date.now(),
     })
@@ -68,8 +72,8 @@ function FolderSection({ folderPath, folderName, tree, onClose }: {
   const running = ingestState.kind === 'running'
   const buildTitle = running
     ? t('sidebar.ingestingGraph', { done: ingestState.done, total: ingestState.total })
-    : mdFiles.length > 0
-      ? t('sidebar.buildGraph', { count: mdFiles.length })
+    : ingestableFiles.length > 0
+      ? t('sidebar.buildGraph', { count: ingestableFiles.length })
       : t('sidebar.buildGraphEmpty')
 
   return (
@@ -97,7 +101,7 @@ function FolderSection({ folderPath, folderName, tree, onClose }: {
           {insightGraphEnabled && (
             <button
               onClick={handleBuildGraph}
-              disabled={running || mdFiles.length === 0}
+              disabled={running || ingestableFiles.length === 0}
               className={clsx(
                 'p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-all',
                 running ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',

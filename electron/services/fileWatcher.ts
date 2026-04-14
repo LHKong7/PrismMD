@@ -30,13 +30,11 @@ export class FileWatcherService {
       },
     })
 
-    watcher.on('change', async () => {
-      try {
-        const content = await fs.readFile(filePath, 'utf-8')
-        this.send('fs:file-changed', filePath, content)
-      } catch {
-        // File might have been deleted
-      }
+    // We only signal that the file changed; the renderer re-reads via
+    // `readFile` or `readFileBytes` depending on the file's format. This
+    // avoids corrupting binary files (PDF / XLSX) by reading them as UTF-8.
+    watcher.on('change', () => {
+      this.send('fs:file-changed', filePath)
     })
 
     this.fileWatchers.set(filePath, watcher)

@@ -8,6 +8,7 @@ import { useReaderDomStore } from '../../store/readerDomStore'
 import { DocSummary } from './DocSummary'
 import { ContradictionBanner } from '../graph/ContradictionBanner'
 import { FileText, FolderOpen, Upload } from 'lucide-react'
+import { detectFormat, kindOfFormat } from '../../lib/fileFormat'
 import '../../styles/markdown.css'
 import '../../styles/cjk.css'
 
@@ -41,20 +42,29 @@ export function MarkdownReader() {
     e.stopPropagation()
 
     const files = Array.from(e.dataTransfer.files)
-    const mdFile = files.find((f) =>
-      f.name.endsWith('.md') || f.name.endsWith('.markdown') || f.name.endsWith('.mdx')
-    )
+    // Pick the first file whose extension is one of the supported Library
+    // formats. Text formats go through the FileReader text path; binary
+    // formats use an ArrayBuffer reader.
+    const file = files.find((f) => {
+      const fmt = detectFormat((f as File & { path?: string }).path ?? f.name)
+      return fmt !== null
+    })
+    if (!file) return
 
-    if (mdFile) {
-      const reader = new FileReader()
-      reader.onload = () => {
-        useFileStore.getState().openFileWithContent(
-          (mdFile as File & { path?: string }).path ?? mdFile.name,
-          reader.result as string
-        )
+    const filePath = (file as File & { path?: string }).path ?? file.name
+    const format = detectFormat(filePath)
+    const kind = format ? kindOfFormat(format) : 'text'
+    const reader = new FileReader()
+    reader.onload = () => {
+      const store = useFileStore.getState()
+      if (kind === 'binary') {
+        store.openFileWithBytes(filePath, reader.result as ArrayBuffer)
+      } else {
+        store.openFileWithContent(filePath, reader.result as string)
       }
-      reader.readAsText(mdFile)
     }
+    if (kind === 'binary') reader.readAsArrayBuffer(file)
+    else reader.readAsText(file)
   }, [])
 
   if (!currentContent) {
