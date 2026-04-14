@@ -84,7 +84,9 @@ InsightGraph SDK 已经支持 PDF / CSV / JSON / XLSX / Markdown，但 PrismMD
 ## 依赖变更（`package.json`，需要 `npm install`）
 
 dependencies:
-- `react-json-view` ^1.21.3
+- `@uiw/react-json-view` ^2.0.0-alpha.30  _(最初选了 `react-json-view@1.x`，
+  但它 peerDeps 卡在 React 16/17，React 18 下会走到新 reconciler 的不兼容
+  路径；改用 uiw 维护的分支，原生支持 React 18 + TS 类型随包发布)_
 - `@tanstack/react-table` ^8.20.5
 - `@tanstack/react-virtual` ^3.10.8
 - `papaparse` ^5.4.1

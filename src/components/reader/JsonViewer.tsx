@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AlertCircle } from 'lucide-react'
-// @ts-expect-error — `react-json-view` is an older package without TS types
-// published for React 18. It still renders correctly; we wrap it below.
-import ReactJson from 'react-json-view'
+import JsonView from '@uiw/react-json-view'
+import { lightTheme } from '@uiw/react-json-view/light'
+import { darkTheme } from '@uiw/react-json-view/dark'
 import { useFileStore } from '../../store/fileStore'
 
 /**
@@ -18,8 +18,8 @@ export function JsonViewer() {
   const { t } = useTranslation()
   const content = useFileStore((s) => s.currentContent)
 
-  // react-json-view exposes a single `theme` prop; we follow the app's
-  // light/dark state by observing the `dark` class on the root element
+  // `@uiw/react-json-view` takes a style object; we pick between its two
+  // shipped themes by observing the `dark` class on the root element
   // (ThemeProvider toggles it there).
   const [isDark, setIsDark] = useState(() =>
     typeof document !== 'undefined' &&
@@ -73,25 +73,23 @@ export function JsonViewer() {
     )
   }
 
-  const rjvTheme = isDark ? 'monokai' : 'rjv-default'
+  const themeStyle = isDark ? darkTheme : lightTheme
 
   return (
     <div
       className="h-full overflow-auto p-4"
       style={{ backgroundColor: 'var(--bg-primary)' }}
     >
-      <ReactJson
-        src={parsed.value as object}
-        theme={rjvTheme}
-        name={null}
+      <JsonView
+        value={parsed.value as object}
         collapsed={2}
         displayDataTypes={false}
-        displayObjectSize
         enableClipboard
-        iconStyle="triangle"
         style={{
+          ...themeStyle,
           backgroundColor: 'transparent',
-          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+          fontFamily:
+            'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
           fontSize: 12,
         }}
       />
