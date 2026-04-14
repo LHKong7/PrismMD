@@ -2,19 +2,20 @@ import { useEffect } from 'react'
 import { useFileStore } from '../store/fileStore'
 
 export function useFileWatcher() {
-  const setContent = useFileStore((s) => s.setContent)
   const refreshFolder = useFileStore((s) => s.refreshFolder)
 
-  // Watch for file content changes
+  // Watch for file content changes. The main process just signals "this
+  // path changed" — we re-read via the store so text vs binary formats
+  // both pick up the change without corrupting binary payloads.
   useEffect(() => {
-    const cleanup = window.electronAPI.onFileChanged((filePath, content) => {
+    const cleanup = window.electronAPI.onFileChanged((filePath) => {
       const state = useFileStore.getState()
       if (filePath === state.currentFilePath) {
-        setContent(content)
+        void state.openFile(filePath)
       }
     })
     return cleanup
-  }, [setContent])
+  }, [])
 
   // Watch for directory changes — refresh only the affected folder
   useEffect(() => {

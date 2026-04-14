@@ -12,16 +12,27 @@ export function registerFileHandlers() {
     if (!win) return null
     const result = await dialog.showOpenDialog(win, {
       properties: ['openFile'],
-      filters: [{ name: 'Markdown', extensions: ['md', 'markdown', 'mdx'] }],
+      // "Library" accepts any format the knowledge-graph SDK can ingest.
+      // `All supported` comes first so it's the default filter.
+      filters: [
+        {
+          name: 'All supported',
+          extensions: ['md', 'markdown', 'mdx', 'pdf', 'csv', 'json', 'xlsx', 'xls'],
+        },
+        { name: 'Markdown', extensions: ['md', 'markdown', 'mdx'] },
+        { name: 'PDF', extensions: ['pdf'] },
+        { name: 'Tabular', extensions: ['csv', 'xlsx', 'xls'] },
+        { name: 'JSON', extensions: ['json'] },
+      ],
     })
 
     if (result.canceled || result.filePaths.length === 0) {
       return null
     }
 
-    const filePath = result.filePaths[0]
-    const content = await fs.readFile(filePath, 'utf-8')
-    return { path: filePath, content }
+    // Return just the path — the renderer decides whether to read as text
+    // or bytes based on the file's extension (see `fileFormat.ts`).
+    return { path: result.filePaths[0] }
   })
 
   ipcMain.handle('dialog:open-folder', async () => {
@@ -40,6 +51,17 @@ export function registerFileHandlers() {
 
   ipcMain.handle('fs:read-file', async (_event, filePath: string) => {
     return fs.readFile(filePath, 'utf-8')
+  })
+
+  // Binary read for PDF / XLSX (anything the renderer's text decoder would
+  // corrupt). We return a fresh ArrayBuffer — Electron's structured-clone
+  // over IPC handles it natively and the renderer can feed it straight to
+  // pdfjs-dist / SheetJS without a base64 round-trip.
+  ipcMain.handle('fs:read-file-bytes', async (_event, filePath: string) => {
+    const buf = await fs.readFile(filePath)
+    // Slice to a standalone ArrayBuffer (the underlying Buffer may share
+    // memory with Node's internal pool).
+    return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)
   })
 
   ipcMain.handle('fs:read-directory', async (_event, dirPath: string) => {

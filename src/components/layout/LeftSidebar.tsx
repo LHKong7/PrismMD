@@ -1,75 +1,60 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState, type RefObject } from 'react'
 import { ChevronRight, Database, FolderOpen, Loader2, Pin, PinOff, Plus, X } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useTranslation } from 'react-i18next'
 import { useFileStore } from '../../store/fileStore'
 import { useUIStore } from '../../store/uiStore'
 import { useSettingsStore } from '../../store/settingsStore'
-import { useInsightGraphStore } from '../../store/insightGraphStore'
+import { useBatchIngestStore } from '../../store/batchIngestStore'
 import { FileTree } from '../filetree/FileTree'
 import type { FileTreeNode } from '../../types/electron'
+import { isSupported } from '../../lib/fileFormat'
 
-const MD_EXT = /\.(md|markdown|mdx)$/i
-
-/** Walk the tree and collect absolute paths of every markdown file. */
-function collectMarkdownFiles(nodes: FileTreeNode[]): string[] {
+/**
+ * Walk the tree and collect paths of every file the knowledge-graph SDK
+ * can ingest (markdown, PDF, CSV, JSON, XLSX). The tree itself is already
+ * filtered to supported extensions on the main-process side, but we guard
+ * here defensively in case of stray nodes.
+ */
+function collectIngestableFiles(nodes: FileTreeNode[]): string[] {
   const out: string[] = []
   const visit = (n: FileTreeNode) => {
-    if (n.type === 'file' && MD_EXT.test(n.name)) out.push(n.path)
+    if (n.type === 'file' && isSupported(n.path)) out.push(n.path)
     else if (n.children) n.children.forEach(visit)
   }
   nodes.forEach(visit)
   return out
 }
 
-function FolderSection({ folderPath, folderName, tree, onClose }: {
+function FolderSection({ folderPath, folderName, tree, onClose, scrollParentRef }: {
   folderPath: string
   folderName: string
   tree: FileTreeNode[]
   onClose: () => void
+  scrollParentRef: RefObject<HTMLElement>
 }) {
   const { t } = useTranslation()
   const [expanded, setExpanded] = useState(true)
   const insightGraphEnabled = useSettingsStore((s) => s.insightGraph.enabled)
-  const ingestFile = useInsightGraphStore((s) => s.ingestFile)
+  const startBatchIngest = useBatchIngestStore((s) => s.startBatchIngest)
+  const batchStatus = useBatchIngestStore((s) => s.status)
+  const batchDone = useBatchIngestStore((s) => s.done.length)
+  const batchFailed = useBatchIngestStore((s) => s.failed.length)
+  const batchTotal = useBatchIngestStore((s) => s.total)
 
-  // Local ingestion progress for this folder. Kept local (not in zustand)
-  // because it's transient UI state tied to a button click and the store
-  // already owns per-file status globally.
-  const [ingestState, setIngestState] = useState<
-    | { kind: 'idle' }
-    | { kind: 'running'; done: number; total: number }
-    | { kind: 'done'; ingested: number; failed: number; at: number }
-  >({ kind: 'idle' })
+  const ingestableFiles = useMemo(() => collectIngestableFiles(tree), [tree])
 
-  const mdFiles = useMemo(() => collectMarkdownFiles(tree), [tree])
-
-  const handleBuildGraph = async (e: React.MouseEvent) => {
+  const handleBuildGraph = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!mdFiles.length || ingestState.kind === 'running') return
-
-    setIngestState({ kind: 'running', done: 0, total: mdFiles.length })
-    let failed = 0
-    for (let i = 0; i < mdFiles.length; i++) {
-      const ok = await ingestFile(mdFiles[i])
-      if (!ok) failed += 1
-      setIngestState({ kind: 'running', done: i + 1, total: mdFiles.length })
-    }
-    setIngestState({
-      kind: 'done',
-      ingested: mdFiles.length - failed,
-      failed,
-      at: Date.now(),
-    })
-    // Return to idle after a moment so the button is usable again.
-    setTimeout(() => setIngestState({ kind: 'idle' }), 4000)
+    if (!ingestableFiles.length || batchStatus === 'running') return
+    void startBatchIngest(ingestableFiles)
   }
 
-  const running = ingestState.kind === 'running'
+  const running = batchStatus === 'running'
   const buildTitle = running
-    ? t('sidebar.ingestingGraph', { done: ingestState.done, total: ingestState.total })
-    : mdFiles.length > 0
-      ? t('sidebar.buildGraph', { count: mdFiles.length })
+    ? t('sidebar.ingestingGraph', { done: batchDone + batchFailed, total: batchTotal })
+    : ingestableFiles.length > 0
+      ? t('sidebar.buildGraph', { count: ingestableFiles.length })
       : t('sidebar.buildGraphEmpty')
 
   return (
@@ -97,7 +82,7 @@ function FolderSection({ folderPath, folderName, tree, onClose }: {
           {insightGraphEnabled && (
             <button
               onClick={handleBuildGraph}
-              disabled={running || mdFiles.length === 0}
+              disabled={running || ingestableFiles.length === 0}
               className={clsx(
                 'p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-all',
                 running ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
@@ -107,10 +92,10 @@ function FolderSection({ folderPath, folderName, tree, onClose }: {
             >
               {running ? (
                 <Loader2 size={12} className="animate-spin" style={{ color: 'var(--accent-color)' }} />
-              ) : ingestState.kind === 'done' ? (
+              ) : batchStatus === 'done' && batchTotal > 0 ? (
                 <Database
                   size={12}
-                  style={{ color: ingestState.failed ? '#ef4444' : 'var(--accent-color)' }}
+                  style={{ color: batchFailed > 0 ? '#ef4444' : 'var(--accent-color)' }}
                 />
               ) : (
                 <Database size={12} style={{ color: 'var(--text-muted)' }} />
@@ -128,7 +113,7 @@ function FolderSection({ folderPath, folderName, tree, onClose }: {
       </div>
       {expanded && (
         <div className="pb-1">
-          <FileTree nodes={tree} />
+          <FileTree nodes={tree} scrollParentRef={scrollParentRef} />
         </div>
       )}
     </div>
@@ -142,6 +127,11 @@ export function LeftSidebar() {
   const openFolderDialog = useFileStore((s) => s.openFolderDialog)
   const leftSidebarPinned = useUIStore((s) => s.leftSidebarPinned)
   const pinLeftSidebar = useUIStore((s) => s.pinLeftSidebar)
+  // The overflow-y-auto container serves as the scroll parent for all
+  // FileTree virtualizers so huge folders don't spawn a DOM node per
+  // file. We pass the ref down instead of letting FileTree introduce
+  // its own scroller (nested scrollers fragment navigation).
+  const scrollParentRef = useRef<HTMLDivElement>(null)
 
   return (
     <div
@@ -181,7 +171,7 @@ export function LeftSidebar() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto" ref={scrollParentRef}>
         {openFolders.length > 0 ? (
           openFolders.map((folder) => (
             <FolderSection
@@ -190,6 +180,7 @@ export function LeftSidebar() {
               folderName={folder.name}
               tree={folder.tree}
               onClose={() => closeFolder(folder.path)}
+              scrollParentRef={scrollParentRef}
             />
           ))
         ) : (

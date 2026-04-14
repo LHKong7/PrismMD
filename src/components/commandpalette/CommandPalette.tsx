@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Command } from 'cmdk'
-import { FileText, Sun, Moon, Monitor, Settings, Bot, Shield, Eye, Network, BookOpen } from 'lucide-react'
+import { FileText, Sun, Moon, Monitor, Settings, Bot, Shield, Eye, Network, BookOpen, Puzzle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useUIStore } from '../../store/uiStore'
 import { useFileStore } from '../../store/fileStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useAgentStore } from '../../store/agentStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
+import { useCommandRegistry } from '../../store/commandRegistry'
 import { applyTheme, getThemeById } from '../../lib/theme/themes'
 
 interface CommandPaletteProps {
@@ -32,7 +33,22 @@ export function CommandPalette({ onOpenSettings }: CommandPaletteProps) {
   const ingestFile = useInsightGraphStore((s) => s.ingestFile)
   const mainViewMode = useUIStore((s) => s.mainViewMode)
   const toggleMainViewMode = useUIStore((s) => s.toggleMainViewMode)
+  const pluginCommands = useCommandRegistry((s) => s.commands)
   const [search, setSearch] = useState('')
+
+  // Group plugin commands by their `group` field so they can each render
+  // under their own heading. Core commands stay hard-coded below (their
+  // behaviour is tightly coupled to local component closures).
+  const pluginGroups = useMemo(() => {
+    const map = new Map<string, typeof pluginCommands>()
+    for (const cmd of pluginCommands) {
+      const g = cmd.group ?? 'Plugins'
+      const list = map.get(g)
+      if (list) list.push(cmd)
+      else map.set(g, [cmd])
+    }
+    return Array.from(map.entries())
+  }, [pluginCommands])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -156,6 +172,32 @@ export function CommandPalette({ onOpenSettings }: CommandPaletteProps) {
                 </Command.Item>
               )}
             </Command.Group>
+
+            {/* Plugin-contributed commands. Grouped by the `group` the
+                plugin provided so multiple plugins sharing a group (e.g.
+                "Export") render under one heading. */}
+            {pluginGroups.map(([group, items]) => (
+              <Command.Group key={group} heading={group} style={{ color: 'var(--text-muted)' }}>
+                {items.map((cmd) => {
+                  const Icon = cmd.icon ?? Puzzle
+                  return (
+                    <Command.Item
+                      key={cmd.id}
+                      value={cmd.title}
+                      onSelect={() => {
+                        setOpen(false)
+                        void useCommandRegistry.getState().execute(cmd.id)
+                      }}
+                      className={cls}
+                      style={{ color: 'var(--text-secondary)' }}
+                    >
+                      <Icon size={14} />
+                      <span className="truncate">{cmd.title}</span>
+                    </Command.Item>
+                  )
+                })}
+              </Command.Group>
+            ))}
           </Command.List>
         </Command>
       </div>

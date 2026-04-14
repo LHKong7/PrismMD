@@ -3,7 +3,7 @@ import { useFileStore } from '../../store/fileStore'
 import { useAgentStore } from '../../store/agentStore'
 import { LeftSidebar } from './LeftSidebar'
 import { RightSidebar } from './RightSidebar'
-import { MarkdownReader } from '../reader/MarkdownReader'
+import { DocumentReader } from '../reader/DocumentReader'
 import { ReadingProgress } from '../reader/ReadingProgress'
 import { AgentSidebar } from '../agent/AgentSidebar'
 import { GraphView } from '../graph/GraphView'
@@ -58,7 +58,7 @@ export function AppShell() {
           transition: 'margin 200ms ease-in-out',
         }}
       >
-        {mainViewMode === 'graph' ? <GraphView /> : <MarkdownReader />}
+        {mainViewMode === 'graph' ? <GraphView /> : <DocumentReader />}
       </div>
 
       {/* Right sidebar (TOC) */}

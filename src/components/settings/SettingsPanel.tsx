@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
-import { X, Check, Loader2, Globe, Palette, Bot, Eye, EyeOff, Shield, Trash2, Network, AlertTriangle, RefreshCw } from 'lucide-react'
+import { X, Check, Loader2, Globe, Palette, Bot, Eye, EyeOff, Shield, Trash2, Network, AlertTriangle, RefreshCw, Puzzle, FolderOpen, CircleAlert, Info, Download } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useSettingsStore, DEFAULT_MODELS, type AIProvider, type InsightGraphDomain } from '../../store/settingsStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
+import { usePluginManager } from '../../lib/plugins/host'
+import { reloadExternalPlugins } from '../../lib/plugins/externalLoader'
+import { useUpdaterStore } from '../../store/updaterStore'
 import { themes } from '../../lib/theme/themes'
 import { LANGUAGES, changeLanguage, type SupportedLanguage } from '../../i18n'
 import { clsx } from 'clsx'
@@ -12,7 +15,7 @@ interface SettingsPanelProps {
   onClose: () => void
 }
 
-type Tab = 'language' | 'theme' | 'ai' | 'privacy' | 'insightgraph'
+type Tab = 'language' | 'theme' | 'ai' | 'privacy' | 'insightgraph' | 'plugins' | 'mcp' | 'about'
 
 export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const { t } = useTranslation()
@@ -42,7 +45,10 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
               { id: 'theme' as Tab, icon: Palette, label: t('settings.theme.title') },
               { id: 'ai' as Tab, icon: Bot, label: t('settings.ai.title') },
               { id: 'insightgraph' as Tab, icon: Network, label: t('settings.insightgraph.title') },
+              { id: 'plugins' as Tab, icon: Puzzle, label: t('settings.plugins.title') },
+              { id: 'mcp' as Tab, icon: Bot, label: t('settings.mcp.title') },
               { id: 'privacy' as Tab, icon: Shield, label: t('settings.privacy.title') },
+              { id: 'about' as Tab, icon: Info, label: t('settings.about.title') },
             ]).map(({ id, icon: Icon, label }) => (
               <button
                 key={id}
@@ -67,7 +73,10 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             {activeTab === 'theme' && <ThemeSettings />}
             {activeTab === 'ai' && <AISettings />}
             {activeTab === 'insightgraph' && <InsightGraphSettings />}
+            {activeTab === 'plugins' && <PluginsSettings />}
+            {activeTab === 'mcp' && <McpSettingsSection />}
             {activeTab === 'privacy' && <PrivacySettings />}
+            {activeTab === 'about' && <AboutSettings />}
           </div>
         </div>
       </div>
@@ -319,7 +328,7 @@ function AIProviderCard({
             color: isActive ? '#fff' : 'var(--text-secondary)',
           }}
         >
-          {isActive ? 'Active' : 'Activate'}
+          {isActive ? t('settings.ai.active') : t('settings.ai.activate')}
         </button>
       </div>
 
@@ -516,9 +525,24 @@ function InsightGraphSettings() {
             value={insightGraph.neo4j.uri}
             onChange={(e) => setConfig({ neo4j: { uri: e.target.value } })}
             placeholder={t('settings.insightgraph.uriPlaceholder')}
+            aria-invalid={!!insightGraph.neo4j.uri && !isValidNeo4jUri(insightGraph.neo4j.uri)}
             className="w-full text-sm px-3 py-2 rounded-md border bg-transparent outline-none focus:border-[var(--accent-color)]"
-            style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+            style={{
+              // Swap to red when the user has typed something that clearly
+              // isn't a Bolt URI — prevents the "Test Connection" round-trip
+              // from failing with a confusing driver error.
+              borderColor:
+                insightGraph.neo4j.uri && !isValidNeo4jUri(insightGraph.neo4j.uri)
+                  ? '#ef4444'
+                  : 'var(--border-color)',
+              color: 'var(--text-primary)',
+            }}
           />
+          {insightGraph.neo4j.uri && !isValidNeo4jUri(insightGraph.neo4j.uri) && (
+            <p className="text-xs text-red-500 mt-1">
+              {t('settings.insightgraph.uriInvalid')}
+            </p>
+          )}
         </div>
 
         <div className="mb-3">
@@ -561,7 +585,7 @@ function InsightGraphSettings() {
             </div>
             <button
               onClick={handleTest}
-              disabled={testing || !insightGraph.neo4j.uri}
+              disabled={testing || !insightGraph.neo4j.uri || !isValidNeo4jUri(insightGraph.neo4j.uri)}
               className="text-xs px-3 py-2 rounded-md border transition-colors disabled:opacity-50"
               style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
               type="button"
@@ -655,4 +679,487 @@ function InsightGraphSettings() {
       </div>
     </div>
   )
+}
+
+/**
+ * Plugin management pane. Lists every loaded plugin (built-in + external),
+ * surfaces load errors, and exposes a "Open plugin folder" shortcut so
+ * users know where to drop new plugins.
+ */
+function PluginsSettings() {
+  const { t } = useTranslation()
+  const loaded = usePluginManager((s) => s.loaded)
+  const [pluginDir, setPluginDir] = useState('')
+  const [reloading, setReloading] = useState(false)
+
+  useEffect(() => {
+    void window.electronAPI.pluginsGetDir().then(setPluginDir)
+  }, [])
+
+  const entries = Object.values(loaded)
+  const builtIn = entries.filter((e) => e.plugin.id.startsWith('prismmd.'))
+  const external = entries.filter((e) => !e.plugin.id.startsWith('prismmd.'))
+
+  const handleReload = async () => {
+    setReloading(true)
+    try {
+      await reloadExternalPlugins()
+    } finally {
+      setReloading(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+          {t('settings.plugins.title')}
+        </h3>
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          {t('settings.plugins.subtitle')}
+        </p>
+      </div>
+
+      {/* Trust warning for external plugins. */}
+      <div
+        className="flex items-start gap-2 p-3 rounded border text-xs"
+        style={{ borderColor: 'var(--border-color)' }}
+      >
+        <CircleAlert size={14} className="flex-shrink-0 mt-0.5 text-amber-500" />
+        <span style={{ color: 'var(--text-secondary)' }}>
+          {t('settings.plugins.trustWarning')}
+        </span>
+      </div>
+
+      {/* Plugin folder shortcut. */}
+      <div
+        className="flex items-center justify-between p-3 rounded border"
+        style={{ borderColor: 'var(--border-color)' }}
+      >
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+            {t('settings.plugins.folderLabel')}
+          </div>
+          <div
+            className="text-[11px] font-mono truncate mt-0.5"
+            style={{ color: 'var(--text-muted)' }}
+            title={pluginDir}
+          >
+            {pluginDir || '…'}
+          </div>
+        </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <button
+            onClick={() => window.electronAPI.pluginsOpenDir()}
+            className="flex items-center gap-1 text-xs px-2 py-1 rounded border hover:bg-black/5 dark:hover:bg-white/5"
+            style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+          >
+            <FolderOpen size={12} />
+            {t('settings.plugins.openFolder')}
+          </button>
+          <button
+            onClick={handleReload}
+            disabled={reloading}
+            className="flex items-center gap-1 text-xs px-2 py-1 rounded border hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-50"
+            style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+          >
+            {reloading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+            {t('settings.plugins.reload')}
+          </button>
+        </div>
+      </div>
+
+      <PluginList title={t('settings.plugins.builtin')} entries={builtIn} />
+      <PluginList
+        title={t('settings.plugins.external')}
+        entries={external}
+        emptyMessage={t('settings.plugins.externalEmpty')}
+      />
+    </div>
+  )
+}
+
+function PluginList({
+  title,
+  entries,
+  emptyMessage,
+}: {
+  title: string
+  entries: ReturnType<typeof usePluginManager>['loaded'][string][]
+  emptyMessage?: string
+}) {
+  return (
+    <div>
+      <h4 className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
+        {title}
+      </h4>
+      {entries.length === 0 ? (
+        emptyMessage && (
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            {emptyMessage}
+          </p>
+        )
+      ) : (
+        <ul className="space-y-2">
+          {entries.map(({ plugin, error }) => (
+            <li
+              key={plugin.id}
+              className="p-3 rounded border"
+              style={{ borderColor: 'var(--border-color)' }}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                    {plugin.name}
+                    <span
+                      className="ml-2 text-[10px] font-mono"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      v{plugin.version}
+                    </span>
+                  </div>
+                  {plugin.description && (
+                    <div className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                      {plugin.description}
+                    </div>
+                  )}
+                  <div className="text-[10px] font-mono mt-1" style={{ color: 'var(--text-muted)' }}>
+                    {plugin.id}
+                  </div>
+                </div>
+              </div>
+              {error && (
+                <div
+                  className="mt-2 flex items-start gap-2 text-xs p-2 rounded"
+                  style={{ backgroundColor: 'rgba(239,68,68,0.08)', color: '#ef4444' }}
+                >
+                  <AlertTriangle size={12} className="flex-shrink-0 mt-0.5" />
+                  <span className="font-mono break-all">{error}</span>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+/**
+ * MCP (Model Context Protocol) settings. Exposes the raw Claude-Desktop-style
+ * JSON config so power users can paste existing `mcpServers` directly, plus
+ * a read-only status row showing which servers are currently running and how
+ * many tools each exposes. A future commit will add a friendlier per-server
+ * form; JSON works today.
+ */
+function McpSettingsSection() {
+  const { t } = useTranslation()
+  const mcp = useSettingsStore((s) => s.mcp)
+  const setMcpConfig = useSettingsStore((s) => s.setMcpConfig)
+
+  // Local draft buffer so the JSON field can be edited freely without
+  // clobbering settings on every keystroke. We only commit on "Save".
+  const [draft, setDraft] = useState('')
+  const [draftError, setDraftError] = useState<string | null>(null)
+  const [statuses, setStatuses] = useState<
+    Array<{ id: string; running: boolean; toolCount: number }>
+  >([])
+  const [refreshing, setRefreshing] = useState(false)
+
+  useEffect(() => {
+    setDraft(JSON.stringify(mcp.servers, null, 2))
+  }, [mcp.servers])
+
+  const loadStatuses = async () => {
+    const res = await window.electronAPI.mcpStatusAll()
+    if (res.ok) setStatuses(res.servers)
+  }
+
+  useEffect(() => {
+    void loadStatuses()
+  }, [mcp.enabled, mcp.servers])
+
+  const handleSave = () => {
+    try {
+      const parsed = JSON.parse(draft) as Record<string, unknown>
+      // Shallow-validate the shape. Each entry must have a `command` string
+      // and an `args` array — this matches Claude Desktop's format.
+      for (const [id, entry] of Object.entries(parsed)) {
+        const e = entry as Record<string, unknown>
+        if (typeof e.command !== 'string') throw new Error(`${id}: missing "command"`)
+        if (!Array.isArray(e.args)) throw new Error(`${id}: "args" must be an array`)
+      }
+      setMcpConfig({ servers: parsed as typeof mcp.servers })
+      setDraftError(null)
+    } catch (err) {
+      setDraftError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  const handleRestart = async () => {
+    setRefreshing(true)
+    try {
+      await window.electronAPI.mcpRestart()
+      await loadStatuses()
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+          {t('settings.mcp.title')}
+        </h3>
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          {t('settings.mcp.subtitle')}
+        </p>
+      </div>
+
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={mcp.enabled}
+          onChange={(e) => setMcpConfig({ enabled: e.target.checked })}
+        />
+        <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
+          {t('settings.mcp.enable')}
+        </span>
+      </label>
+
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+            {t('settings.mcp.serversLabel')}
+          </label>
+          <a
+            href="https://modelcontextprotocol.io/docs/quickstart/user"
+            target="_blank"
+            rel="noreferrer"
+            className="text-[11px] hover:underline"
+            style={{ color: 'var(--accent-color)' }}
+          >
+            {t('settings.mcp.docs')}
+          </a>
+        </div>
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder={'{\n  "fetch": {\n    "command": "npx",\n    "args": ["-y", "@modelcontextprotocol/server-fetch"]\n  }\n}'}
+          spellCheck={false}
+          className="w-full min-h-[180px] text-xs font-mono p-3 rounded border outline-none"
+          style={{
+            backgroundColor: 'var(--bg-secondary)',
+            borderColor: draftError ? '#ef4444' : 'var(--border-color)',
+            color: 'var(--text-primary)',
+          }}
+        />
+        {draftError && (
+          <p className="mt-1 text-xs text-red-500">{draftError}</p>
+        )}
+        <div className="flex items-center gap-2 mt-2">
+          <button
+            onClick={handleSave}
+            className="text-xs px-3 py-1 rounded font-medium"
+            style={{ backgroundColor: 'var(--accent-color)', color: '#fff' }}
+          >
+            {t('settings.mcp.save')}
+          </button>
+          <button
+            onClick={handleRestart}
+            disabled={refreshing}
+            className="flex items-center gap-1 text-xs px-3 py-1 rounded border hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-50"
+            style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+          >
+            {refreshing ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <RefreshCw size={12} />
+            )}
+            {t('settings.mcp.restart')}
+          </button>
+        </div>
+      </div>
+
+      {statuses.length > 0 && (
+        <div>
+          <h4 className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
+            {t('settings.mcp.status')}
+          </h4>
+          <ul className="space-y-1">
+            {statuses.map((s) => (
+              <li
+                key={s.id}
+                className="flex items-center justify-between p-2 rounded border text-xs"
+                style={{ borderColor: 'var(--border-color)' }}
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`w-2 h-2 rounded-full ${s.running ? 'bg-green-500' : 'bg-gray-400'}`}
+                  />
+                  <span className="font-mono" style={{ color: 'var(--text-primary)' }}>
+                    {s.id}
+                  </span>
+                </div>
+                <span style={{ color: 'var(--text-muted)' }}>
+                  {s.running
+                    ? t('settings.mcp.toolCount', { count: s.toolCount })
+                    : t('settings.mcp.stopped')}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * About & Updates. Shows the running version and the current auto-update
+ * state, with manual check + restart-to-install actions. Auto-update
+ * only runs in packaged mac/win builds — dev runs and linux packages
+ * show the "dev / unsupported" banner instead of a non-functional button.
+ */
+function AboutSettings() {
+  const { t } = useTranslation()
+  const currentVersion = useUpdaterStore((s) => s.currentVersion)
+  const kind = useUpdaterStore((s) => s.kind)
+  const nextVersion = useUpdaterStore((s) => s.version)
+  const error = useUpdaterStore((s) => s.error)
+  const lastEventAt = useUpdaterStore((s) => s.lastEventAt)
+  const checkNow = useUpdaterStore((s) => s.checkNow)
+  const quitAndInstall = useUpdaterStore((s) => s.quitAndInstall)
+
+  // "x seconds / minutes / hours ago" for the last-checked timestamp.
+  // Kept as a cheap polling clock instead of a tick loop because this
+  // surface is read-rarely and the precision doesn't matter.
+  const [, forceTick] = useState(0)
+  useEffect(() => {
+    if (!lastEventAt) return
+    const id = window.setInterval(() => forceTick((n) => n + 1), 30_000)
+    return () => window.clearInterval(id)
+  }, [lastEventAt])
+
+  const relativeTime = lastEventAt
+    ? formatRelativeTime(Date.now() - lastEventAt, t)
+    : null
+
+  const statusLine = (() => {
+    switch (kind) {
+      case 'checking': return t('settings.about.statusChecking')
+      case 'available': return t('settings.about.statusAvailable', { version: nextVersion ?? '' })
+      case 'downloading': return t('settings.about.statusDownloading')
+      case 'downloaded': return t('settings.about.statusDownloaded', { version: nextVersion ?? '' })
+      case 'not-available': return t('settings.about.statusLatest')
+      case 'error':
+        // `error === 'offline'` is a sentinel the store sets when the
+        // browser reports we're offline — swap in the localised copy
+        // instead of leaking the raw updater error.
+        if (error === 'offline') return t('settings.about.statusOffline')
+        return t('settings.about.statusError', { error: error ?? '' })
+      default: return t('settings.about.statusIdle')
+    }
+  })()
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+          {t('settings.about.title')}
+        </h3>
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          {t('settings.about.subtitle')}
+        </p>
+      </div>
+
+      {/* Version + current state */}
+      <div
+        className="flex items-start justify-between gap-3 p-4 rounded border"
+        style={{ borderColor: 'var(--border-color)' }}
+      >
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+            PrismMD
+            {currentVersion && (
+              <span
+                className="ml-2 text-[11px] font-mono"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                v{currentVersion}
+              </span>
+            )}
+          </div>
+          <div className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+            {statusLine}
+          </div>
+          {relativeTime && (
+            <div className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              {t('settings.about.lastChecked', { time: relativeTime })}
+            </div>
+          )}
+        </div>
+        <div className="flex flex-col items-stretch gap-1 flex-shrink-0">
+          {kind === 'downloaded' ? (
+            <button
+              onClick={quitAndInstall}
+              className="flex items-center gap-1 text-xs px-3 py-1 rounded font-medium"
+              style={{ backgroundColor: 'var(--accent-color)', color: '#fff' }}
+            >
+              <Download size={12} />
+              {t('settings.about.restartNow')}
+            </button>
+          ) : (
+            <button
+              onClick={() => void checkNow()}
+              disabled={kind === 'checking' || kind === 'downloading'}
+              className="flex items-center gap-1 text-xs px-3 py-1 rounded border hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-50"
+              style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+            >
+              {kind === 'checking' ? (
+                <Loader2 size={12} className="animate-spin" />
+              ) : (
+                <RefreshCw size={12} />
+              )}
+              {t('settings.about.checkNow')}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Dev / linux hint — auto-updater skips these silently in the
+          main process; explaining *why* beats an invisible no-op. */}
+      {kind === 'idle' && !lastEventAt && (
+        <div
+          className="flex items-start gap-2 p-3 rounded border text-xs"
+          style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
+        >
+          <Info size={14} className="flex-shrink-0 mt-0.5" />
+          <span>{t('settings.about.devNote')}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Accept any scheme the official Neo4j driver supports:
+ * `bolt`, `bolt+s`, `bolt+ssc`, `neo4j`, `neo4j+s`, `neo4j+ssc`. Anything
+ * else (e.g. `http://`, bare hostname, typos) is caught before the
+ * driver's opaque error bubbles up.
+ */
+function isValidNeo4jUri(uri: string): boolean {
+  return /^(bolt|neo4j)(\+s|\+ssc)?:\/\/[^\s/]+(:\d+)?\/?$/i.test(uri.trim())
+}
+
+function formatRelativeTime(ms: number, t: (key: string, vars?: Record<string, unknown>) => string): string {
+  const s = Math.max(0, Math.floor(ms / 1000))
+  if (s < 60) return t('settings.about.relative.secondsAgo', { count: s })
+  const m = Math.floor(s / 60)
+  if (m < 60) return t('settings.about.relative.minutesAgo', { count: m })
+  const h = Math.floor(m / 60)
+  if (h < 24) return t('settings.about.relative.hoursAgo', { count: h })
+  const d = Math.floor(h / 24)
+  return t('settings.about.relative.daysAgo', { count: d })
 }

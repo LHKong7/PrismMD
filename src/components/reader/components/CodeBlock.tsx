@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
 import { Copy, Check } from 'lucide-react'
+import { lookupMarkdownRenderer } from '../../../lib/markdown/rendererRegistry'
 
 interface CodeBlockProps {
   children?: ReactNode
@@ -36,10 +37,14 @@ export function CodeBlock({ children, ...props }: CodeBlockProps) {
     textContent = extractText(codeEl.props.children)
   }
 
-  // Check for Mermaid
-  if (language === 'mermaid') {
-    const { MermaidBlock } = require('./MermaidBlock')
-    return <MermaidBlock code={textContent} />
+  // Plugin-contributed language renderers (e.g. the built-in mermaid
+  // plugin). If none is registered for this language, fall through to
+  // the default copy-aware code card below.
+  if (language) {
+    const PluginRenderer = lookupMarkdownRenderer(language)
+    if (PluginRenderer) {
+      return <PluginRenderer code={textContent} />
+    }
   }
 
   const handleCopy = async () => {

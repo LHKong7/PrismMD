@@ -1,5 +1,6 @@
 import type { ForgeConfig } from '@electron-forge/shared-types'
 import { VitePlugin } from '@electron-forge/plugin-vite'
+import { PublisherGithub } from '@electron-forge/publisher-github'
 import { appConfig } from './app.config'
 import { resolveProfile } from './build-config/profiles'
 
@@ -39,6 +40,21 @@ const config: ForgeConfig = {
   },
   makers: profile.makers,
   outDir: profile.outDir,
+  // Publisher is only consulted by `npm run publish` — `package` / `make`
+  // ignore it, so adding it has zero effect on local builds. Requires a
+  // `GITHUB_TOKEN` env var (a personal access token with `repo` scope) at
+  // publish time. `draft: true` means the release lands as a draft on
+  // GitHub so we get a chance to review before it's visible to users.
+  publishers: [
+    new PublisherGithub({
+      repository: {
+        owner: 'lhkong7',
+        name: 'prismmd',
+      },
+      draft: true,
+      prerelease: false,
+    }),
+  ],
   plugins: [
     new VitePlugin({
       build: [

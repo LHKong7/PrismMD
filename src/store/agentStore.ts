@@ -42,6 +42,14 @@ export interface ChatMessage {
   timestamp: number
   /** Evidence the model was instructed to cite (assistant messages only). */
   evidence?: CitationEvidence[]
+  /**
+   * `'error'` assistant messages render with an error style and a retry
+   * button — see ChatMessage.tsx. We track the exact user prompt that
+   * produced the error so retry can re-send it without rebuilding the
+   * history.
+   */
+  status?: 'ok' | 'error'
+  errorRetryPrompt?: string
 }
 
 interface AgentStore {
@@ -52,6 +60,14 @@ interface AgentStore {
    * finalizes. Reset on every new send. */
   pendingEvidence: CitationEvidence[]
   agentSidebarOpen: boolean
+  /**
+   * Non-blocking warning from the main process (e.g. MCP tools couldn't
+   * be attached). Shown as a dismissible banner in AgentSidebar — null
+   * hides it. The store, not the component, owns this so the warning
+   * survives the component unmounting/remounting across tabs.
+   */
+  mcpWarning: string | null
+  dismissMcpWarning: () => void
 
   addMessage: (message: Omit<ChatMessage, 'id' | 'timestamp'>) => void
   setStreaming: (isStreaming: boolean) => void
@@ -64,17 +80,65 @@ interface AgentStore {
   // Send with memory
   sendMessage: (content: string, documentContext?: string, currentFilePath?: string) => Promise<void>
   stopGeneration: () => void
+  /** Re-send a previously failed user prompt (powers the Retry button). */
+  retryMessage: (messageId: string, documentContext?: string, currentFilePath?: string) => Promise<void>
 
   // Memory
   saveConversationMemory: (filePath: string) => Promise<void>
 }
 
-export const useAgentStore = create<AgentStore>((set, get) => ({
+/**
+ * Install global listeners for main-process events the store cares about.
+ * Run once at module load — these are process-wide and never detach
+ * (the BrowserWindow owns its own lifetime; when it goes away, so does
+ * this renderer).
+ */
+let globalListenersBound = false
+function bindGlobalAgentListeners(
+  set: (partial: Partial<AgentStore> | ((s: AgentStore) => Partial<AgentStore>)) => void,
+  get: () => AgentStore,
+) {
+  if (globalListenersBound) return
+  if (typeof window === 'undefined' || !window.electronAPI) return
+  globalListenersBound = true
+
+  const api = window.electronAPI
+  api.onAgentStreamError?.((message) => {
+    // Promote any in-flight streamed partial into the message list so
+    // the user still sees what the model had time to produce, then
+    // stamp on an error message underneath with a retry affordance.
+    const { streamingContent, messages, addMessage } = get()
+    // The most recent user message is the prompt we want to retry.
+    const lastUser = [...messages].reverse().find((m) => m.role === 'user')
+    const retryPrompt = lastUser?.content
+    if (streamingContent) {
+      addMessage({ role: 'assistant', content: streamingContent })
+    }
+    set({ isStreaming: false, streamingContent: '', pendingEvidence: [] })
+    addMessage({
+      role: 'assistant',
+      content: message || 'An error occurred.',
+      status: 'error',
+      ...(retryPrompt ? { errorRetryPrompt: retryPrompt } : {}),
+    })
+  })
+  api.onAgentMcpWarning?.((message) => {
+    set({ mcpWarning: message })
+  })
+}
+
+export const useAgentStore = create<AgentStore>((set, get) => {
+  // Side effect at store creation — installs once per renderer.
+  bindGlobalAgentListeners(set as Parameters<typeof bindGlobalAgentListeners>[0], get)
+
+  return {
   messages: [],
   isStreaming: false,
   streamingContent: '',
   pendingEvidence: [],
   agentSidebarOpen: false,
+  mcpWarning: null,
+  dismissMcpWarning: () => set({ mcpWarning: null }),
 
   addMessage: (message) => {
     const newMsg: ChatMessage = {
@@ -213,9 +277,16 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
       }
     } catch (err) {
       set({ isStreaming: false, streamingContent: '' })
+      // Note: streaming errors raised through the `agent:stream-error`
+      // IPC event are handled in bindGlobalAgentListeners (and include
+      // retry metadata). This catch only fires for failures before the
+      // stream starts (setup, IPC round-trip). We still attach a retry
+      // prompt so the user isn't stranded.
       addMessage({
         role: 'assistant',
         content: err instanceof Error ? err.message : 'An error occurred.',
+        status: 'error',
+        errorRetryPrompt: content,
       })
     }
   },
@@ -224,6 +295,28 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
     window.electronAPI.stopAgentGeneration?.()
     const { finalizeStream } = get()
     finalizeStream('openai', '')
+  },
+
+  retryMessage: async (messageId, documentContext, currentFilePath) => {
+    const { messages, sendMessage } = get()
+    const msg = messages.find((m) => m.id === messageId)
+    const prompt = msg?.errorRetryPrompt
+    if (!prompt) return
+    // Drop the failed assistant message before retrying so we don't
+    // accumulate duplicate error bubbles in the transcript. Also drop
+    // the user turn that produced it — sendMessage will re-add both.
+    set((state) => {
+      const idx = state.messages.findIndex((m) => m.id === messageId)
+      if (idx < 0) return {}
+      // Remove the error bubble and the user message immediately above
+      // it (if any) to keep the flow clean.
+      const next = state.messages.slice(0, idx)
+      if (next.length && next[next.length - 1].role === 'user' && next[next.length - 1].content === prompt) {
+        next.pop()
+      }
+      return { messages: next }
+    })
+    await sendMessage(prompt, documentContext, currentFilePath)
   },
 
   saveConversationMemory: async (filePath: string) => {
@@ -241,4 +334,5 @@ export const useAgentStore = create<AgentStore>((set, get) => ({
       // Memory save failed silently
     }
   },
-}))
+  }
+})

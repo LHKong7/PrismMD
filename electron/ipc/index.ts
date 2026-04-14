@@ -4,6 +4,9 @@ import { registerAnnotationHandlers } from './annotationHandlers'
 import { registerSettingsHandlers } from './settingsHandlers'
 import { registerAgentHandlers } from './agentHandlers'
 import { registerInsightGraphHandlers } from './insightGraphHandlers'
+import { registerPluginHandlers } from './pluginHandlers'
+import { registerMcpHandlers } from './mcpHandlers'
+import { registerUpdaterHandlers } from './updaterHandlers'
 import { getMainWindow } from '../main'
 
 /**
@@ -21,4 +24,7 @@ export function registerIpcHandlers() {
   registerSettingsHandlers()
   registerAgentHandlers()
   registerInsightGraphHandlers()
+  registerPluginHandlers()
+  registerMcpHandlers()
+  registerUpdaterHandlers()
 }

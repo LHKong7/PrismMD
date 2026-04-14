@@ -19,9 +19,10 @@ export interface Annotation {
 
 export interface ElectronAPI {
   // File operations
-  openFileDialog: () => Promise<{ path: string; content: string } | null>
+  openFileDialog: () => Promise<{ path: string } | null>
   openFolderDialog: () => Promise<string | null>
   readFile: (filePath: string) => Promise<string>
+  readFileBytes: (filePath: string) => Promise<ArrayBuffer>
   readDirectory: (dirPath: string) => Promise<FileTreeNode[]>
 
   // File watching
@@ -29,7 +30,7 @@ export interface ElectronAPI {
   unwatchFile: (filePath: string) => void
   watchDirectory: (dirPath: string) => void
   unwatchDirectory: (dirPath: string) => void
-  onFileChanged: (callback: (filePath: string, content: string) => void) => () => void
+  onFileChanged: (callback: (filePath: string) => void) => () => void
   onDirectoryChanged: (callback: (dirPath: string) => void) => () => void
 
   // Annotations
@@ -58,6 +59,8 @@ export interface ElectronAPI {
     memoryContext?: string
   }) => Promise<{ provider: string; model: string }>
   onAgentStream: (callback: (chunk: string) => void) => () => void
+  onAgentStreamError: (callback: (error: string) => void) => () => void
+  onAgentMcpWarning: (callback: (message: string) => void) => () => void
   stopAgentGeneration: () => void
   testAgentConnection: (provider: string, apiKey: string, baseUrl?: string) => Promise<boolean>
 
@@ -69,6 +72,71 @@ export interface ElectronAPI {
 
   // Platform
   platform: string
+
+  // Auto-updater
+  updaterCurrentVersion: () => Promise<string>
+  updaterLastError: () => Promise<string | null>
+  updaterCheckNow: () => Promise<void>
+  updaterQuitAndInstall: () => void
+  onUpdaterEvent: (
+    callback: (ev: {
+      kind: 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'
+      version?: string
+      releaseNotes?: string
+      releaseName?: string
+      releaseDate?: string
+      error?: string
+    }) => void,
+  ) => () => void
+
+  // MCP
+  mcpStatusAll: () => Promise<
+    | {
+        ok: true
+        servers: Array<{ id: string; running: boolean; error?: string; toolCount: number }>
+      }
+    | { ok: false; error: string }
+  >
+  mcpListTools: (serverId: string) => Promise<
+    | {
+        ok: true
+        tools: Array<{
+          name: string
+          description?: string
+          inputSchema: Record<string, unknown>
+        }>
+      }
+    | { ok: false; error: string }
+  >
+  mcpCallTool: (
+    serverId: string,
+    toolName: string,
+    args: Record<string, unknown>,
+  ) => Promise<{ ok: true; result: unknown } | { ok: false; error: string }>
+  mcpRestart: () => Promise<{ ok: true } | { ok: false; error: string }>
+  mcpStop: (serverId: string) => Promise<{ ok: true } | { ok: false; error: string }>
+
+  // Plugins
+  pluginsDiscover: () => Promise<
+    | {
+        ok: true
+        plugins: Array<{
+          manifest: {
+            id: string
+            name: string
+            version: string
+            description?: string
+            main?: string
+          }
+          source: string
+          dir: string
+        }>
+        errors: Array<{ dir: string; error: string }>
+      }
+    | { ok: false; error: string }
+  >
+  pluginsGetDir: () => Promise<string>
+  pluginsOpenDir: () => Promise<{ ok: true } | { ok: false; error: string }>
 }
 
 declare global {

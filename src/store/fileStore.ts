@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { FileTreeNode } from '../types/electron'
 import type { TocEntry } from '../lib/markdown/remarkToc'
+import { detectFormat, kindOfFormat, type FileFormat } from '../lib/fileFormat'
 
 interface OpenFolder {
   path: string
@@ -10,13 +11,22 @@ interface OpenFolder {
 
 interface FileStore {
   currentFilePath: string | null
+  currentFormat: FileFormat | null
+  /** Text-format content (markdown / csv / json). `null` for binary formats. */
   currentContent: string | null
+  /**
+   * Binary-format content (pdf / xlsx). `null` for text formats. We keep the
+   * raw ArrayBuffer so viewers (pdfjs-dist, SheetJS) can consume it directly
+   * without an extra round-trip.
+   */
+  currentBytes: ArrayBuffer | null
   openFolders: OpenFolder[]
   recentFiles: string[]
   toc: TocEntry[]
 
   openFile: (filePath: string) => Promise<void>
   openFileWithContent: (filePath: string, content: string) => void
+  openFileWithBytes: (filePath: string, bytes: ArrayBuffer) => void
   openFolder: (folderPath: string) => Promise<void>
   closeFolder: (folderPath: string) => void
   setContent: (content: string) => void
@@ -34,20 +44,61 @@ function folderName(folderPath: string): string {
 
 export const useFileStore = create<FileStore>((set, get) => ({
   currentFilePath: null,
+  currentFormat: null,
   currentContent: null,
+  currentBytes: null,
   openFolders: [],
   recentFiles: [],
   toc: [],
 
   openFile: async (filePath: string) => {
-    const content = await window.electronAPI.readFile(filePath)
-    set({ currentFilePath: filePath, currentContent: content })
+    // Dispatch on extension so the right reader is used for text vs
+    // binary formats. Unknown extensions fall through to text (best-
+    // effort for files the user drops in that we haven't catalogued).
+    const format = detectFormat(filePath)
+    const kind = format ? kindOfFormat(format) : 'text'
+
+    if (kind === 'binary') {
+      const bytes = await window.electronAPI.readFileBytes(filePath)
+      set({
+        currentFilePath: filePath,
+        currentFormat: format,
+        currentContent: null,
+        currentBytes: bytes,
+      })
+    } else {
+      const content = await window.electronAPI.readFile(filePath)
+      set({
+        currentFilePath: filePath,
+        currentFormat: format,
+        currentContent: content,
+        currentBytes: null,
+      })
+    }
     get().addRecentFile(filePath)
     window.electronAPI.watchFile(filePath)
   },
 
   openFileWithContent: (filePath: string, content: string) => {
-    set({ currentFilePath: filePath, currentContent: content })
+    const format = detectFormat(filePath)
+    set({
+      currentFilePath: filePath,
+      currentFormat: format,
+      currentContent: content,
+      currentBytes: null,
+    })
+    get().addRecentFile(filePath)
+    window.electronAPI.watchFile(filePath)
+  },
+
+  openFileWithBytes: (filePath: string, bytes: ArrayBuffer) => {
+    const format = detectFormat(filePath)
+    set({
+      currentFilePath: filePath,
+      currentFormat: format,
+      currentContent: null,
+      currentBytes: bytes,
+    })
     get().addRecentFile(filePath)
     window.electronAPI.watchFile(filePath)
   },
@@ -112,7 +163,9 @@ export const useFileStore = create<FileStore>((set, get) => ({
   openFileDialog: async () => {
     const result = await window.electronAPI.openFileDialog()
     if (result) {
-      get().openFileWithContent(result.path, result.content)
+      // The dialog only returns a path now — `openFile` picks the right
+      // reader based on extension (text vs binary).
+      await get().openFile(result.path)
     }
   },
 

@@ -2,7 +2,14 @@ import { create } from 'zustand'
 
 export type MainViewMode = 'reader' | 'graph'
 export type GraphScope = 'global' | 'document' | 'entity'
-export type RightSidebarTab = 'toc' | 'entity' | 'related'
+/**
+ * Built-in tab ids. Plugins register their own tabs with arbitrary
+ * string ids (namespaced like `<pluginId>.<tabId>` by convention), so
+ * `rightSidebarTab` is widened to `string`. The built-in tabs stay a
+ * union so switch-case readers still type-narrow when they need to.
+ */
+export type BuiltinRightSidebarTab = 'toc' | 'entity' | 'related'
+export type RightSidebarTab = BuiltinRightSidebarTab | (string & {})
 
 interface UIStore {
   leftSidebarOpen: boolean

@@ -53,7 +53,18 @@ export function GraphView() {
   const insightGraphEnabled = useSettingsStore((s) => s.insightGraph.enabled)
   const reports = useInsightGraphStore((s) => s.reports)
   const refreshReports = useInsightGraphStore((s) => s.refreshReports)
+  const ingestStage = useInsightGraphStore((s) => s.ingest.stage)
   const currentFilePath = useFileStore((s) => s.currentFilePath)
+
+  // One-shot guard: right after an ingest completes, if the user hasn't
+  // manually chosen a scope and we can't match the current file to a report,
+  // auto-switch to Global so the newly-built graph is visible instead of
+  // an empty Document view.
+  const autoScopedRef = useRef(false)
+  // When autoScopedRef fires we also flip this so the user sees a
+  // dismissible banner — otherwise the scope change happens silently
+  // and the user has no idea why they're suddenly in Global.
+  const [autoScopeNotice, setAutoScopeNotice] = useState(false)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 800, height: 600 })
@@ -103,25 +114,35 @@ export function GraphView() {
           // writes its own `report_id` that doesn't line up with the UUID
           // the ingest response returns). Fall back to the most recent
           // report, then to the bounded global graph.
-          const storeReports = useInsightGraphStore.getState().reports
+          //
+          // NOTE: we read from the reactive `reports` (captured by the
+          // effect's deps below) so the effect re-runs when ingest finishes
+          // and this branch sees the freshly-loaded reports.
           const targetName = currentFilePath
             ? currentFilePath.split(/[/\\]/).pop()
             : undefined
           const matched =
             (targetName &&
-              storeReports.find(
+              reports.find(
                 (r) => r.filename === targetName || r.filePath === currentFilePath,
               )) ||
-            storeReports[0]
+            reports[0]
           if (matched?.reportId) {
             const entitiesRes = await window.electronAPI.insightGraphEntitiesForReport(
               matched.reportId,
             )
             if (entitiesRes.ok && entitiesRes.data.length > 0) {
-              result = (await window.electronAPI.insightGraphBuildSubgraphFromEntities(
+              const sub = (await window.electronAPI.insightGraphBuildSubgraphFromEntities(
                 entitiesRes.data,
                 { maxEntities: 120 },
               )) as typeof result
+              // Only accept the subgraph if it actually has nodes; a matched
+              // report with zero returned entity-nodes (e.g. stale Cypher
+              // names, SDK dedup edge-cases) shouldn't blank out the canvas
+              // — fall through to the global fallback below.
+              if (sub && sub.ok && sub.data.nodes.length > 0) {
+                result = sub
+              }
             } else if (!entitiesRes.ok) {
               result = entitiesRes as typeof result
             }
@@ -170,6 +191,31 @@ export function GraphView() {
   useEffect(() => {
     if (insightGraphEnabled) refreshReports()
   }, [insightGraphEnabled, refreshReports])
+
+  // Right after a successful ingest, if the user is sitting in Document
+  // scope with no file open that matches a report, pop them into Global so
+  // they actually see the graph that was just built. One-shot — we never
+  // override the user's subsequent scope choice.
+  useEffect(() => {
+    if (autoScopedRef.current) return
+    if (ingestStage !== 'completed') return
+    if (scope !== 'document') return
+    const targetName = currentFilePath
+      ? currentFilePath.split(/[/\\]/).pop()
+      : undefined
+    const matched =
+      targetName &&
+      reports.find(
+        (r) => r.filename === targetName || r.filePath === currentFilePath,
+      )
+    if (!matched && reports.length > 0) {
+      autoScopedRef.current = true
+      setScope('global')
+      setAutoScopeNotice(true)
+      // Auto-dismiss the notice so the user isn't left with stale chrome.
+      window.setTimeout(() => setAutoScopeNotice(false), 6000)
+    }
+  }, [ingestStage, scope, reports, currentFilePath, setScope])
 
   // Map the SDK's edge shape (source/target strings) to whatever
   // react-force-graph expects on `graphData.links`.
@@ -231,12 +277,35 @@ export function GraphView() {
       </div>
 
       {/* Canvas */}
+      {autoScopeNotice && (
+        <div
+          className="flex items-center gap-2 px-3 py-1.5 text-[11px] border-b"
+          style={{
+            borderColor: 'var(--border-color)',
+            backgroundColor: 'color-mix(in srgb, var(--accent-color) 10%, transparent)',
+            color: 'var(--text-primary)',
+          }}
+          role="status"
+        >
+          <Globe size={11} style={{ color: 'var(--accent-color)' }} />
+          <span className="flex-1">{t('graphView.autoScopedToGlobal')}</span>
+          <button
+            onClick={() => setAutoScopeNotice(false)}
+            className="p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-[var(--accent-color)]"
+            aria-label={t('common.dismiss')}
+            title={t('common.dismiss')}
+          >
+            <span aria-hidden>×</span>
+          </button>
+        </div>
+      )}
+
       <div ref={containerRef} className="flex-1 relative overflow-hidden">
         {status === 'loading' && <GraphStatus icon={<Loader2 size={14} className="animate-spin" />} label={t('graphView.loading')} />}
         {status === 'error' && (
           <GraphStatus
             icon={<AlertCircle size={14} className="text-red-500" />}
-            label={`${t('graphView.error')}${error ? `: ${error}` : ''}`}
+            label={classifyGraphError(error, t)}
             tone="error"
           />
         )}
@@ -261,7 +330,7 @@ export function GraphView() {
             </div>
           </div>
         )}
-        {status === 'idle' && data && data.nodes.length > 0 && (
+        {status === 'idle' && data && data.nodes.length > 0 && size.width > 0 && size.height > 0 && (
           <ForceGraph2D
             width={size.width}
             height={size.height}
@@ -346,6 +415,40 @@ function GraphStatus({
       </div>
     </div>
   )
+}
+
+/**
+ * Turn a raw Neo4j / SDK error string into an actionable, translated
+ * message. Keeps the original as a fallback so power users can still
+ * see the underlying cause.
+ */
+function classifyGraphError(raw: string | null, t: (key: string, vars?: Record<string, unknown>) => string): string {
+  const base = t('graphView.error')
+  if (!raw) return base
+  const msg = raw.toLowerCase()
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return `${base}: ${t('graphView.errorOffline')}`
+  }
+  if (
+    msg.includes('authentication') ||
+    msg.includes('unauthorized') ||
+    msg.includes('neo.clienterror.security')
+  ) {
+    return `${base}: ${t('graphView.errorAuth')}`
+  }
+  if (
+    msg.includes('econnrefused') ||
+    msg.includes('connection refused') ||
+    msg.includes('could not perform discovery') ||
+    msg.includes('service unavailable') ||
+    msg.includes('routing')
+  ) {
+    return `${base}: ${t('graphView.errorUnreachable')}`
+  }
+  if (msg.includes('timeout') || msg.includes('timed out')) {
+    return `${base}: ${t('graphView.errorTimeout')}`
+  }
+  return `${base}: ${raw}`
 }
 
 /**

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { clsx } from 'clsx'
 import { useUIStore, type RightSidebarTab } from '../../store/uiStore'
 import { useSettingsStore } from '../../store/settingsStore'
+import { useSidebarPanelRegistry } from '../../store/sidebarPanelRegistry'
 import { TableOfContents } from '../toc/TableOfContents'
 import { EntityPanel } from '../graph/EntityPanel'
 import { RelatedRail } from '../graph/RelatedRail'
@@ -29,6 +30,7 @@ export function RightSidebar({ toc }: RightSidebarProps) {
   const activeTab = useUIStore((s) => s.rightSidebarTab)
   const setTab = useUIStore((s) => s.setRightSidebarTab)
   const graphEnabled = useSettingsStore((s) => s.insightGraph.enabled)
+  const pluginPanels = useSidebarPanelRegistry((s) => s.panels)
 
   const tabs: {
     id: RightSidebarTab
@@ -39,7 +41,18 @@ export function RightSidebar({ toc }: RightSidebarProps) {
     { id: 'toc', icon: List, label: t('sidebar.contents') },
     { id: 'entity', icon: User, label: t('sidebar.entity'), hidden: !graphEnabled },
     { id: 'related', icon: Network, label: t('sidebar.related'), hidden: !graphEnabled },
+    // Plugin-contributed tabs appear after the built-ins. Plugins can
+    // register multiple; we dedupe by id already in the registry.
+    ...pluginPanels.map((p) => ({
+      id: p.id,
+      icon: p.icon,
+      label: p.title,
+    })),
   ]
+
+  // Resolve the active plugin panel (if any) so we render its component
+  // body. Built-in tabs keep their explicit conditional rendering below.
+  const activePluginPanel = pluginPanels.find((p) => p.id === activeTab) ?? null
 
   return (
     <div
@@ -101,6 +114,11 @@ export function RightSidebar({ toc }: RightSidebarProps) {
           </div>
         )}
         {activeTab === 'related' && graphEnabled && <RelatedRail />}
+        {activePluginPanel && (
+          <div className="h-full overflow-y-auto">
+            <activePluginPanel.component />
+          </div>
+        )}
       </div>
     </div>
   )
