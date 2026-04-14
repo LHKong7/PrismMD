@@ -71,6 +71,33 @@ export interface ElectronAPI {
   // Platform
   platform: string
 
+  // MCP
+  mcpStatusAll: () => Promise<
+    | {
+        ok: true
+        servers: Array<{ id: string; running: boolean; error?: string; toolCount: number }>
+      }
+    | { ok: false; error: string }
+  >
+  mcpListTools: (serverId: string) => Promise<
+    | {
+        ok: true
+        tools: Array<{
+          name: string
+          description?: string
+          inputSchema: Record<string, unknown>
+        }>
+      }
+    | { ok: false; error: string }
+  >
+  mcpCallTool: (
+    serverId: string,
+    toolName: string,
+    args: Record<string, unknown>,
+  ) => Promise<{ ok: true; result: unknown } | { ok: false; error: string }>
+  mcpRestart: () => Promise<{ ok: true } | { ok: false; error: string }>
+  mcpStop: (serverId: string) => Promise<{ ok: true } | { ok: false; error: string }>
+
   // Plugins
   pluginsDiscover: () => Promise<
     | {

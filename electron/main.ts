@@ -3,6 +3,7 @@ import path from 'path'
 import { registerIpcHandlers } from './ipc'
 import { appConfig } from '../app.config'
 import { shutdown as shutdownInsightGraph } from './services/insightGraphService'
+import { startAll as startMcpServers, shutdownAll as shutdownMcpServers } from './services/mcpService'
 
 // Apply app identity from the central config
 app.setName(appConfig.name)
@@ -58,9 +59,12 @@ function createWindow() {
   })
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   registerIpcHandlers()
   createWindow()
+  // Fire MCP servers in the background — failures don't block window
+  // creation, and individual server errors are logged inside the service.
+  startMcpServers().catch((err) => console.warn('[mcp] startAll failed:', err))
 })
 
 app.on('window-all-closed', () => {
@@ -69,14 +73,17 @@ app.on('window-all-closed', () => {
   }
 })
 
-let insightGraphShutdownStarted = false
+let servicesShutdownStarted = false
 app.on('before-quit', (event) => {
-  if (insightGraphShutdownStarted) return
-  insightGraphShutdownStarted = true
+  if (servicesShutdownStarted) return
+  servicesShutdownStarted = true
   event.preventDefault()
-  shutdownInsightGraph()
-    .catch(() => {})
-    .finally(() => app.exit(0))
+  // Tear down both long-running services in parallel so the user
+  // isn't stuck waiting on one blocking the other on app close.
+  Promise.all([
+    shutdownInsightGraph().catch(() => {}),
+    shutdownMcpServers().catch(() => {}),
+  ]).finally(() => app.exit(0))
 })
 
 app.on('activate', () => {

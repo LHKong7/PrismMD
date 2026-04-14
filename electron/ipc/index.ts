@@ -5,6 +5,7 @@ import { registerSettingsHandlers } from './settingsHandlers'
 import { registerAgentHandlers } from './agentHandlers'
 import { registerInsightGraphHandlers } from './insightGraphHandlers'
 import { registerPluginHandlers } from './pluginHandlers'
+import { registerMcpHandlers } from './mcpHandlers'
 import { getMainWindow } from '../main'
 
 /**
@@ -23,4 +24,5 @@ export function registerIpcHandlers() {
   registerAgentHandlers()
   registerInsightGraphHandlers()
   registerPluginHandlers()
+  registerMcpHandlers()
 }

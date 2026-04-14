@@ -154,6 +154,18 @@
       "clearMemoryDesc": "删除所有存储的对话历史与偏好。",
       "cleared": "记忆已清除"
     },
+    "mcp": {
+      "title": "MCP 服务",
+      "subtitle": "通过 Model Context Protocol 连接 AI 工具。格式和 Claude Desktop 的 mcpServers 兼容，已有配置可以直接粘贴。",
+      "enable": "启用 MCP 工具调用",
+      "serversLabel": "服务配置（JSON）",
+      "docs": "文档 ↗",
+      "save": "保存",
+      "restart": "全部重启",
+      "status": "运行状态",
+      "toolCount": "{{count}} 个工具",
+      "stopped": "已停止"
+    },
     "plugins": {
       "title": "插件",
       "subtitle": "用社区贡献的命令、侧栏面板、Markdown 渲染器扩展 PrismMD。",

@@ -18,6 +18,26 @@ export interface InsightGraphSettings {
   entityLinking?: boolean
 }
 
+/**
+ * MCP (Model Context Protocol) servers that expose tools to the AI
+ * assistant. Shape mirrors Claude Desktop's `mcpServers` config so
+ * users can paste existing configs directly.
+ */
+export interface McpServerConfig {
+  command: string
+  args: string[]
+  env?: Record<string, string>
+  /** Soft-disabled entries stay configured but aren't started. */
+  enabled?: boolean
+}
+
+export interface McpSettings {
+  enabled: boolean
+  servers: Record<string, McpServerConfig>
+  /** Max milliseconds a single tool call may run. Defaults to 30s. */
+  toolTimeoutMs: number
+}
+
 interface AppSettings {
   language: string
   themeId: string
@@ -27,6 +47,7 @@ interface AppSettings {
   providers: Record<string, ProviderConfig>
   activeProvider: string | null
   insightGraph: InsightGraphSettings
+  mcp: McpSettings
 }
 
 const DEFAULT_INSIGHT_GRAPH: InsightGraphSettings = {
@@ -38,6 +59,12 @@ const DEFAULT_INSIGHT_GRAPH: InsightGraphSettings = {
   },
   domain: 'default',
   entityLinking: false,
+}
+
+const DEFAULT_MCP: McpSettings = {
+  enabled: false,
+  servers: {},
+  toolTimeoutMs: 30_000,
 }
 
 const store = new Store<{ settings: AppSettings }>({
@@ -58,6 +85,7 @@ const store = new Store<{ settings: AppSettings }>({
       },
       activeProvider: null,
       insightGraph: DEFAULT_INSIGHT_GRAPH,
+      mcp: DEFAULT_MCP,
     },
   },
 })
@@ -75,11 +103,20 @@ export function loadSettings(): AppSettings {
         ...(s.insightGraph?.neo4j ?? {}),
       },
     },
+    mcp: {
+      ...DEFAULT_MCP,
+      ...(s.mcp ?? {}),
+      servers: { ...(s.mcp?.servers ?? {}) },
+    },
   }
 }
 
 export function getInsightGraphSettings(): InsightGraphSettings {
   return loadSettings().insightGraph
+}
+
+export function getMcpSettings(): McpSettings {
+  return loadSettings().mcp
 }
 
 export function saveSettings(settings: AppSettings): void {

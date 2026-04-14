@@ -287,6 +287,32 @@ const electronAPI = {
   > => ipcRenderer.invoke('insightgraph:related-reports', reportId, limit),
 
   // External plugin loading (reads <userData>/plugins/<id>/).
+  // MCP (Model Context Protocol) — tool servers the AI assistant can
+  // call. Configured in settings.mcp.servers.
+  mcpStatusAll: (): Promise<
+    | { ok: true; servers: Array<{ id: string; running: boolean; error?: string; toolCount: number }> }
+    | { ok: false; error: string }
+  > => ipcRenderer.invoke('mcp:status-all'),
+  mcpListTools: (
+    serverId: string,
+  ): Promise<
+    | {
+        ok: true
+        tools: Array<{ name: string; description?: string; inputSchema: Record<string, unknown> }>
+      }
+    | { ok: false; error: string }
+  > => ipcRenderer.invoke('mcp:list-tools', serverId),
+  mcpCallTool: (
+    serverId: string,
+    toolName: string,
+    args: Record<string, unknown>,
+  ): Promise<{ ok: true; result: unknown } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('mcp:call-tool', serverId, toolName, args),
+  mcpRestart: (): Promise<{ ok: true } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('mcp:restart'),
+  mcpStop: (serverId: string): Promise<{ ok: true } | { ok: false; error: string }> =>
+    ipcRenderer.invoke('mcp:stop', serverId),
+
   pluginsDiscover: (): Promise<
     | { ok: true; plugins: Array<{
           manifest: { id: string; name: string; version: string; description?: string; main?: string }

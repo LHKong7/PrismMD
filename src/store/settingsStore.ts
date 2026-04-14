@@ -39,6 +39,25 @@ export const DEFAULT_INSIGHT_GRAPH_CONFIG: InsightGraphConfig = {
   entityLinking: false,
 }
 
+export interface McpServerConfig {
+  command: string
+  args: string[]
+  env?: Record<string, string>
+  enabled?: boolean
+}
+
+export interface McpConfig {
+  enabled: boolean
+  servers: Record<string, McpServerConfig>
+  toolTimeoutMs: number
+}
+
+export const DEFAULT_MCP_CONFIG: McpConfig = {
+  enabled: false,
+  servers: {},
+  toolTimeoutMs: 30_000,
+}
+
 export const DEFAULT_MODELS: Record<AIProvider, string[]> = {
   openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
   anthropic: ['claude-sonnet-4-20250514', 'claude-haiku-4-20250414', 'claude-3-5-sonnet-20241022'],
@@ -69,6 +88,9 @@ interface SettingsStore {
   // InsightGraph (optional RAG over a Neo4j knowledge graph)
   insightGraph: InsightGraphConfig
 
+  // MCP (Model Context Protocol) — tool servers the agent can call
+  mcp: McpConfig
+
   // Actions
   setLanguage: (lang: SupportedLanguage) => void
   setThemeId: (id: string) => void
@@ -79,6 +101,8 @@ interface SettingsStore {
   setActiveProvider: (provider: AIProvider | null) => void
   setFocusMode: (enabled: boolean) => void
   setInsightGraphConfig: (config: Partial<InsightGraphConfig> & { neo4j?: Partial<InsightGraphConfig['neo4j']> }) => void
+  setMcpConfig: (config: Partial<McpConfig>) => void
+  setMcpServer: (id: string, config: McpServerConfig | null) => void
 
   // Persistence
   loadSettings: () => Promise<void>
@@ -93,6 +117,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   privacyMode: false,
   focusMode: false,
   insightGraph: DEFAULT_INSIGHT_GRAPH_CONFIG,
+  mcp: DEFAULT_MCP_CONFIG,
 
   providers: {
     openai: { apiKey: '', model: 'gpt-4o', enabled: false },
@@ -171,6 +196,24 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
     get().saveSettings()
   },
 
+  setMcpConfig: (config) => {
+    set((state) => ({ mcp: { ...state.mcp, ...config } }))
+    get().saveSettings()
+    // Ask main to restart its pool so the change takes effect immediately.
+    void window.electronAPI.mcpRestart()
+  },
+
+  setMcpServer: (id, config) => {
+    set((state) => {
+      const servers = { ...state.mcp.servers }
+      if (config === null) delete servers[id]
+      else servers[id] = config
+      return { mcp: { ...state.mcp, servers } }
+    })
+    get().saveSettings()
+    void window.electronAPI.mcpRestart()
+  },
+
   loadSettings: async () => {
     try {
       const raw = await window.electronAPI.loadSettings()
@@ -192,6 +235,13 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
               ...(((s.insightGraph as Partial<InsightGraphConfig>)?.neo4j) ?? {}),
             },
           },
+          mcp: {
+            ...DEFAULT_MCP_CONFIG,
+            ...((s.mcp as Partial<McpConfig>) ?? {}),
+            servers: {
+              ...(((s.mcp as Partial<McpConfig>)?.servers) ?? {}),
+            },
+          },
         })
       }
     } catch {
@@ -200,10 +250,10 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   },
 
   saveSettings: async () => {
-    const { language, themeId, themeMode, vibrancy, privacyMode, providers, activeProvider, insightGraph } = get()
+    const { language, themeId, themeMode, vibrancy, privacyMode, providers, activeProvider, insightGraph, mcp } = get()
     try {
       await window.electronAPI.saveSettings({
-        language, themeId, themeMode, vibrancy, privacyMode, providers, activeProvider, insightGraph,
+        language, themeId, themeMode, vibrancy, privacyMode, providers, activeProvider, insightGraph, mcp,
       })
     } catch {
       // Silently fail

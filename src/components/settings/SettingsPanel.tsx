@@ -14,7 +14,7 @@ interface SettingsPanelProps {
   onClose: () => void
 }
 
-type Tab = 'language' | 'theme' | 'ai' | 'privacy' | 'insightgraph' | 'plugins'
+type Tab = 'language' | 'theme' | 'ai' | 'privacy' | 'insightgraph' | 'plugins' | 'mcp'
 
 export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const { t } = useTranslation()
@@ -45,6 +45,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
               { id: 'ai' as Tab, icon: Bot, label: t('settings.ai.title') },
               { id: 'insightgraph' as Tab, icon: Network, label: t('settings.insightgraph.title') },
               { id: 'plugins' as Tab, icon: Puzzle, label: t('settings.plugins.title') },
+              { id: 'mcp' as Tab, icon: Bot, label: t('settings.mcp.title') },
               { id: 'privacy' as Tab, icon: Shield, label: t('settings.privacy.title') },
             ]).map(({ id, icon: Icon, label }) => (
               <button
@@ -71,6 +72,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             {activeTab === 'ai' && <AISettings />}
             {activeTab === 'insightgraph' && <InsightGraphSettings />}
             {activeTab === 'plugins' && <PluginsSettings />}
+            {activeTab === 'mcp' && <McpSettingsSection />}
             {activeTab === 'privacy' && <PrivacySettings />}
           </div>
         </div>
@@ -820,6 +822,177 @@ function PluginList({
             </li>
           ))}
         </ul>
+      )}
+    </div>
+  )
+}
+
+/**
+ * MCP (Model Context Protocol) settings. Exposes the raw Claude-Desktop-style
+ * JSON config so power users can paste existing `mcpServers` directly, plus
+ * a read-only status row showing which servers are currently running and how
+ * many tools each exposes. A future commit will add a friendlier per-server
+ * form; JSON works today.
+ */
+function McpSettingsSection() {
+  const { t } = useTranslation()
+  const mcp = useSettingsStore((s) => s.mcp)
+  const setMcpConfig = useSettingsStore((s) => s.setMcpConfig)
+
+  // Local draft buffer so the JSON field can be edited freely without
+  // clobbering settings on every keystroke. We only commit on "Save".
+  const [draft, setDraft] = useState('')
+  const [draftError, setDraftError] = useState<string | null>(null)
+  const [statuses, setStatuses] = useState<
+    Array<{ id: string; running: boolean; toolCount: number }>
+  >([])
+  const [refreshing, setRefreshing] = useState(false)
+
+  useEffect(() => {
+    setDraft(JSON.stringify(mcp.servers, null, 2))
+  }, [mcp.servers])
+
+  const loadStatuses = async () => {
+    const res = await window.electronAPI.mcpStatusAll()
+    if (res.ok) setStatuses(res.servers)
+  }
+
+  useEffect(() => {
+    void loadStatuses()
+  }, [mcp.enabled, mcp.servers])
+
+  const handleSave = () => {
+    try {
+      const parsed = JSON.parse(draft) as Record<string, unknown>
+      // Shallow-validate the shape. Each entry must have a `command` string
+      // and an `args` array — this matches Claude Desktop's format.
+      for (const [id, entry] of Object.entries(parsed)) {
+        const e = entry as Record<string, unknown>
+        if (typeof e.command !== 'string') throw new Error(`${id}: missing "command"`)
+        if (!Array.isArray(e.args)) throw new Error(`${id}: "args" must be an array`)
+      }
+      setMcpConfig({ servers: parsed as typeof mcp.servers })
+      setDraftError(null)
+    } catch (err) {
+      setDraftError(err instanceof Error ? err.message : String(err))
+    }
+  }
+
+  const handleRestart = async () => {
+    setRefreshing(true)
+    try {
+      await window.electronAPI.mcpRestart()
+      await loadStatuses()
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+          {t('settings.mcp.title')}
+        </h3>
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          {t('settings.mcp.subtitle')}
+        </p>
+      </div>
+
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={mcp.enabled}
+          onChange={(e) => setMcpConfig({ enabled: e.target.checked })}
+        />
+        <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
+          {t('settings.mcp.enable')}
+        </span>
+      </label>
+
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+            {t('settings.mcp.serversLabel')}
+          </label>
+          <a
+            href="https://modelcontextprotocol.io/docs/quickstart/user"
+            target="_blank"
+            rel="noreferrer"
+            className="text-[11px] hover:underline"
+            style={{ color: 'var(--accent-color)' }}
+          >
+            {t('settings.mcp.docs')}
+          </a>
+        </div>
+        <textarea
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          placeholder={'{\n  "fetch": {\n    "command": "npx",\n    "args": ["-y", "@modelcontextprotocol/server-fetch"]\n  }\n}'}
+          spellCheck={false}
+          className="w-full min-h-[180px] text-xs font-mono p-3 rounded border outline-none"
+          style={{
+            backgroundColor: 'var(--bg-secondary)',
+            borderColor: draftError ? '#ef4444' : 'var(--border-color)',
+            color: 'var(--text-primary)',
+          }}
+        />
+        {draftError && (
+          <p className="mt-1 text-xs text-red-500">{draftError}</p>
+        )}
+        <div className="flex items-center gap-2 mt-2">
+          <button
+            onClick={handleSave}
+            className="text-xs px-3 py-1 rounded font-medium"
+            style={{ backgroundColor: 'var(--accent-color)', color: '#fff' }}
+          >
+            {t('settings.mcp.save')}
+          </button>
+          <button
+            onClick={handleRestart}
+            disabled={refreshing}
+            className="flex items-center gap-1 text-xs px-3 py-1 rounded border hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-50"
+            style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+          >
+            {refreshing ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <RefreshCw size={12} />
+            )}
+            {t('settings.mcp.restart')}
+          </button>
+        </div>
+      </div>
+
+      {statuses.length > 0 && (
+        <div>
+          <h4 className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
+            {t('settings.mcp.status')}
+          </h4>
+          <ul className="space-y-1">
+            {statuses.map((s) => (
+              <li
+                key={s.id}
+                className="flex items-center justify-between p-2 rounded border text-xs"
+                style={{ borderColor: 'var(--border-color)' }}
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`w-2 h-2 rounded-full ${s.running ? 'bg-green-500' : 'bg-gray-400'}`}
+                  />
+                  <span className="font-mono" style={{ color: 'var(--text-primary)' }}>
+                    {s.id}
+                  </span>
+                </div>
+                <span style={{ color: 'var(--text-muted)' }}>
+                  {s.running
+                    ? t('settings.mcp.toolCount', { count: s.toolCount })
+                    : t('settings.mcp.stopped')}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   )

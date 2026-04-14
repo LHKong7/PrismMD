@@ -17,6 +17,7 @@
     "@anthropic-ai/sdk": "^0.88.0",
     "@google/generative-ai": "^0.24.1",
     "@insightgraph/sdk-embedded": "^0.1.2",
+    "@modelcontextprotocol/sdk": "^1.0.4",
     "borderless-agent": "file:../borderless_agent",
     "chokidar": "^4.0.1",
     "clsx": "^2.1.1",

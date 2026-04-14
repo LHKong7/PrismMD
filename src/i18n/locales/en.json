@@ -154,6 +154,18 @@
       "clearMemoryDesc": "Remove all stored conversation history and preferences.",
       "cleared": "Memory cleared"
     },
+    "mcp": {
+      "title": "MCP Servers",
+      "subtitle": "Connect AI tools via the Model Context Protocol. Format matches Claude Desktop's `mcpServers` config — you can paste existing entries.",
+      "enable": "Enable MCP tool calls",
+      "serversLabel": "Servers (JSON)",
+      "docs": "Docs ↗",
+      "save": "Save",
+      "restart": "Restart all",
+      "status": "Status",
+      "toolCount": "{{count}} tools",
+      "stopped": "Stopped"
+    },
     "plugins": {
       "title": "Plugins",
       "subtitle": "Extend PrismMD with community-contributed commands, sidebar panels, and markdown renderers.",
