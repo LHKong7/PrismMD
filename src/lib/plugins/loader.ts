@@ -5,8 +5,9 @@ import type { Plugin } from './types'
 // HMR works during dev. External (`<userData>/plugins/…`) loading lives
 // in its own loader that speaks via IPC.
 import helloPlugin from '../../plugins/hello'
+import mermaidPlugin from '../../plugins/mermaid'
 
-const BUILTIN_PLUGINS: Plugin[] = [helloPlugin]
+const BUILTIN_PLUGINS: Plugin[] = [helloPlugin, mermaidPlugin]
 
 let bootstrapped = false
 
