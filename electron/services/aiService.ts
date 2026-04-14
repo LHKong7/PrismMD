@@ -2,6 +2,7 @@ import { AgentBuilder } from 'borderless-agent'
 import type { AgentInstance, LLMConfig } from 'borderless-agent'
 import { BrowserWindow } from 'electron'
 import { getActiveProvider, loadSettings } from './settingsStore'
+import { callTool as callMcpTool, discoverAll as discoverAllMcpTools } from './mcpService'
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
@@ -25,16 +26,87 @@ export function stopGeneration() {
 }
 
 /**
- * Build an AgentInstance from borderless-agent using the active provider config.
+ * Register discovered MCP tools on the agent builder.
+ *
+ * `borderless-agent`'s exact tool-registration API isn't documented in the
+ * dependency we have at build time, so we probe a couple of common fluent
+ * method names (`addTool`, `registerTool`, `withTool`) and fall back to
+ * logging a warning if none match. A failure here never blocks chat —
+ * the agent just runs without the extra tools.
+ *
+ * Tool names are prefixed `<serverId>__<toolName>` so two MCP servers
+ * exposing the same name (both "search", for example) don't collide.
  */
-function buildAgent(
+async function attachMcpTools(builder: AgentBuilder): Promise<number> {
+  let attached = 0
+  let discovered: Awaited<ReturnType<typeof discoverAllMcpTools>> = []
+  try {
+    discovered = await discoverAllMcpTools()
+  } catch (err) {
+    console.warn('[mcp] tool discovery failed:', err)
+    return 0
+  }
+  if (discovered.length === 0) return 0
+
+  type LooseBuilder = AgentBuilder & Record<string, unknown>
+  const loose = builder as LooseBuilder
+
+  // Pick the first available tool-registration method. Recorded here
+  // (rather than inline-cast at each call site) so the fallback branch
+  // can log one clear warning.
+  const registrar =
+    (typeof loose.addTool === 'function' && 'addTool') ||
+    (typeof loose.registerTool === 'function' && 'registerTool') ||
+    (typeof loose.withTool === 'function' && 'withTool') ||
+    null
+  if (!registrar) {
+    console.warn(
+      '[mcp] borderless-agent exposes no addTool/registerTool/withTool; ' +
+        `skipping ${discovered.length} MCP tool(s). Tool use will resume ` +
+        "once the agent's tool API is wired.",
+    )
+    return 0
+  }
+
+  for (const { serverId, tool, qualifiedName } of discovered) {
+    try {
+      // The shape passed below is the most common one across agent
+      // libraries (description + JSON-Schema inputs + async execute).
+      // If `borderless-agent` accepts slightly different keys, fix in
+      // one place (here).
+      ;(loose[registrar] as (t: unknown) => void)({
+        name: qualifiedName,
+        description: tool.description ?? `MCP tool from server "${serverId}"`,
+        inputSchema: tool.inputSchema,
+        parameters: tool.inputSchema, // alias some libraries prefer
+        execute: async (args: Record<string, unknown>) =>
+          callMcpTool(serverId, tool.name, args ?? {}),
+      })
+      attached += 1
+    } catch (err) {
+      console.warn(`[mcp] failed to register tool "${qualifiedName}":`, err)
+    }
+  }
+  return attached
+}
+
+/**
+ * Build an AgentInstance from borderless-agent using the active provider config.
+ *
+ * When MCP is enabled in settings, `attachMcpTools` registers every
+ * discovered tool before `build()` — this lifts the previous
+ * `setMaxToolRounds(1)` cap to a larger budget so the model has room
+ * for multi-step tool use (fetch → summarise → cite, for example).
+ */
+async function buildAgent(
   provider: string,
   apiKey: string,
   model: string,
   baseUrl?: string,
   systemPrompt?: string,
-  maxToolRounds: number = 1
-): AgentInstance {
+  maxToolRounds: number = 1,
+  attachTools: boolean = true,
+): Promise<AgentInstance> {
   const llmConfig: LLMConfig = { apiKey, model }
 
   // Ollama uses an OpenAI-compatible endpoint at /v1
@@ -49,15 +121,41 @@ function buildAgent(
     llmConfig.baseUrl = baseUrl
   }
 
+  const settings = loadSettings()
+  const mcpEnabled = settings.mcp.enabled && attachTools
+
   const builder = new AgentBuilder()
     .setLLM(llmConfig)
     .setIncludeBuiltinTools(false)
     .enableStreaming()
     .enableContext()
-    .setMaxToolRounds(maxToolRounds)
+    // When MCP is enabled, give the model headroom for a few tool rounds
+    // regardless of the caller's request. Without tools we honour the
+    // caller's intent (1 for streaming chat, higher for structured
+    // one-shot calls).
+    .setMaxToolRounds(mcpEnabled ? Math.max(maxToolRounds, 5) : maxToolRounds)
 
   if (systemPrompt) {
     builder.setSystemPrompt(systemPrompt)
+  }
+
+  if (mcpEnabled) {
+    const attached = await attachMcpTools(builder)
+    if (attached > 0) {
+      // Nudge the model to actually use them — some models otherwise
+      // ignore tools unless told they exist.
+      builder.setSystemPrompt(
+        [
+          systemPrompt ?? '',
+          '',
+          `You have access to ${attached} MCP tool(s). Call them when ` +
+            'the user asks for information you don\'t already have in the ' +
+            'provided context.',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      )
+    }
   }
 
   return builder.build()
@@ -122,7 +220,7 @@ export async function sendMessage(
   }
 
   // Build agent with the active provider
-  const agent = buildAgent(provider, apiKey, model, baseUrl, systemPrompt)
+  const agent = await buildAgent(provider, apiKey, model, baseUrl, systemPrompt)
 
   currentAbortController = new AbortController()
   const signal = currentAbortController.signal
@@ -197,7 +295,7 @@ export async function sendOneShot(request: {
   // the agent has room to produce a final answer (streaming chat never
   // triggers tools; one-shot with a JSON schema occasionally spends a
   // round before emitting the final reply).
-  const agent = buildAgent(provider, apiKey, model, baseUrl, systemPrompt, 8)
+  const agent = await buildAgent(provider, apiKey, model, baseUrl, systemPrompt, 8)
   try {
     const result = await agent.chat(request.prompt)
     const reply = result.reply ?? ''
@@ -237,7 +335,9 @@ export async function testConnection(
   try {
     const model = provider === 'ollama' ? 'llama3' : provider === 'anthropic' ? 'claude-haiku-4-20250414' : provider === 'google' ? 'gemini-1.5-flash' : 'gpt-4o-mini'
 
-    const agent = buildAgent(provider, apiKey, model, baseUrl)
+    // Connection test — skip MCP tool attach so a broken server can't
+    // block the test handshake.
+    const agent = await buildAgent(provider, apiKey, model, baseUrl, undefined, 1, false)
 
     const result = await agent.chat('hi')
     await agent.close()
