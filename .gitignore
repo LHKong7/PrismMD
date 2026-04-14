@@ -8,3 +8,4 @@ release/
 Thumbs.db
 
 out/
+*.tsbuildinfo
