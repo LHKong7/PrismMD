@@ -3,10 +3,31 @@
     "name": "PrismMD",
     "welcome": {
       "title": "Welcome to PrismMD",
-      "subtitle": "Open a Markdown file or folder to start reading. You can also drag and drop files here.",
+      "subtitle": "Open a document or folder to start reading. Markdown, PDF, CSV, JSON and XLSX are all supported — drag and drop works too.",
       "openFile": "Open File",
       "openFolder": "Open Folder",
       "tip": "Tip: Press {{shortcut}} to open the command palette"
+    }
+  },
+  "reader": {
+    "unsupported": {
+      "title": "Unsupported file format",
+      "body": "PrismMD's Library currently supports Markdown, PDF, CSV, JSON and XLSX. Try opening one of those."
+    },
+    "json": {
+      "parseError": "This JSON file isn't valid"
+    },
+    "csv": {
+      "placeholderTitle": "CSV viewer coming up",
+      "placeholderBody": "The tabular viewer will be enabled once the table dependencies are installed on this branch."
+    },
+    "xlsx": {
+      "placeholderTitle": "Spreadsheet viewer coming up",
+      "placeholderBody": "The XLSX viewer will be enabled once SheetJS is installed on this branch."
+    },
+    "pdf": {
+      "placeholderTitle": "PDF viewer coming up",
+      "placeholderBody": "The PDF viewer will be enabled once pdfjs-dist is installed on this branch."
     }
   },
   "sidebar": {

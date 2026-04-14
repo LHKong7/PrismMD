@@ -3,10 +3,31 @@
     "name": "PrismMD",
     "welcome": {
       "title": "欢迎使用 PrismMD",
-      "subtitle": "打开 Markdown 文件或文件夹开始阅读，也可以直接拖拽文件到此处。",
+      "subtitle": "打开文件或文件夹开始阅读，支持 Markdown / PDF / CSV / JSON / XLSX，也可以直接拖拽文件到此处。",
       "openFile": "打开文件",
       "openFolder": "打开文件夹",
       "tip": "提示：按下 {{shortcut}} 打开命令面板"
+    }
+  },
+  "reader": {
+    "unsupported": {
+      "title": "暂不支持的文件格式",
+      "body": "资料库目前支持 Markdown / PDF / CSV / JSON / XLSX，请换一个文件试试。"
+    },
+    "json": {
+      "parseError": "这个 JSON 文件解析失败"
+    },
+    "csv": {
+      "placeholderTitle": "CSV 视图即将上线",
+      "placeholderBody": "安装表格相关依赖后会自动启用。"
+    },
+    "xlsx": {
+      "placeholderTitle": "表格视图即将上线",
+      "placeholderBody": "安装 SheetJS 后会自动启用。"
+    },
+    "pdf": {
+      "placeholderTitle": "PDF 视图即将上线",
+      "placeholderBody": "安装 pdfjs-dist 后会自动启用。"
     }
   },
   "sidebar": {
