@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { X, Check, Loader2, Globe, Palette, Bot, Eye, EyeOff, Shield, Trash2, Network, AlertTriangle, RefreshCw, Puzzle, FolderOpen, CircleAlert } from 'lucide-react'
+import { X, Check, Loader2, Globe, Palette, Bot, Eye, EyeOff, Shield, Trash2, Network, AlertTriangle, RefreshCw, Puzzle, FolderOpen, CircleAlert, Info, Download } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useSettingsStore, DEFAULT_MODELS, type AIProvider, type InsightGraphDomain } from '../../store/settingsStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
 import { usePluginManager } from '../../lib/plugins/host'
 import { reloadExternalPlugins } from '../../lib/plugins/externalLoader'
+import { useUpdaterStore } from '../../store/updaterStore'
 import { themes } from '../../lib/theme/themes'
 import { LANGUAGES, changeLanguage, type SupportedLanguage } from '../../i18n'
 import { clsx } from 'clsx'
@@ -14,7 +15,7 @@ interface SettingsPanelProps {
   onClose: () => void
 }
 
-type Tab = 'language' | 'theme' | 'ai' | 'privacy' | 'insightgraph' | 'plugins' | 'mcp'
+type Tab = 'language' | 'theme' | 'ai' | 'privacy' | 'insightgraph' | 'plugins' | 'mcp' | 'about'
 
 export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const { t } = useTranslation()
@@ -47,6 +48,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
               { id: 'plugins' as Tab, icon: Puzzle, label: t('settings.plugins.title') },
               { id: 'mcp' as Tab, icon: Bot, label: t('settings.mcp.title') },
               { id: 'privacy' as Tab, icon: Shield, label: t('settings.privacy.title') },
+              { id: 'about' as Tab, icon: Info, label: t('settings.about.title') },
             ]).map(({ id, icon: Icon, label }) => (
               <button
                 key={id}
@@ -74,6 +76,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             {activeTab === 'plugins' && <PluginsSettings />}
             {activeTab === 'mcp' && <McpSettingsSection />}
             {activeTab === 'privacy' && <PrivacySettings />}
+            {activeTab === 'about' && <AboutSettings />}
           </div>
         </div>
       </div>
@@ -996,4 +999,137 @@ function McpSettingsSection() {
       )}
     </div>
   )
+}
+
+/**
+ * About & Updates. Shows the running version and the current auto-update
+ * state, with manual check + restart-to-install actions. Auto-update
+ * only runs in packaged mac/win builds — dev runs and linux packages
+ * show the "dev / unsupported" banner instead of a non-functional button.
+ */
+function AboutSettings() {
+  const { t } = useTranslation()
+  const currentVersion = useUpdaterStore((s) => s.currentVersion)
+  const kind = useUpdaterStore((s) => s.kind)
+  const nextVersion = useUpdaterStore((s) => s.version)
+  const error = useUpdaterStore((s) => s.error)
+  const lastEventAt = useUpdaterStore((s) => s.lastEventAt)
+  const checkNow = useUpdaterStore((s) => s.checkNow)
+  const quitAndInstall = useUpdaterStore((s) => s.quitAndInstall)
+
+  // "x seconds / minutes / hours ago" for the last-checked timestamp.
+  // Kept as a cheap polling clock instead of a tick loop because this
+  // surface is read-rarely and the precision doesn't matter.
+  const [, forceTick] = useState(0)
+  useEffect(() => {
+    if (!lastEventAt) return
+    const id = window.setInterval(() => forceTick((n) => n + 1), 30_000)
+    return () => window.clearInterval(id)
+  }, [lastEventAt])
+
+  const relativeTime = lastEventAt
+    ? formatRelativeTime(Date.now() - lastEventAt, t)
+    : null
+
+  const statusLine = (() => {
+    switch (kind) {
+      case 'checking': return t('settings.about.statusChecking')
+      case 'available': return t('settings.about.statusAvailable', { version: nextVersion ?? '' })
+      case 'downloading': return t('settings.about.statusDownloading')
+      case 'downloaded': return t('settings.about.statusDownloaded', { version: nextVersion ?? '' })
+      case 'not-available': return t('settings.about.statusLatest')
+      case 'error': return t('settings.about.statusError', { error: error ?? '' })
+      default: return t('settings.about.statusIdle')
+    }
+  })()
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+          {t('settings.about.title')}
+        </h3>
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          {t('settings.about.subtitle')}
+        </p>
+      </div>
+
+      {/* Version + current state */}
+      <div
+        className="flex items-start justify-between gap-3 p-4 rounded border"
+        style={{ borderColor: 'var(--border-color)' }}
+      >
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+            PrismMD
+            {currentVersion && (
+              <span
+                className="ml-2 text-[11px] font-mono"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                v{currentVersion}
+              </span>
+            )}
+          </div>
+          <div className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+            {statusLine}
+          </div>
+          {relativeTime && (
+            <div className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              {t('settings.about.lastChecked', { time: relativeTime })}
+            </div>
+          )}
+        </div>
+        <div className="flex flex-col items-stretch gap-1 flex-shrink-0">
+          {kind === 'downloaded' ? (
+            <button
+              onClick={quitAndInstall}
+              className="flex items-center gap-1 text-xs px-3 py-1 rounded font-medium"
+              style={{ backgroundColor: 'var(--accent-color)', color: '#fff' }}
+            >
+              <Download size={12} />
+              {t('settings.about.restartNow')}
+            </button>
+          ) : (
+            <button
+              onClick={() => void checkNow()}
+              disabled={kind === 'checking' || kind === 'downloading'}
+              className="flex items-center gap-1 text-xs px-3 py-1 rounded border hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-50"
+              style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+            >
+              {kind === 'checking' ? (
+                <Loader2 size={12} className="animate-spin" />
+              ) : (
+                <RefreshCw size={12} />
+              )}
+              {t('settings.about.checkNow')}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Dev / linux hint — auto-updater skips these silently in the
+          main process; explaining *why* beats an invisible no-op. */}
+      {kind === 'idle' && !lastEventAt && (
+        <div
+          className="flex items-start gap-2 p-3 rounded border text-xs"
+          style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
+        >
+          <Info size={14} className="flex-shrink-0 mt-0.5" />
+          <span>{t('settings.about.devNote')}</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function formatRelativeTime(ms: number, t: (key: string, vars?: Record<string, unknown>) => string): string {
+  const s = Math.max(0, Math.floor(ms / 1000))
+  if (s < 60) return t('settings.about.relative.secondsAgo', { count: s })
+  const m = Math.floor(s / 60)
+  if (m < 60) return t('settings.about.relative.minutesAgo', { count: m })
+  const h = Math.floor(m / 60)
+  if (h < 24) return t('settings.about.relative.hoursAgo', { count: h })
+  const d = Math.floor(h / 24)
+  return t('settings.about.relative.daysAgo', { count: d })
 }

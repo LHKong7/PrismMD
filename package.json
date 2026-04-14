@@ -6,11 +6,16 @@
   "main": ".vite/build/main.js",
   "author": "LHKong7",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lhkong7/prismmd.git"
+  },
   "scripts": {
     "start": "electron-forge start",
     "dev": "electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",
+    "publish": "electron-forge publish",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -49,6 +54,7 @@
     "remark-rehype": "^11.1.1",
     "unified": "^11.0.5",
     "unist-util-visit": "^5.1.0",
+    "update-electron-app": "^3.1.1",
     "zustand": "^5.0.0"
   },
   "devDependencies": {
@@ -58,6 +64,7 @@
     "@electron-forge/maker-squirrel": "^7.11.1",
     "@electron-forge/maker-zip": "^7.11.1",
     "@electron-forge/plugin-vite": "^7.11.1",
+    "@electron-forge/publisher-github": "^7.11.1",
     "@tailwindcss/typography": "^0.5.15",
     "@types/papaparse": "^5.3.15",
     "@types/react": "^18.3.12",

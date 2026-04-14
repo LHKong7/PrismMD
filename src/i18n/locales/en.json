@@ -166,6 +166,27 @@
       "toolCount": "{{count}} tools",
       "stopped": "Stopped"
     },
+    "about": {
+      "title": "About & Updates",
+      "subtitle": "Check for new releases and apply them with one click.",
+      "statusIdle": "Up-to-date status will appear here after the first check.",
+      "statusChecking": "Checking for updates…",
+      "statusAvailable": "Update available: {{version}} — downloading in the background.",
+      "statusDownloading": "Downloading update…",
+      "statusDownloaded": "Update {{version}} ready to install.",
+      "statusLatest": "You're on the latest version.",
+      "statusError": "Update check failed: {{error}}",
+      "lastChecked": "Last checked {{time}}",
+      "checkNow": "Check now",
+      "restartNow": "Restart & install",
+      "devNote": "Auto-update is active in packaged macOS / Windows builds with a signed GitHub Release. Dev runs and Linux packages skip it.",
+      "relative": {
+        "secondsAgo": "{{count}}s ago",
+        "minutesAgo": "{{count}}m ago",
+        "hoursAgo": "{{count}}h ago",
+        "daysAgo": "{{count}}d ago"
+      }
+    },
     "plugins": {
       "title": "Plugins",
       "subtitle": "Extend PrismMD with community-contributed commands, sidebar panels, and markdown renderers.",
@@ -286,6 +307,11 @@
       "writing": "Writing to graph…",
       "completed": "Saved to graph",
       "failed": "Ingest failed"
+    },
+    "updater": {
+      "ready": "Update ready",
+      "readyTitle": "A new version is ready — click to restart and install.",
+      "readyWithVersion": "Version {{version}} is ready — click to restart and install."
     }
   },
   "filetree": {

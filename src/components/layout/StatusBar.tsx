@@ -4,7 +4,8 @@ import { useFileStore } from '../../store/fileStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
 import { useBatchIngestStore } from '../../store/batchIngestStore'
-import { Bot, Globe, Shield, Network, Loader2, AlertCircle, CheckCircle2, X } from 'lucide-react'
+import { useUpdaterStore } from '../../store/updaterStore'
+import { Bot, Globe, Shield, Network, Loader2, AlertCircle, CheckCircle2, X, Download } from 'lucide-react'
 
 export function StatusBar() {
   const { t } = useTranslation()
@@ -43,6 +44,13 @@ export function StatusBar() {
   const batchProgress = batchTotal > 0
     ? Math.min(100, Math.round(((batchDone + batchFailed) / batchTotal) * 100))
     : 0
+
+  // Auto-update: only surface a chip when an update is actually ready
+  // to install. "Checking" / "not-available" are uninteresting and would
+  // just add noise to an already-busy status bar.
+  const updaterKind = useUpdaterStore((s) => s.kind)
+  const updaterVersion = useUpdaterStore((s) => s.version)
+  const quitAndInstall = useUpdaterStore((s) => s.quitAndInstall)
 
   return (
     <div
@@ -142,6 +150,22 @@ export function StatusBar() {
       </div>
 
       <div className="flex items-center gap-3">
+        {updaterKind === 'downloaded' && (
+          <button
+            onClick={quitAndInstall}
+            className="flex items-center gap-1 px-2 h-5 rounded text-[11px] font-medium"
+            style={{ backgroundColor: 'var(--accent-color)', color: '#fff' }}
+            title={
+              updaterVersion
+                ? t('statusBar.updater.readyWithVersion', { version: updaterVersion })
+                : t('statusBar.updater.readyTitle')
+            }
+          >
+            <Download size={11} />
+            <span>{t('statusBar.updater.ready')}</span>
+          </button>
+        )}
+
         {stats ? (
           <>
             <span>{t('statusBar.words', { count: stats.words })}</span>

@@ -71,6 +71,22 @@ export interface ElectronAPI {
   // Platform
   platform: string
 
+  // Auto-updater
+  updaterCurrentVersion: () => Promise<string>
+  updaterLastError: () => Promise<string | null>
+  updaterCheckNow: () => Promise<void>
+  updaterQuitAndInstall: () => void
+  onUpdaterEvent: (
+    callback: (ev: {
+      kind: 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'
+      version?: string
+      releaseNotes?: string
+      releaseName?: string
+      releaseDate?: string
+      error?: string
+    }) => void,
+  ) => () => void
+
   // MCP
   mcpStatusAll: () => Promise<
     | {

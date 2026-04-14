@@ -4,6 +4,7 @@ import { registerIpcHandlers } from './ipc'
 import { appConfig } from '../app.config'
 import { shutdown as shutdownInsightGraph } from './services/insightGraphService'
 import { startAll as startMcpServers, shutdownAll as shutdownMcpServers } from './services/mcpService'
+import { initAutoUpdater } from './services/updaterService'
 
 // Apply app identity from the central config
 app.setName(appConfig.name)
@@ -65,6 +66,9 @@ app.whenReady().then(async () => {
   // Fire MCP servers in the background — failures don't block window
   // creation, and individual server errors are logged inside the service.
   startMcpServers().catch((err) => console.warn('[mcp] startAll failed:', err))
+  // Auto-updater: only active in packaged builds on mac/win; dev runs
+  // and linux packages are skipped internally.
+  initAutoUpdater()
 })
 
 app.on('window-all-closed', () => {

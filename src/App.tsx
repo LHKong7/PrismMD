@@ -13,6 +13,7 @@ import { PluginNotificationHost } from './components/plugins/PluginNotificationH
 import { useFileWatcher } from './hooks/useFileWatcher'
 import { useAutoHide } from './hooks/useAutoHide'
 import { useAnnotations } from './hooks/useAnnotations'
+import { useUpdaterBridge } from './hooks/useUpdaterBridge'
 import { useSettingsStore } from './store/settingsStore'
 import { bootstrapExternalPlugins } from './lib/plugins/externalLoader'
 import { initI18n } from './i18n'
@@ -22,6 +23,7 @@ initI18n()
 function AppContent() {
   useFileWatcher()
   useAutoHide()
+  useUpdaterBridge()
   const { addAnnotation } = useAnnotations()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const loadSettings = useSettingsStore((s) => s.loadSettings)

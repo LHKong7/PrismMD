@@ -287,6 +287,34 @@ const electronAPI = {
   > => ipcRenderer.invoke('insightgraph:related-reports', reportId, limit),
 
   // External plugin loading (reads <userData>/plugins/<id>/).
+  // Auto-update. `onUpdaterEvent` subscribes to every event emitted by
+  // the main-process `autoUpdater` (checking / available / downloaded / …).
+  updaterCurrentVersion: (): Promise<string> =>
+    ipcRenderer.invoke('updater:current-version'),
+  updaterLastError: (): Promise<string | null> =>
+    ipcRenderer.invoke('updater:last-error'),
+  updaterCheckNow: (): Promise<void> => ipcRenderer.invoke('updater:check-now'),
+  updaterQuitAndInstall: (): void => {
+    ipcRenderer.send('updater:quit-and-install')
+  },
+  onUpdaterEvent: (
+    callback: (ev: {
+      kind: 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'
+      version?: string
+      releaseNotes?: string
+      releaseName?: string
+      releaseDate?: string
+      error?: string
+    }) => void,
+  ): (() => void) => {
+    const handler = (
+      _event: Electron.IpcRendererEvent,
+      ev: Parameters<typeof callback>[0],
+    ) => callback(ev)
+    ipcRenderer.on('updater:event', handler)
+    return () => ipcRenderer.removeListener('updater:event', handler)
+  },
+
   // MCP (Model Context Protocol) — tool servers the AI assistant can
   // call. Configured in settings.mcp.servers.
   mcpStatusAll: (): Promise<
