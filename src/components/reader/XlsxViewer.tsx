@@ -4,6 +4,11 @@ import * as XLSX from 'xlsx'
 import { AlertCircle } from 'lucide-react'
 import { useFileStore } from '../../store/fileStore'
 import { VirtualTable } from './VirtualTable'
+import { TableSkeleton } from './TableSkeleton'
+
+// Files larger than this defer SheetJS parsing onto the next tick so
+// the skeleton has a chance to paint first.
+const ASYNC_PARSE_THRESHOLD_BYTES = 512 * 1024 // 512 KB (xlsx is denser than CSV)
 
 /**
  * XlsxViewer — parses the current XLSX/XLS (binary) via SheetJS and
@@ -19,14 +24,42 @@ export function XlsxViewer() {
   const { t } = useTranslation()
   const bytes = useFileStore((s) => s.currentBytes)
   const [activeSheet, setActiveSheet] = useState<string | null>(null)
+  const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null)
+  const [loading, setLoading] = useState(false)
 
-  const workbook = useMemo(() => {
-    if (!bytes) return null
-    try {
-      // SheetJS accepts an ArrayBuffer directly via `type: 'array'`.
-      return XLSX.read(bytes, { type: 'array' })
-    } catch {
-      return null
+  // Defer SheetJS parsing so the skeleton can paint first on big books.
+  // Small books parse synchronously to avoid the flash.
+  useEffect(() => {
+    if (!bytes) {
+      setWorkbook(null)
+      setLoading(false)
+      return
+    }
+    const parse = () => {
+      try {
+        return XLSX.read(bytes, { type: 'array' })
+      } catch {
+        return null
+      }
+    }
+    if (bytes.byteLength < ASYNC_PARSE_THRESHOLD_BYTES) {
+      setWorkbook(parse())
+      setLoading(false)
+      return
+    }
+    setLoading(true)
+    setWorkbook(null)
+    let cancelled = false
+    const handle = window.setTimeout(() => {
+      if (cancelled) return
+      const wb = parse()
+      if (cancelled) return
+      setWorkbook(wb)
+      setLoading(false)
+    }, 0)
+    return () => {
+      cancelled = true
+      window.clearTimeout(handle)
     }
   }, [bytes])
 
@@ -70,6 +103,14 @@ export function XlsxViewer() {
       rows: normalized,
     }
   }, [workbook, activeSheet])
+
+  if (loading) {
+    return (
+      <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--bg-primary)' }}>
+        <TableSkeleton label={t('reader.parsing', { size: formatBytes(bytes?.byteLength ?? 0) })} />
+      </div>
+    )
+  }
 
   if (!bytes || !workbook) {
     return (
@@ -143,4 +184,10 @@ export function XlsxViewer() {
       )}
     </div>
   )
+}
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`
 }

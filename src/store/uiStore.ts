@@ -32,6 +32,15 @@ interface UIStore {
   /** Which tab the right sidebar shows. */
   rightSidebarTab: RightSidebarTab
 
+  /**
+   * Settings dialog state lives here so any component (welcome screen,
+   * agent sidebar, command palette) can open it directly to a specific
+   * tab without prop-drilling `onOpenSettings` everywhere.
+   */
+  settingsOpen: boolean
+  /** When non-null, SettingsPanel mounts with this tab pre-selected. */
+  pendingSettingsTab: string | null
+
   toggleLeftSidebar: () => void
   toggleRightSidebar: () => void
   setLeftSidebarOpen: (open: boolean) => void
@@ -48,6 +57,11 @@ interface UIStore {
   setGraphScope: (scope: GraphScope) => void
   focusEntity: (name: string | null) => void
   setRightSidebarTab: (tab: RightSidebarTab) => void
+
+  openSettings: (tab?: string) => void
+  closeSettings: () => void
+  /** Consume the pending tab id, returning it once. */
+  consumePendingSettingsTab: () => string | null
 }
 
 export const useUIStore = create<UIStore>((set) => ({
@@ -63,6 +77,21 @@ export const useUIStore = create<UIStore>((set) => ({
   graphScope: 'document',
   focusedEntityName: null,
   rightSidebarTab: 'toc',
+
+  settingsOpen: false,
+  pendingSettingsTab: null,
+
+  openSettings: (tab?: string) =>
+    set({ settingsOpen: true, pendingSettingsTab: tab ?? null }),
+  closeSettings: () => set({ settingsOpen: false }),
+  consumePendingSettingsTab: () => {
+    let value: string | null = null
+    set((state) => {
+      value = state.pendingSettingsTab
+      return { pendingSettingsTab: null }
+    })
+    return value
+  },
 
   setMainViewMode: (mode) => set({ mainViewMode: mode }),
   toggleMainViewMode: () =>

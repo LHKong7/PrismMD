@@ -1,13 +1,16 @@
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FileText, FolderOpen, Upload } from 'lucide-react'
+import { FileText, FolderOpen, Upload, Bot } from 'lucide-react'
 import { useFileStore } from '../../store/fileStore'
+import { useSettingsStore } from '../../store/settingsStore'
+import { useUIStore } from '../../store/uiStore'
 import { detectFormat, kindOfFormat } from '../../lib/fileFormat'
 import { MarkdownReader } from './MarkdownReader'
 import { JsonViewer } from './JsonViewer'
 import { CsvViewer } from './CsvViewer'
 import { XlsxViewer } from './XlsxViewer'
 import { PdfViewer } from './PdfViewer'
+import { Button } from '../ui/Button'
 
 /**
  * DocumentReader — the main content pane's format-aware router.
@@ -25,6 +28,11 @@ export function DocumentReader() {
   const currentFormat = useFileStore((s) => s.currentFormat)
   const openFileDialog = useFileStore((s) => s.openFileDialog)
   const openFolderDialog = useFileStore((s) => s.openFolderDialog)
+  const activeProvider = useSettingsStore((s) => s.activeProvider)
+  const openSettings = useUIStore((s) => s.openSettings)
+  // First-run users have no provider configured — surface a fast path
+  // to the AI tab so they don't need to discover Settings on their own.
+  const aiNotConfigured = !activeProvider
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -81,26 +89,39 @@ export function DocumentReader() {
             {t('app.welcome.subtitle')}
           </p>
           <div className="flex gap-3 justify-center">
-            <button
+            <Button
+              variant="primary"
+              size="md"
               onClick={openFileDialog}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-              style={{ backgroundColor: 'var(--accent-color)', color: '#ffffff' }}
+              className="px-4 py-2 rounded-lg font-medium"
             >
               <FileText size={16} />
               {t('app.welcome.openFile')}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
+              size="md"
               onClick={openFolderDialog}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-              style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+              className="px-4 py-2 rounded-lg font-medium"
             >
               <FolderOpen size={16} />
               {t('app.welcome.openFolder')}
-            </button>
+            </Button>
           </div>
           <p className="text-xs mt-6" style={{ color: 'var(--text-muted)' }}>
             {t('app.welcome.tip', { shortcut: 'Ctrl+P' })}
           </p>
+          {aiNotConfigured && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => openSettings('ai')}
+              className="mt-4"
+            >
+              <Bot size={12} style={{ color: 'var(--accent-color)' }} />
+              {t('app.welcome.configureAI')}
+            </Button>
+          )}
         </div>
       </div>
     )

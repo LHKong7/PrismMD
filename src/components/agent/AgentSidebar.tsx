@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Send, Square, Trash2, Bot, ChevronDown, Brain, AlertTriangle, X, ArrowDown } from 'lucide-react'
+import { Send, Square, Trash2, Bot, ChevronDown, Brain, AlertTriangle, X, ArrowDown, Download } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useAgentStore } from '../../store/agentStore'
+import { useAgentStore, type ChatMessage as ChatMessageType } from '../../store/agentStore'
 import { useFileStore } from '../../store/fileStore'
 import { useSettingsStore, DEFAULT_MODELS, type AIProvider } from '../../store/settingsStore'
+import { useUIStore } from '../../store/uiStore'
 import { ChatMessage, renderWithCitations } from './ChatMessage'
 import { useReaderDomStore } from '../../store/readerDomStore'
+import { Button } from '../ui/Button'
 import { clsx } from 'clsx'
 
 export function AgentSidebar() {
@@ -41,6 +43,7 @@ export function AgentSidebar() {
   const privacyMode = useSettingsStore((s) => s.privacyMode)
   const setActiveProvider = useSettingsStore((s) => s.setActiveProvider)
   const setProviderConfig = useSettingsStore((s) => s.setProviderConfig)
+  const openSettings = useUIStore((s) => s.openSettings)
 
   const onScroll = useCallback(() => {
     const el = scrollRef.current
@@ -102,14 +105,25 @@ export function AgentSidebar() {
           <div className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px]" style={{ color: 'var(--text-muted)' }}>
             <Brain size={10} />
           </div>
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => exportConversationAsMarkdown(messages, currentFilePath, t)}
+            disabled={messages.length === 0}
+            title={t('agent.exportConversation')}
+            aria-label={t('agent.exportConversation')}
+          >
+            <Download size={13} style={{ color: 'var(--text-muted)' }} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={clearMessages}
-            className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-[var(--accent-color)] transition-colors"
             title={t('agent.clear')}
             aria-label={t('agent.clear')}
           >
             <Trash2 size={13} style={{ color: 'var(--text-muted)' }} />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -226,10 +240,23 @@ export function AgentSidebar() {
           </button>
         )}
         {messages.length === 0 && !isStreaming ? (
-          <div className="flex items-center justify-center h-full px-4">
+          <div className="flex flex-col items-center justify-center h-full px-4 gap-3">
             <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>
-              {currentContent ? t('agent.placeholder') : t('agent.noDocument')}
+              {!hasApiKey
+                ? t('agent.onboardingHint')
+                : currentContent ? t('agent.placeholder') : t('agent.noDocument')}
             </p>
+            {!hasApiKey && (
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => openSettings('ai')}
+                className="font-medium"
+              >
+                <Bot size={12} />
+                {t('agent.configureProvider')}
+              </Button>
+            )}
           </div>
         ) : (
           <>
@@ -276,16 +303,81 @@ export function AgentSidebar() {
             style={{ color: 'var(--text-primary)' }}
           />
           {isStreaming ? (
-            <button onClick={stopGeneration} className="p-1.5 rounded-md" style={{ backgroundColor: 'var(--accent-color)' }} title={t('agent.stop')}>
-              <Square size={14} color="#fff" />
-            </button>
+            <Button
+              variant="primary"
+              size="icon"
+              onClick={stopGeneration}
+              className="p-1.5 rounded-md"
+              title={t('agent.stop')}
+              aria-label={t('agent.stop')}
+            >
+              <Square size={14} />
+            </Button>
           ) : (
-            <button onClick={handleSend} disabled={!input.trim() || !hasApiKey} className="p-1.5 rounded-md disabled:opacity-30" style={{ backgroundColor: 'var(--accent-color)' }} title={t('agent.send')}>
-              <Send size={14} color="#fff" />
-            </button>
+            <Button
+              variant="primary"
+              size="icon"
+              onClick={handleSend}
+              disabled={!input.trim() || !hasApiKey}
+              className="p-1.5 rounded-md"
+              title={t('agent.send')}
+              aria-label={t('agent.send')}
+            >
+              <Send size={14} />
+            </Button>
           )}
         </div>
       </div>
     </div>
   )
+}
+
+/**
+ * Render the current conversation as a Markdown document and trigger a
+ * browser download. Format favors human-readability + dogfooding —
+ * PrismMD itself can re-open the resulting `.md` file. Citations are
+ * preserved as a "Sources" list per assistant turn so context isn't lost.
+ */
+function exportConversationAsMarkdown(
+  messages: ChatMessageType[],
+  filePath: string | null,
+  t: (key: string, vars?: Record<string, unknown>) => string,
+): void {
+  if (messages.length === 0) return
+  const baseName = filePath ? filePath.split(/[/\\]/).pop() ?? 'document' : 'untitled'
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+  const lines: string[] = []
+  lines.push(`# ${t('agent.title')} — ${baseName}`)
+  lines.push('')
+  lines.push(`_${new Date().toLocaleString()}_`)
+  lines.push('')
+
+  for (const msg of messages) {
+    const heading = msg.role === 'user' ? t('chat.you') : t('chat.assistant')
+    const meta = msg.model ? ` (${msg.model})` : ''
+    lines.push(`## ${heading}${meta}`)
+    lines.push('')
+    lines.push(msg.content || '')
+    lines.push('')
+    if (msg.evidence && msg.evidence.length > 0) {
+      lines.push(`**${t('chat.sources')}:**`)
+      for (const ev of msg.evidence) {
+        lines.push(`- [${ev.index}] ${ev.text}`)
+      }
+      lines.push('')
+    }
+    lines.push('---')
+    lines.push('')
+  }
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `prismmd-chat-${baseName.replace(/\.[^.]+$/, '')}-${stamp}.md`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  // Revoke async so the browser has time to start the download.
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
 }

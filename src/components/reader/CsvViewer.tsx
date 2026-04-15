@@ -1,9 +1,40 @@
-import { useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import Papa from 'papaparse'
 import { AlertCircle } from 'lucide-react'
 import { useFileStore } from '../../store/fileStore'
 import { VirtualTable } from './VirtualTable'
+import { TableSkeleton } from './TableSkeleton'
+
+// Files larger than this defer parsing onto a microtask + show a
+// skeleton so the UI stays responsive on big CSVs (~5MB+).
+const ASYNC_PARSE_THRESHOLD_BYTES = 1024 * 1024 // 1 MB
+
+interface ParsedCsv {
+  headers: string[]
+  rows: string[][]
+  error: string | null
+}
+
+function parseCsv(content: string): ParsedCsv {
+  const result = Papa.parse<string[]>(content, {
+    skipEmptyLines: 'greedy',
+    // Keep raw strings — a CSV viewer shouldn't silently coerce "01"
+    // into a number. The user can inspect the table as-written.
+    dynamicTyping: false,
+  })
+  const firstError = result.errors?.[0]
+  const all = result.data as string[][]
+  if (all.length === 0) {
+    return { headers: [], rows: [], error: firstError?.message ?? null }
+  }
+  const [headers, ...rows] = all
+  return {
+    headers: headers.map((h) => h ?? ''),
+    rows,
+    error: firstError?.message ?? null,
+  }
+}
 
 /**
  * CsvViewer — parses the current CSV synchronously with papaparse and
@@ -18,27 +49,48 @@ import { VirtualTable } from './VirtualTable'
 export function CsvViewer() {
   const { t } = useTranslation()
   const content = useFileStore((s) => s.currentContent)
+  const [parsed, setParsed] = useState<ParsedCsv | null>(null)
+  const [loading, setLoading] = useState(false)
 
-  const parsed = useMemo(() => {
-    if (!content) return { headers: [] as string[], rows: [] as string[][], error: null as string | null }
-    const result = Papa.parse<string[]>(content, {
-      skipEmptyLines: 'greedy',
-      // Keep raw strings — a CSV viewer shouldn't silently coerce "01"
-      // into a number. The user can inspect the table as-written.
-      dynamicTyping: false,
-    })
-    const firstError = result.errors?.[0]
-    const all = result.data as string[][]
-    if (all.length === 0) {
-      return { headers: [], rows: [], error: firstError?.message ?? null }
+  // Defer parsing for big files so the main thread can render the
+  // skeleton first. Small files parse synchronously to avoid the flash.
+  useEffect(() => {
+    if (!content) {
+      setParsed({ headers: [], rows: [], error: null })
+      setLoading(false)
+      return
     }
-    const [headers, ...rows] = all
-    return {
-      headers: headers.map((h) => h ?? ''),
-      rows,
-      error: firstError?.message ?? null,
+    if (content.length < ASYNC_PARSE_THRESHOLD_BYTES) {
+      setParsed(parseCsv(content))
+      setLoading(false)
+      return
+    }
+    setLoading(true)
+    setParsed(null)
+    let cancelled = false
+    // setTimeout(0) yields one frame so the skeleton paints before the
+    // main thread blocks on papaparse. Web Worker would be cleaner but
+    // would require shipping a worker bundle just for this viewer.
+    const handle = window.setTimeout(() => {
+      if (cancelled) return
+      const result = parseCsv(content)
+      if (cancelled) return
+      setParsed(result)
+      setLoading(false)
+    }, 0)
+    return () => {
+      cancelled = true
+      window.clearTimeout(handle)
     }
   }, [content])
+
+  if (loading || !parsed) {
+    return (
+      <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--bg-primary)' }}>
+        <TableSkeleton label={t('reader.parsing', { size: formatBytes(content?.length ?? 0) })} />
+      </div>
+    )
+  }
 
   if (parsed.headers.length === 0) {
     return (
@@ -83,4 +135,10 @@ export function CsvViewer() {
       </div>
     </div>
   )
+}
+
+function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`
 }

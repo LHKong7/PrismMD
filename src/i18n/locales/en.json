@@ -6,7 +6,8 @@
       "subtitle": "Open a document or folder to start reading. Markdown, PDF, CSV, JSON and XLSX are all supported — drag and drop works too.",
       "openFile": "Open File",
       "openFolder": "Open Folder",
-      "tip": "Tip: Press {{shortcut}} to open the command palette"
+      "tip": "Tip: Press {{shortcut}} to open the command palette",
+      "configureAI": "Configure AI provider"
     }
   },
   "reader": {
@@ -32,8 +33,11 @@
       "errorTitle": "Couldn't render this PDF",
       "prev": "Previous page",
       "next": "Next page",
-      "pageOf": "Page {{page}} / {{total}}"
-    }
+      "pageOf": "Page {{page}} / {{total}}",
+      "loading": "Rendering PDF…"
+    },
+    "loading": "Loading…",
+    "parsing": "Parsing {{size}}…"
   },
   "sidebar": {
     "explorer": "Explorer",
@@ -55,10 +59,15 @@
   "titlebar": {
     "toggleFileTree": "Toggle file tree",
     "toggleOutline": "Toggle outline",
+    "toggleAgent": "Toggle AI Assistant",
     "settings": "Settings",
     "theme": "Theme",
     "showGraph": "Show Knowledge Graph",
-    "showReader": "Back to reader"
+    "showReader": "Back to reader",
+    "minimize": "Minimize",
+    "maximize": "Maximize",
+    "restore": "Restore",
+    "close": "Close window"
   },
   "graphView": {
     "title": "Knowledge Graph",
@@ -68,6 +77,10 @@
       "entity": "Entity"
     },
     "loading": "Loading graph…",
+    "loadingSlow": "Still connecting to Neo4j — check the Bolt URI if this hangs.",
+    "legendTitle": "Entity types",
+    "legendShow": "Show legend",
+    "legendHide": "Hide legend",
     "error": "Couldn't load graph",
     "errorAuth": "Authentication failed — check your Neo4j credentials.",
     "errorUnreachable": "Neo4j is unreachable — check the Bolt URI and that the database is running.",
@@ -299,6 +312,9 @@
     "privacyBadgeTooltip": "Cloud providers (OpenAI, Anthropic, Google, Custom) are disabled while Privacy Mode is on. Only Ollama is available.",
     "newMessages": "New messages",
     "jumpToLatest": "Jump to latest message",
+    "onboardingHint": "Connect an AI provider to start chatting with this document.",
+    "configureProvider": "Configure AI provider",
+    "exportConversation": "Export conversation",
     "contextMenu": {
       "explain": "Explain this",
       "translate": "Translate",
