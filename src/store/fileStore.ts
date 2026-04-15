@@ -3,6 +3,14 @@ import type { FileTreeNode } from '../types/electron'
 import type { TocEntry } from '../lib/markdown/remarkToc'
 import { detectFormat, kindOfFormat, type FileFormat } from '../lib/fileFormat'
 
+// Notify the search index that the indexed file set may have changed.
+// Imported lazily inside the actions to avoid a circular module init.
+function invalidateSearchIndex() {
+  void import('./searchIndexStore').then((m) =>
+    m.useSearchIndexStore.getState().invalidate(),
+  )
+}
+
 interface OpenFolder {
   path: string
   name: string
@@ -116,6 +124,7 @@ export const useFileStore = create<FileStore>((set, get) => ({
       ],
     })
     window.electronAPI.watchDirectory(folderPath)
+    invalidateSearchIndex()
   },
 
   closeFolder: (folderPath: string) => {
@@ -123,6 +132,7 @@ export const useFileStore = create<FileStore>((set, get) => ({
     set((state) => ({
       openFolders: state.openFolders.filter((f) => f.path !== folderPath),
     }))
+    invalidateSearchIndex()
   },
 
   setContent: (content: string) => {
@@ -140,6 +150,7 @@ export const useFileStore = create<FileStore>((set, get) => ({
         f.path === folderPath ? { ...f, tree } : f
       ),
     }))
+    invalidateSearchIndex()
   },
 
   refreshAllFolders: async () => {
@@ -151,6 +162,7 @@ export const useFileStore = create<FileStore>((set, get) => ({
       })
     )
     set({ openFolders: updated })
+    invalidateSearchIndex()
   },
 
   addRecentFile: (filePath: string) => {

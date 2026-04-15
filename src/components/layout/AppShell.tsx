@@ -9,6 +9,7 @@ import { DocumentReader } from '../reader/DocumentReader'
 import { ReadingProgress } from '../reader/ReadingProgress'
 import { AgentSidebar } from '../agent/AgentSidebar'
 import { GraphView } from '../graph/GraphView'
+import { ErrorBoundary } from '../ErrorBoundary'
 
 export function AppShell() {
   const { t } = useTranslation()
@@ -82,7 +83,9 @@ export function AppShell() {
           transition: 'margin 200ms ease-in-out',
         }}
       >
-        {mainViewMode === 'graph' ? <GraphView /> : <DocumentReader />}
+        <ErrorBoundary>
+          {mainViewMode === 'graph' ? <GraphView /> : <DocumentReader />}
+        </ErrorBoundary>
       </div>
 
       {/* Right sidebar (TOC) */}

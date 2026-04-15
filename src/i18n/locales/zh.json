@@ -18,6 +18,12 @@
     "json": {
       "parseError": "这个 JSON 文件解析失败"
     },
+    "markdown": {
+      "errorTitle": "无法渲染该 Markdown"
+    },
+    "pageInputAria": "跳转到页码",
+    "errorBoundaryTitle": "出错了",
+    "errorBoundaryRetry": "重试",
     "csv": {
       "emptyTitle": "没有可显示的内容",
       "emptyBody": "这个 CSV 文件是空的。",
@@ -122,7 +128,10 @@
     "togglePrivacy": "切换隐私模式",
     "insightGraphIngest": "将当前文档存入知识图谱",
     "showGraph": "打开知识图谱",
-    "showReader": "返回阅读器"
+    "showReader": "返回阅读器",
+    "searchResults": "内容匹配",
+    "indexing": "正在建立索引…（{{count}} 个文件）",
+    "noContentMatch": "文档内容中未找到匹配。"
   },
   "settings": {
     "title": "设置",

@@ -18,6 +18,12 @@
     "json": {
       "parseError": "This JSON file isn't valid"
     },
+    "markdown": {
+      "errorTitle": "Couldn't render this Markdown"
+    },
+    "pageInputAria": "Go to page",
+    "errorBoundaryTitle": "Something went wrong",
+    "errorBoundaryRetry": "Try again",
     "csv": {
       "emptyTitle": "Nothing to show",
       "emptyBody": "This CSV file is empty.",
@@ -122,7 +128,10 @@
     "togglePrivacy": "Toggle Privacy Mode",
     "insightGraphIngest": "Save Document to Knowledge Graph",
     "showGraph": "Show Knowledge Graph",
-    "showReader": "Back to Reader"
+    "showReader": "Back to Reader",
+    "searchResults": "Content Matches",
+    "indexing": "Indexing… ({{count}} files)",
+    "noContentMatch": "No matches in document content."
   },
   "settings": {
     "title": "Settings",
