@@ -34,6 +34,7 @@ export function PdfViewer() {
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
   const [pageNumber, setPageNumber] = useState(1)
   const [loading, setLoading] = useState(false)
+  const [pageRendering, setPageRendering] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Load (or reload) the PDF whenever the byte payload changes.
@@ -79,6 +80,7 @@ export function PdfViewer() {
     if (!doc || !canvasRef.current) return
     let cancelled = false
     const canvas = canvasRef.current
+    setPageRendering(true)
 
     const render = async () => {
       const page = await doc.getPage(pageNumber)
@@ -112,11 +114,15 @@ export function PdfViewer() {
       }).promise
     }
 
-    render().catch((err) => {
-      if (!cancelled) {
-        setError(err instanceof Error ? err.message : String(err))
-      }
-    })
+    render()
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : String(err))
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setPageRendering(false)
+      })
 
     return () => {
       cancelled = true
@@ -183,10 +189,43 @@ export function PdfViewer() {
         )}
       </div>
 
-      {/* Canvas viewport */}
-      <div className="flex-1 overflow-auto flex justify-center p-4">
+      {/* Canvas viewport. We always mount the canvas so the render effect
+          can write into it, but show a skeleton overlay when the document
+          itself is loading or the page hasn't finished rasterizing yet —
+          previously large PDFs showed a blank canvas which read as
+          "frozen". */}
+      <div className="flex-1 overflow-auto flex justify-center p-4 relative">
         <canvas ref={canvasRef} />
+        {(loading || (!doc && pageRendering)) && (
+          <PdfSkeleton label={t('reader.pdf.loading')} />
+        )}
       </div>
+    </div>
+  )
+}
+
+/**
+ * Skeleton shown while pdfjs parses the document and rasterizes the
+ * first page. Mirrors the chat sidebar's `animate-pulse` rhythm so the
+ * loading vocabulary feels consistent across the app.
+ */
+function PdfSkeleton({ label }: { label: string }) {
+  return (
+    <div
+      className="absolute inset-4 flex flex-col items-center justify-center gap-3 pointer-events-none"
+      role="status"
+      aria-live="polite"
+    >
+      <div
+        className="w-full max-w-2xl h-full rounded-md animate-pulse"
+        style={{ backgroundColor: 'var(--bg-secondary)' }}
+      />
+      <span
+        className="absolute text-xs"
+        style={{ color: 'var(--text-muted)' }}
+      >
+        {label}
+      </span>
     </div>
   )
 }

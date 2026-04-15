@@ -1,7 +1,9 @@
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FileText, FolderOpen, Upload } from 'lucide-react'
+import { FileText, FolderOpen, Upload, Bot } from 'lucide-react'
 import { useFileStore } from '../../store/fileStore'
+import { useSettingsStore } from '../../store/settingsStore'
+import { useUIStore } from '../../store/uiStore'
 import { detectFormat, kindOfFormat } from '../../lib/fileFormat'
 import { MarkdownReader } from './MarkdownReader'
 import { JsonViewer } from './JsonViewer'
@@ -25,6 +27,11 @@ export function DocumentReader() {
   const currentFormat = useFileStore((s) => s.currentFormat)
   const openFileDialog = useFileStore((s) => s.openFileDialog)
   const openFolderDialog = useFileStore((s) => s.openFolderDialog)
+  const activeProvider = useSettingsStore((s) => s.activeProvider)
+  const openSettings = useUIStore((s) => s.openSettings)
+  // First-run users have no provider configured — surface a fast path
+  // to the AI tab so they don't need to discover Settings on their own.
+  const aiNotConfigured = !activeProvider
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -101,6 +108,16 @@ export function DocumentReader() {
           <p className="text-xs mt-6" style={{ color: 'var(--text-muted)' }}>
             {t('app.welcome.tip', { shortcut: 'Ctrl+P' })}
           </p>
+          {aiNotConfigured && (
+            <button
+              onClick={() => openSettings('ai')}
+              className="mt-4 inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+              style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+            >
+              <Bot size={12} style={{ color: 'var(--accent-color)' }} />
+              {t('app.welcome.configureAI')}
+            </button>
+          )}
         </div>
       </div>
     )

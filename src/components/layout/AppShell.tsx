@@ -1,3 +1,5 @@
+import { useTranslation } from 'react-i18next'
+import { ChevronRight, ChevronLeft } from 'lucide-react'
 import { useUIStore } from '../../store/uiStore'
 import { useFileStore } from '../../store/fileStore'
 import { useAgentStore } from '../../store/agentStore'
@@ -9,6 +11,7 @@ import { AgentSidebar } from '../agent/AgentSidebar'
 import { GraphView } from '../graph/GraphView'
 
 export function AppShell() {
+  const { t } = useTranslation()
   const leftSidebarOpen = useUIStore((s) => s.leftSidebarOpen)
   const rightSidebarOpen = useUIStore((s) => s.rightSidebarOpen)
   const leftSidebarPinned = useUIStore((s) => s.leftSidebarPinned)
@@ -37,13 +40,34 @@ export function AppShell() {
         <LeftSidebar />
       </div>
 
-      {/* Left hover trigger */}
+      {/* Left hover trigger + visible handle. The hover-only zone fails
+          on trackpads/touch because the user can't "rest" the cursor at
+          the edge — the handle gives them a clickable target plus a
+          visual hint that there's a panel hidden there. */}
       {!leftSidebarOpen && (
-        <div
-          className="absolute top-0 bottom-0 left-0 z-20"
-          style={{ width: 8 }}
-          onMouseEnter={() => setLeftSidebarOpen(true)}
-        />
+        <>
+          <div
+            className="absolute top-0 bottom-0 left-0 z-20"
+            style={{ width: 8 }}
+            onMouseEnter={() => setLeftSidebarOpen(true)}
+          />
+          <button
+            onClick={() => setLeftSidebarOpen(true)}
+            className="absolute top-1/2 -translate-y-1/2 left-0 z-20 flex items-center justify-center rounded-r-md opacity-50 hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+            style={{
+              width: 14,
+              height: 48,
+              backgroundColor: 'var(--bg-secondary)',
+              color: 'var(--text-muted)',
+              border: '1px solid var(--border-color)',
+              borderLeft: 'none',
+            }}
+            aria-label={t('titlebar.toggleFileTree')}
+            title={`${t('titlebar.toggleFileTree')} (Ctrl+B)`}
+          >
+            <ChevronRight size={12} />
+          </button>
+        </>
       )}
 
       {/* Main content — swapped wholesale based on uiStore.mainViewMode.
@@ -77,13 +101,34 @@ export function AppShell() {
         <RightSidebar toc={toc} />
       </div>
 
-      {/* Right hover trigger */}
+      {/* Right hover trigger + handle. Mirrors the left side. We anchor
+          the handle to the agent sidebar's edge when it's open so it
+          stays reachable without overlapping the chat. */}
       {!rightSidebarOpen && (
-        <div
-          className="absolute top-0 bottom-0 right-0 z-20"
-          style={{ width: 8 }}
-          onMouseEnter={() => setRightSidebarOpen(true)}
-        />
+        <>
+          <div
+            className="absolute top-0 bottom-0 right-0 z-20"
+            style={{ width: 8, right: agentSidebarOpen ? 340 : 0 }}
+            onMouseEnter={() => setRightSidebarOpen(true)}
+          />
+          <button
+            onClick={() => setRightSidebarOpen(true)}
+            className="absolute top-1/2 -translate-y-1/2 z-20 flex items-center justify-center rounded-l-md opacity-50 hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+            style={{
+              width: 14,
+              height: 48,
+              right: agentSidebarOpen ? 340 : 0,
+              backgroundColor: 'var(--bg-secondary)',
+              color: 'var(--text-muted)',
+              border: '1px solid var(--border-color)',
+              borderRight: 'none',
+            }}
+            aria-label={t('titlebar.toggleOutline')}
+            title={`${t('titlebar.toggleOutline')} (Ctrl+Shift+B)`}
+          >
+            <ChevronLeft size={12} />
+          </button>
+        </>
       )}
 
       {/* Agent sidebar */}

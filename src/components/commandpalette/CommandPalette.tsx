@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Command } from 'cmdk'
+import { useFocusTrap } from '../../hooks/useFocusTrap'
 import { FileText, Sun, Moon, Monitor, Settings, Bot, Shield, Eye, Network, BookOpen, Puzzle } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useUIStore } from '../../store/uiStore'
@@ -35,6 +36,8 @@ export function CommandPalette({ onOpenSettings }: CommandPaletteProps) {
   const toggleMainViewMode = useUIStore((s) => s.toggleMainViewMode)
   const pluginCommands = useCommandRegistry((s) => s.commands)
   const [search, setSearch] = useState('')
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useFocusTrap(dialogRef, open)
 
   // Group plugin commands by their `group` field so they can each render
   // under their own heading. Core commands stay hard-coded below (their
@@ -85,9 +88,14 @@ export function CommandPalette({ onOpenSettings }: CommandPaletteProps) {
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]" onClick={() => setOpen(false)}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <div
+        ref={dialogRef}
         className="relative w-full max-w-lg rounded-xl overflow-hidden shadow-2xl border"
         style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('commandPalette.placeholder')}
+        tabIndex={-1}
       >
         <Command value={search} onValueChange={setSearch}
           className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-semibold"

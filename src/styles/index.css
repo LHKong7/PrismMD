@@ -34,11 +34,16 @@
   --accent-color: #7aa2f7;
   --accent-hover: #89b4fa;
   --code-bg: #24283b;
-  --highlight-yellow: #3b3520;
-  --highlight-green: #1a3a2a;
-  --highlight-blue: #1a2a3a;
-  --highlight-pink: #3a1a2a;
-  --highlight-purple: #2a1a3a;
+  /* Highlight colors retuned for dark mode. Previous values had very
+   * low chroma (~5%) so they barely registered against the deep
+   * background; the new tones bump saturation while keeping luminance
+   * dark enough that --text-primary (#c0caf5) still meets WCAG AA
+   * (~5:1 contrast) on top. */
+  --highlight-yellow: #5a4818;
+  --highlight-green: #14512f;
+  --highlight-blue: #1d3f6b;
+  --highlight-pink: #6b1d44;
+  --highlight-purple: #4a2670;
   --scrollbar-bg: transparent;
   --scrollbar-thumb: #414868;
   --progress-bar: #7aa2f7;

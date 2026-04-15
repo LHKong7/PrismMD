@@ -65,6 +65,7 @@ export function TitleBar({ onOpenSettings }: TitleBarProps) {
           onClick={toggleLeftSidebar}
           className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
           title={`${t('titlebar.toggleFileTree')} (Ctrl+B)`}
+          aria-label={t('titlebar.toggleFileTree')}
         >
           <PanelLeft size={16} style={{ color: 'var(--text-secondary)' }} />
         </button>
@@ -82,6 +83,7 @@ export function TitleBar({ onOpenSettings }: TitleBarProps) {
             onClick={toggleMainViewMode}
             className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
             title={mainViewMode === 'graph' ? t('titlebar.showReader') : t('titlebar.showGraph')}
+            aria-label={mainViewMode === 'graph' ? t('titlebar.showReader') : t('titlebar.showGraph')}
           >
             {mainViewMode === 'graph' ? (
               <BookOpen size={16} style={{ color: 'var(--accent-color)' }} />
@@ -93,7 +95,8 @@ export function TitleBar({ onOpenSettings }: TitleBarProps) {
         <button
           onClick={toggleAgentSidebar}
           className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-          title="AI Assistant (Ctrl+J)"
+          title={t('titlebar.toggleAgent')}
+          aria-label={t('titlebar.toggleAgent')}
         >
           <Bot size={16} style={{ color: 'var(--text-secondary)' }} />
         </button>
@@ -101,6 +104,7 @@ export function TitleBar({ onOpenSettings }: TitleBarProps) {
           onClick={toggleRightSidebar}
           className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
           title={`${t('titlebar.toggleOutline')} (Ctrl+Shift+B)`}
+          aria-label={t('titlebar.toggleOutline')}
         >
           <PanelRight size={16} style={{ color: 'var(--text-secondary)' }} />
         </button>
@@ -108,6 +112,7 @@ export function TitleBar({ onOpenSettings }: TitleBarProps) {
           onClick={cycleTheme}
           className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
           title={`${t('titlebar.theme')}: ${getThemeById(themeId)?.name ?? themeId} (Ctrl+T)`}
+          aria-label={t('titlebar.theme')}
         >
           <Palette size={16} style={{ color: 'var(--text-secondary)' }} />
         </button>
@@ -115,6 +120,7 @@ export function TitleBar({ onOpenSettings }: TitleBarProps) {
           onClick={onOpenSettings}
           className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
           title={`${t('titlebar.settings')} (Ctrl+,)`}
+          aria-label={t('titlebar.settings')}
         >
           <Settings size={16} style={{ color: 'var(--text-secondary)' }} />
         </button>
@@ -125,18 +131,24 @@ export function TitleBar({ onOpenSettings }: TitleBarProps) {
             <button
               onClick={() => window.electronAPI.minimizeWindow()}
               className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+              aria-label={t('titlebar.minimize')}
+              title={t('titlebar.minimize')}
             >
               <Minus size={16} style={{ color: 'var(--text-secondary)' }} />
             </button>
             <button
               onClick={() => window.electronAPI.maximizeWindow()}
               className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+              aria-label={isMaximized ? t('titlebar.restore') : t('titlebar.maximize')}
+              title={isMaximized ? t('titlebar.restore') : t('titlebar.maximize')}
             >
               <Square size={14} style={{ color: 'var(--text-secondary)' }} />
             </button>
             <button
               onClick={() => window.electronAPI.closeWindow()}
               className="p-1.5 rounded hover:bg-red-500/20 transition-colors"
+              aria-label={t('titlebar.close')}
+              title={t('titlebar.close')}
             >
               <X size={16} style={{ color: 'var(--text-secondary)' }} />
             </button>

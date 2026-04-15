@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { X, Check, Loader2, Globe, Palette, Bot, Eye, EyeOff, Shield, Trash2, Network, AlertTriangle, RefreshCw, Puzzle, FolderOpen, CircleAlert, Info, Download } from 'lucide-react'
+import { useFocusTrap } from '../../hooks/useFocusTrap'
 import { useTranslation } from 'react-i18next'
 import { useSettingsStore, DEFAULT_MODELS, type AIProvider, type InsightGraphDomain } from '../../store/settingsStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
+import { useUIStore } from '../../store/uiStore'
 import { usePluginManager } from '../../lib/plugins/host'
 import { reloadExternalPlugins } from '../../lib/plugins/externalLoader'
 import { useUpdaterStore } from '../../store/updaterStore'
@@ -20,6 +22,31 @@ type Tab = 'language' | 'theme' | 'ai' | 'privacy' | 'insightgraph' | 'plugins' 
 export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<Tab>('language')
+  const consumePendingTab = useUIStore((s) => s.consumePendingSettingsTab)
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useFocusTrap(dialogRef, open)
+
+  // Esc closes the dialog — companion to the focus trap so keyboard
+  // users have an obvious exit.
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        onClose()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
+  // When the panel opens via uiStore.openSettings('ai'), jump straight
+  // to that tab (used by the welcome / agent-sidebar onboarding CTAs).
+  useEffect(() => {
+    if (!open) return
+    const pending = consumePendingTab()
+    if (pending) setActiveTab(pending as Tab)
+  }, [open, consumePendingTab])
 
   if (!open) return null
 
@@ -27,13 +54,23 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
       <div
+        ref={dialogRef}
         className="relative w-full max-w-2xl max-h-[80vh] rounded-xl overflow-hidden shadow-2xl border flex flex-col"
         style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('settings.title')}
+        tabIndex={-1}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--border-color)' }}>
           <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{t('settings.title')}</h2>
-          <button onClick={onClose} className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10">
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10"
+            aria-label={t('settings.close')}
+            title={t('settings.close')}
+          >
             <X size={18} style={{ color: 'var(--text-muted)' }} />
           </button>
         </div>
@@ -68,7 +105,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             ))}
           </div>
 
-          <div className="flex-1 overflow-y-auto p-6">
+          <ScrollPaneWithFade>
             {activeTab === 'language' && <LanguageSettings />}
             {activeTab === 'theme' && <ThemeSettings />}
             {activeTab === 'ai' && <AISettings />}
@@ -77,9 +114,55 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             {activeTab === 'mcp' && <McpSettingsSection />}
             {activeTab === 'privacy' && <PrivacySettings />}
             {activeTab === 'about' && <AboutSettings />}
-          </div>
+          </ScrollPaneWithFade>
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Right pane of the settings dialog. Adds a bottom fade mask while the
+ * scrollable content overflows so users can see there's more below
+ * the fold — previously several long sections (AI providers, MCP)
+ * cut off without any cue.
+ */
+function ScrollPaneWithFade({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [atBottom, setAtBottom] = useState(true)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const update = () => {
+      const overflows = el.scrollHeight > el.clientHeight + 1
+      const bottom = el.scrollHeight - el.scrollTop - el.clientHeight < 8
+      setAtBottom(!overflows || bottom)
+    }
+    update()
+    el.addEventListener('scroll', update, { passive: true })
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => {
+      el.removeEventListener('scroll', update)
+      ro.disconnect()
+    }
+  }, [children])
+
+  return (
+    <div className="flex-1 relative min-h-0">
+      <div ref={ref} className="absolute inset-0 overflow-y-auto p-6">
+        {children}
+      </div>
+      {!atBottom && (
+        <div
+          className="pointer-events-none absolute bottom-0 left-0 right-0 h-8"
+          style={{
+            background: 'linear-gradient(to bottom, transparent, var(--bg-primary))',
+          }}
+          aria-hidden
+        />
+      )}
     </div>
   )
 }

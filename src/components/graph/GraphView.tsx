@@ -71,6 +71,13 @@ export function GraphView() {
   const [data, setData] = useState<GraphData | null>(null)
   const [status, setStatus] = useState<'idle' | 'loading' | 'error' | 'empty'>('idle')
   const [error, setError] = useState<string | null>(null)
+  // Toggle legend off — collapsed by default so it doesn't cover canvas
+  // on smaller windows, but persists in component state per session.
+  const [legendOpen, setLegendOpen] = useState(true)
+  // Surface "still connecting…" if a load takes unusually long. Neo4j
+  // Bolt can hang on bad URIs without throwing, so without this the
+  // spinner appears to spin forever.
+  const [slowLoad, setSlowLoad] = useState(false)
 
   // Track container size so the canvas always fills the available space.
   useEffect(() => {
@@ -91,6 +98,15 @@ export function GraphView() {
       setData(null)
       return
     }
+
+    setSlowLoad(false)
+    // 12s gives a healthy Neo4j a comfortable margin while still
+    // catching hangs on dead Bolt endpoints. We don't abort the request
+    // — just inform the user — because the underlying SDK has its own
+    // timeout that eventually surfaces as an error.
+    const slowTimer = window.setTimeout(() => {
+      if (!cancelled) setSlowLoad(true)
+    }, 12_000)
 
     const load = async () => {
       setStatus('loading')
@@ -180,9 +196,13 @@ export function GraphView() {
       }
     }
 
-    load()
+    load().finally(() => {
+      window.clearTimeout(slowTimer)
+      if (!cancelled) setSlowLoad(false)
+    })
     return () => {
       cancelled = true
+      window.clearTimeout(slowTimer)
     }
   }, [scope, focusedEntity, insightGraphEnabled, reports, currentFilePath])
 
@@ -301,7 +321,12 @@ export function GraphView() {
       )}
 
       <div ref={containerRef} className="flex-1 relative overflow-hidden">
-        {status === 'loading' && <GraphStatus icon={<Loader2 size={14} className="animate-spin" />} label={t('graphView.loading')} />}
+        {status === 'loading' && (
+          <GraphStatus
+            icon={<Loader2 size={14} className="animate-spin" />}
+            label={slowLoad ? t('graphView.loadingSlow') : t('graphView.loading')}
+          />
+        )}
         {status === 'error' && (
           <GraphStatus
             icon={<AlertCircle size={14} className="text-red-500" />}
@@ -329,6 +354,19 @@ export function GraphView() {
               </p>
             </div>
           </div>
+        )}
+        {/* Legend — collapsible overlay so users can map node colour to
+            entity type without trial-and-error hovering. */}
+        {status === 'idle' && data && data.nodes.length > 0 && (
+          <GraphLegend
+            nodes={data.nodes}
+            colorize={nodeTypeColor}
+            open={legendOpen}
+            onToggle={() => setLegendOpen((v) => !v)}
+            label={t('graphView.legendTitle')}
+            collapseLabel={t('graphView.legendHide')}
+            expandLabel={t('graphView.legendShow')}
+          />
         )}
         {status === 'idle' && data && data.nodes.length > 0 && size.width > 0 && size.height > 0 && (
           <ForceGraph2D
@@ -392,6 +430,74 @@ function ScopeButton({
       {icon}
       {children}
     </button>
+  )
+}
+
+function GraphLegend({
+  nodes,
+  colorize,
+  open,
+  onToggle,
+  label,
+  collapseLabel,
+  expandLabel,
+}: {
+  nodes: GraphNode[]
+  colorize: (type?: string) => string
+  open: boolean
+  onToggle: () => void
+  label: string
+  collapseLabel: string
+  expandLabel: string
+}) {
+  // Derive unique entity types from the current dataset so the legend
+  // only shows colors that actually appear on screen.
+  const types = useMemo(() => {
+    const set = new Set<string>()
+    for (const n of nodes) if (n.type) set.add(n.type)
+    return Array.from(set).sort()
+  }, [nodes])
+
+  if (types.length === 0) return null
+
+  return (
+    <div
+      className="absolute bottom-3 right-3 z-10 max-w-[200px] text-[11px] rounded-md border shadow-sm"
+      style={{
+        backgroundColor: 'color-mix(in srgb, var(--bg-primary) 92%, transparent)',
+        borderColor: 'var(--border-color)',
+        backdropFilter: 'blur(4px)',
+      }}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 text-left focus-visible:ring-2 focus-visible:ring-[var(--accent-color)]"
+        style={{ color: 'var(--text-secondary)' }}
+        aria-label={open ? collapseLabel : expandLabel}
+        aria-expanded={open}
+      >
+        <span className="font-semibold uppercase tracking-wider text-[10px]" style={{ color: 'var(--text-muted)' }}>
+          {label}
+        </span>
+        <span aria-hidden style={{ color: 'var(--text-muted)' }}>{open ? '−' : '+'}</span>
+      </button>
+      {open && (
+        <ul className="px-2.5 pb-2 space-y-1 max-h-48 overflow-y-auto">
+          {types.map((type) => (
+            <li key={type} className="flex items-center gap-2">
+              <span
+                className="inline-block w-2.5 h-2.5 rounded-full flex-shrink-0"
+                style={{ backgroundColor: colorize(type) }}
+              />
+              <span className="truncate" style={{ color: 'var(--text-secondary)' }} title={type}>
+                {type}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 

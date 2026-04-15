@@ -232,6 +232,7 @@ export function DocSummary() {
               disabled={ingestInFlight}
               className="p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-50"
               title={t('docSummary.buildGraph')}
+              aria-label={t('docSummary.buildGraph')}
             >
               <Network size={12} className={ingestInFlight ? 'animate-pulse' : undefined} />
             </button>
@@ -241,6 +242,7 @@ export function DocSummary() {
             disabled={status === 'loading'}
             className="p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-50"
             title={summary ? t('docSummary.regenerate') : t('docSummary.generate')}
+            aria-label={summary ? t('docSummary.regenerate') : t('docSummary.generate')}
           >
             <RefreshCw size={12} className={status === 'loading' ? 'animate-spin' : undefined} />
           </button>
@@ -248,6 +250,7 @@ export function DocSummary() {
             onClick={() => setDismissedFor(currentFilePath)}
             className="p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/10"
             title={t('docSummary.dismiss')}
+            aria-label={t('docSummary.dismiss')}
           >
             <X size={12} />
           </button>

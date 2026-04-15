@@ -6,7 +6,8 @@
       "subtitle": "打开文件或文件夹开始阅读，支持 Markdown / PDF / CSV / JSON / XLSX，也可以直接拖拽文件到此处。",
       "openFile": "打开文件",
       "openFolder": "打开文件夹",
-      "tip": "提示：按下 {{shortcut}} 打开命令面板"
+      "tip": "提示：按下 {{shortcut}} 打开命令面板",
+      "configureAI": "配置 AI 服务商"
     }
   },
   "reader": {
@@ -32,8 +33,11 @@
       "errorTitle": "无法渲染该 PDF",
       "prev": "上一页",
       "next": "下一页",
-      "pageOf": "第 {{page}} / {{total}} 页"
-    }
+      "pageOf": "第 {{page}} / {{total}} 页",
+      "loading": "渲染 PDF 中…"
+    },
+    "loading": "加载中…",
+    "parsing": "正在解析 {{size}}…"
   },
   "sidebar": {
     "explorer": "资源管理器",
@@ -55,10 +59,15 @@
   "titlebar": {
     "toggleFileTree": "切换文件树",
     "toggleOutline": "切换大纲",
+    "toggleAgent": "切换 AI 助手",
     "settings": "设置",
     "theme": "主题",
     "showGraph": "打开知识图谱",
-    "showReader": "返回阅读器"
+    "showReader": "返回阅读器",
+    "minimize": "最小化",
+    "maximize": "最大化",
+    "restore": "还原",
+    "close": "关闭窗口"
   },
   "graphView": {
     "title": "知识图谱",
@@ -68,6 +77,10 @@
       "entity": "实体"
     },
     "loading": "加载图谱中…",
+    "loadingSlow": "仍在连接 Neo4j——若长时间无响应请检查 Bolt 地址。",
+    "legendTitle": "实体类型",
+    "legendShow": "显示图例",
+    "legendHide": "隐藏图例",
     "error": "图谱加载失败",
     "errorAuth": "认证失败——请检查 Neo4j 用户名和密码。",
     "errorUnreachable": "无法连接 Neo4j——请检查 Bolt 地址及数据库是否运行。",
@@ -299,6 +312,9 @@
     "privacyBadgeTooltip": "开启隐私模式后，云端服务商（OpenAI、Anthropic、Google、自定义）会被禁用，仅允许 Ollama。",
     "newMessages": "有新消息",
     "jumpToLatest": "跳到最新消息",
+    "onboardingHint": "先配置一个 AI 服务商，就可以围绕这篇文档开始对话。",
+    "configureProvider": "配置 AI 服务商",
+    "exportConversation": "导出对话",
     "contextMenu": {
       "explain": "解释这段",
       "translate": "翻译",
