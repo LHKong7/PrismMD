@@ -174,8 +174,14 @@ export function PdfViewer() {
         >
           <ChevronLeft size={14} style={{ color: 'var(--text-secondary)' }} />
         </button>
-        <span className="text-xs tabular-nums" style={{ color: 'var(--text-secondary)' }}>
-          {t('reader.pdf.pageOf', { page: pageNumber, total: pageCount || '…' })}
+        <PageInput
+          page={pageNumber}
+          pageCount={pageCount}
+          onJump={setPageNumber}
+          ariaLabel={t('reader.pageInputAria')}
+        />
+        <span className="text-xs tabular-nums" style={{ color: 'var(--text-muted)' }}>
+          / {pageCount || '…'}
         </span>
         <button
           onClick={() => canNext && setPageNumber((p) => p + 1)}
@@ -200,6 +206,65 @@ export function PdfViewer() {
         )}
       </div>
     </div>
+  )
+}
+
+/**
+ * Inline "Go to page N" input. Accepts intermediate values while the
+ * user types and only commits on Enter or blur so partial input doesn't
+ * thrash the renderer. External page changes (prev/next buttons) are
+ * mirrored back via useEffect so the field stays in sync.
+ */
+function PageInput({
+  page,
+  pageCount,
+  onJump,
+  ariaLabel,
+}: {
+  page: number
+  pageCount: number
+  onJump: (n: number) => void
+  ariaLabel: string
+}) {
+  const [draft, setDraft] = useState(String(page))
+  useEffect(() => {
+    setDraft(String(page))
+  }, [page])
+
+  const commit = () => {
+    const n = parseInt(draft, 10)
+    if (!Number.isFinite(n)) {
+      setDraft(String(page))
+      return
+    }
+    const clamped = Math.min(Math.max(1, n), Math.max(1, pageCount))
+    if (clamped !== page) onJump(clamped)
+    setDraft(String(clamped))
+  }
+
+  return (
+    <input
+      type="number"
+      min={1}
+      max={pageCount || undefined}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault()
+          commit()
+          ;(e.target as HTMLInputElement).blur()
+        }
+      }}
+      onBlur={commit}
+      disabled={pageCount === 0}
+      aria-label={ariaLabel}
+      className="w-12 text-xs tabular-nums bg-transparent rounded px-1 py-0.5 border focus:outline-none focus-visible:ring-1"
+      style={{
+        borderColor: 'var(--border-color)',
+        color: 'var(--text-secondary)',
+      }}
+    />
   )
 }
 

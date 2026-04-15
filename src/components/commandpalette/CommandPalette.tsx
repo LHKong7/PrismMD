@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Command } from 'cmdk'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
-import { FileText, Sun, Moon, Monitor, Settings, Bot, Shield, Eye, Network, BookOpen, Puzzle } from 'lucide-react'
+import { FileText, Sun, Moon, Monitor, Settings, Bot, Shield, Eye, Network, BookOpen, Puzzle, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useUIStore } from '../../store/uiStore'
 import { useFileStore } from '../../store/fileStore'
@@ -9,7 +9,9 @@ import { useSettingsStore } from '../../store/settingsStore'
 import { useAgentStore } from '../../store/agentStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
 import { useCommandRegistry } from '../../store/commandRegistry'
+import { useSearchIndexStore } from '../../store/searchIndexStore'
 import { applyTheme, getThemeById } from '../../lib/theme/themes'
+import { flattenFiles, fileName } from '../../lib/fileTree'
 
 interface CommandPaletteProps {
   onOpenSettings: () => void
@@ -36,8 +38,33 @@ export function CommandPalette({ onOpenSettings }: CommandPaletteProps) {
   const toggleMainViewMode = useUIStore((s) => s.toggleMainViewMode)
   const pluginCommands = useCommandRegistry((s) => s.commands)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const dialogRef = useRef<HTMLDivElement>(null)
   useFocusTrap(dialogRef, open)
+
+  const buildIndex = useSearchIndexStore((s) => s.build)
+  const indexStatus = useSearchIndexStore((s) => s.status)
+  const indexedCount = useSearchIndexStore((s) => s.fileCount)
+  const runSearch = useSearchIndexStore((s) => s.search)
+
+  // Build the index lazily the first time the palette opens — the read
+  // pass is async, so paying it on demand keeps app startup snappy.
+  useEffect(() => {
+    if (open && indexStatus === 'idle') void buildIndex()
+  }, [open, indexStatus, buildIndex])
+
+  // Debounce the user's keystrokes before running MiniSearch so we don't
+  // re-rank on every character.
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebouncedSearch(search), 150)
+    return () => window.clearTimeout(id)
+  }, [search])
+
+  const searchHits = useMemo(() => {
+    if (debouncedSearch.trim().length < 2) return []
+    if (indexStatus !== 'ready') return []
+    return runSearch(debouncedSearch)
+  }, [debouncedSearch, indexStatus, runSearch])
 
   // Group plugin commands by their `group` field so they can each render
   // under their own heading. Core commands stay hard-coded below (their
@@ -68,17 +95,7 @@ export function CommandPalette({ onOpenSettings }: CommandPaletteProps) {
     setOpen(false)
   }
 
-  const flattenFiles = (nodes: import('../../types/electron').FileTreeNode[]): string[] => {
-    const files: string[] = []
-    for (const node of nodes) {
-      if (node.type === 'file') files.push(node.path)
-      else if (node.children) files.push(...flattenFiles(node.children))
-    }
-    return files
-  }
-
   const allFiles = openFolders.flatMap((f) => flattenFiles(f.tree))
-  const fileName = (path: string) => path.split(/[/\\]/).pop() ?? path
 
   if (!open) return null
 
@@ -109,6 +126,41 @@ export function CommandPalette({ onOpenSettings }: CommandPaletteProps) {
             <Command.Empty className="px-4 py-6 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
               {t('commandPalette.noResults')}
             </Command.Empty>
+
+            {debouncedSearch.trim().length >= 2 && (
+              <Command.Group heading={t('commandPalette.searchResults')} style={{ color: 'var(--text-muted)' }}>
+                {indexStatus === 'building' && (
+                  <div className="px-3 py-2 text-xs flex items-center gap-2" style={{ color: 'var(--text-muted)' }}>
+                    <Search size={12} />
+                    <span>{t('commandPalette.indexing', { count: indexedCount })}</span>
+                  </div>
+                )}
+                {indexStatus === 'ready' && searchHits.length === 0 && (
+                  <div className="px-3 py-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+                    {t('commandPalette.noContentMatch')}
+                  </div>
+                )}
+                {searchHits.map((hit) => (
+                  <Command.Item
+                    key={`hit:${hit.path}`}
+                    value={`${search} ${hit.path}`}
+                    onSelect={() => { openFile(hit.path); setOpen(false) }}
+                    className={cls}
+                    style={{ color: 'var(--text-secondary)' }}
+                  >
+                    <Search size={14} style={{ color: 'var(--text-muted)' }} />
+                    <div className="flex-1 min-w-0">
+                      <div className="truncate">{hit.name}</div>
+                      {hit.snippet && (
+                        <div className="text-[11px] truncate" style={{ color: 'var(--text-muted)' }}>
+                          {hit.snippet}
+                        </div>
+                      )}
+                    </div>
+                  </Command.Item>
+                ))}
+              </Command.Group>
+            )}
 
             {recentFiles.length > 0 && (
               <Command.Group heading={t('commandPalette.recentFiles')} style={{ color: 'var(--text-muted)' }}>

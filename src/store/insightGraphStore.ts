@@ -79,6 +79,15 @@ interface InsightGraphStore {
   contradictionsCache: Record<string, Record<string, unknown>[]>
   timelineCache: Record<string, Record<string, unknown>[]>
   subgraphCache: Record<string, Subgraph>
+  /**
+   * Cache of entity-name lists keyed by reportId (or `__global__` for the
+   * findEntities fallback). Avoids re-running the trie-fetch on every doc
+   * switch — invalidated on ingest via `entityNamesCacheStamp`.
+   */
+  entityNamesCache: Record<string, string[]>
+  entityNamesCacheStamp: number
+
+  setEntityNames: (key: string, names: string[]) => void
 
   // Actions
   ingestFile: (filePath: string) => Promise<boolean>
@@ -133,6 +142,13 @@ export const useInsightGraphStore = create<InsightGraphStore>((set, get) => {
     contradictionsCache: {},
     timelineCache: {},
     subgraphCache: {},
+    entityNamesCache: {},
+    entityNamesCacheStamp: 0,
+
+    setEntityNames: (key, names) =>
+      set((state) => ({
+        entityNamesCache: { ...state.entityNamesCache, [key]: names },
+      })),
 
     ingestFile: async (filePath) => {
       set({
@@ -157,13 +173,17 @@ export const useInsightGraphStore = create<InsightGraphStore>((set, get) => {
         await get().refreshReports()
         const match = get().reports.find((r) => r.filePath === filePath || r.filename === filenameOf(filePath))
         const reportId = match?.reportId ?? ''
-        set({
+        set((state) => ({
           ingest: {
             filePath,
             stage: 'completed',
             reportId,
           },
-        })
+          // Newly ingested data invalidates the entity-name cache so the
+          // next doc open re-fetches.
+          entityNamesCache: {},
+          entityNamesCacheStamp: state.entityNamesCacheStamp + 1,
+        }))
         void result
         return true
       } catch (err) {
@@ -344,13 +364,15 @@ export const useInsightGraphStore = create<InsightGraphStore>((set, get) => {
     },
 
     clearGraphCaches: () =>
-      set({
+      set((state) => ({
         entityProfileCache: {},
         claimsCache: {},
         entityRelationshipsCache: {},
         contradictionsCache: {},
         timelineCache: {},
         subgraphCache: {},
-      }),
+        entityNamesCache: {},
+        entityNamesCacheStamp: state.entityNamesCacheStamp + 1,
+      })),
   }
 })

@@ -26,6 +26,8 @@ export function useEntityLinking(containerRef: React.RefObject<HTMLElement>) {
   const currentContent = useFileStore((s) => s.currentContent)
   const reports = useInsightGraphStore((s) => s.reports)
   const findEntities = useInsightGraphStore((s) => s.findEntities)
+  const entityNamesCacheStamp = useInsightGraphStore((s) => s.entityNamesCacheStamp)
+  const setEntityNames = useInsightGraphStore((s) => s.setEntityNames)
   const focusEntity = useUIStore((s) => s.focusEntity)
 
   useEffect(() => {
@@ -40,17 +42,27 @@ export function useEntityLinking(containerRef: React.RefObject<HTMLElement>) {
       // Prefer a report-scoped entity list when we have the mapping —
       // avoids highlighting names that don't actually appear in this
       // document's source. Fall back to the global top-200 when the file
-      // hasn't been ingested yet.
-      let names: string[] = []
+      // hasn't been ingested yet. Cache by reportId (or `__global__`) so
+      // doc switches don't re-fetch.
       const report = reports.find((r) => r.filePath === currentFilePath)
-      if (report) {
-        const res = await window.electronAPI.insightGraphEntitiesForReport(report.reportId)
-        if (res.ok) names = res.data
+      const cacheKey = report?.reportId ?? '__global__'
+      const cached = useInsightGraphStore.getState().entityNamesCache[cacheKey]
+      let names: string[] = cached ?? []
+
+      if (!cached) {
+        if (report) {
+          const res = await window.electronAPI.insightGraphEntitiesForReport(report.reportId)
+          if (res.ok) names = res.data
+        }
+        if (names.length === 0) {
+          const entities = await findEntities({ limit: 200 })
+          names = entities.map((e) => e.name).filter(Boolean)
+        }
+        if (!cancelled && names.length > 0) {
+          setEntityNames(cacheKey, names)
+        }
       }
-      if (names.length === 0) {
-        const entities = await findEntities({ limit: 200 })
-        names = entities.map((e) => e.name).filter(Boolean)
-      }
+
       if (cancelled) return
       if (names.length === 0) return
 
@@ -73,8 +85,14 @@ export function useEntityLinking(containerRef: React.RefObject<HTMLElement>) {
     // processed.
     currentContent,
     reports,
+    // Bumped on ingest / clearGraphCaches so we re-fetch the entity list
+    // when the underlying graph changes.
+    entityNamesCacheStamp,
     containerRef,
     findEntities,
+    setEntityNames,
     focusEntity,
+    // entityNamesCache itself is read inside `run` via getState() so we
+    // don't need it as a dep — including it would loop on every cache write.
   ])
 }

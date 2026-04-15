@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import * as XLSX from 'xlsx'
-import { AlertCircle } from 'lucide-react'
 import { useFileStore } from '../../store/fileStore'
 import { VirtualTable } from './VirtualTable'
 import { TableSkeleton } from './TableSkeleton'
+import { ErrorBanner } from './components/ErrorBanner'
 
 // Files larger than this defer SheetJS parsing onto the next tick so
 // the skeleton has a chance to paint first.
@@ -26,6 +26,7 @@ export function XlsxViewer() {
   const [activeSheet, setActiveSheet] = useState<string | null>(null)
   const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null)
   const [loading, setLoading] = useState(false)
+  const [parseError, setParseError] = useState<string | null>(null)
 
   // Defer SheetJS parsing so the skeleton can paint first on big books.
   // Small books parse synchronously to avoid the flash.
@@ -33,12 +34,15 @@ export function XlsxViewer() {
     if (!bytes) {
       setWorkbook(null)
       setLoading(false)
+      setParseError(null)
       return
     }
+    setParseError(null)
     const parse = () => {
       try {
         return XLSX.read(bytes, { type: 'array' })
-      } catch {
+      } catch (e) {
+        setParseError(e instanceof Error ? e.message : String(e))
         return null
       }
     }
@@ -114,22 +118,11 @@ export function XlsxViewer() {
 
   if (!bytes || !workbook) {
     return (
-      <div
-        className="h-full flex items-center justify-center p-8 text-center"
-        style={{ backgroundColor: 'var(--bg-primary)' }}
-      >
-        <div className="flex items-start gap-2 max-w-sm text-left">
-          <AlertCircle size={14} className="flex-shrink-0 mt-0.5 text-red-500" />
-          <div>
-            <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
-              {t('reader.xlsx.parseErrorTitle')}
-            </h3>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              {t('reader.xlsx.parseErrorBody')}
-            </p>
-          </div>
-        </div>
-      </div>
+      <ErrorBanner
+        severity="error"
+        title={t('reader.xlsx.parseErrorTitle')}
+        message={parseError ?? t('reader.xlsx.parseErrorBody')}
+      />
     )
   }
 
