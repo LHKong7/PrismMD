@@ -6,6 +6,7 @@ import { useFileStore } from '../../store/fileStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useAgentStore } from '../../store/agentStore'
 import { themes, applyTheme, getThemeById } from '../../lib/theme/themes'
+import { Button } from '../ui/Button'
 
 const dragStyle = { WebkitAppRegion: 'drag' } as unknown as CSSProperties
 const noDragStyle = { WebkitAppRegion: 'no-drag' } as unknown as CSSProperties
@@ -61,14 +62,16 @@ export function TitleBar({ onOpenSettings }: TitleBarProps) {
     >
       {/* Left controls */}
       <div className="flex items-center gap-1 px-2" style={noDragStyle}>
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={toggleLeftSidebar}
-          className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+          className="p-1.5"
           title={`${t('titlebar.toggleFileTree')} (Ctrl+B)`}
           aria-label={t('titlebar.toggleFileTree')}
         >
           <PanelLeft size={16} style={{ color: 'var(--text-secondary)' }} />
-        </button>
+        </Button>
       </div>
 
       {/* Title */}
@@ -79,9 +82,11 @@ export function TitleBar({ onOpenSettings }: TitleBarProps) {
       {/* Right controls */}
       <div className="flex items-center gap-1 px-2" style={noDragStyle}>
         {graphEnabled && (
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={toggleMainViewMode}
-            className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+            className="p-1.5"
             title={mainViewMode === 'graph' ? t('titlebar.showReader') : t('titlebar.showGraph')}
             aria-label={mainViewMode === 'graph' ? t('titlebar.showReader') : t('titlebar.showGraph')}
           >
@@ -90,68 +95,84 @@ export function TitleBar({ onOpenSettings }: TitleBarProps) {
             ) : (
               <Network size={16} style={{ color: 'var(--text-secondary)' }} />
             )}
-          </button>
+          </Button>
         )}
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={toggleAgentSidebar}
-          className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+          className="p-1.5"
           title={t('titlebar.toggleAgent')}
           aria-label={t('titlebar.toggleAgent')}
         >
           <Bot size={16} style={{ color: 'var(--text-secondary)' }} />
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={toggleRightSidebar}
-          className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+          className="p-1.5"
           title={`${t('titlebar.toggleOutline')} (Ctrl+Shift+B)`}
           aria-label={t('titlebar.toggleOutline')}
         >
           <PanelRight size={16} style={{ color: 'var(--text-secondary)' }} />
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={cycleTheme}
-          className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+          className="p-1.5"
           title={`${t('titlebar.theme')}: ${getThemeById(themeId)?.name ?? themeId} (Ctrl+T)`}
           aria-label={t('titlebar.theme')}
         >
           <Palette size={16} style={{ color: 'var(--text-secondary)' }} />
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={onOpenSettings}
-          className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+          className="p-1.5"
           title={`${t('titlebar.settings')} (Ctrl+,)`}
           aria-label={t('titlebar.settings')}
         >
           <Settings size={16} style={{ color: 'var(--text-secondary)' }} />
-        </button>
+        </Button>
 
-        {/* Window controls (non-macOS) */}
+        {/* Window controls (non-macOS). Close button keeps its red-tinted
+            hover since it's the "destructive" window action — overrides
+            the ghost variant's default hover. */}
         {!isMac && (
           <>
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => window.electronAPI.minimizeWindow()}
-              className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+              className="p-1.5"
               aria-label={t('titlebar.minimize')}
               title={t('titlebar.minimize')}
             >
               <Minus size={16} style={{ color: 'var(--text-secondary)' }} />
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => window.electronAPI.maximizeWindow()}
-              className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+              className="p-1.5"
               aria-label={isMaximized ? t('titlebar.restore') : t('titlebar.maximize')}
               title={isMaximized ? t('titlebar.restore') : t('titlebar.maximize')}
             >
               <Square size={14} style={{ color: 'var(--text-secondary)' }} />
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => window.electronAPI.closeWindow()}
-              className="p-1.5 rounded hover:bg-red-500/20 transition-colors"
+              className="p-1.5 hover:!bg-red-500/20"
               aria-label={t('titlebar.close')}
               title={t('titlebar.close')}
             >
               <X size={16} style={{ color: 'var(--text-secondary)' }} />
-            </button>
+            </Button>
           </>
         )}
       </div>

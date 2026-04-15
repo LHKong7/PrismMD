@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Sparkles, RefreshCw, X, ChevronRight, Loader2, Network } from 'lucide-react'
+import { Sparkles, RefreshCw, X, ChevronRight, Network } from 'lucide-react'
 import { useFileStore } from '../../store/fileStore'
 import { useAgentStore } from '../../store/agentStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
 import { useUIStore } from '../../store/uiStore'
+import { Button } from '../ui/Button'
+import { Spinner } from '../ui/Spinner'
 
 interface CachedSummary {
   tldr: string
@@ -227,33 +229,39 @@ export function DocSummary() {
         </div>
         <div className="flex items-center gap-1">
           {graphGateOpen && (
-            <button
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={handleBuildGraph}
               disabled={ingestInFlight}
-              className="p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-50"
+              className="p-0.5"
               title={t('docSummary.buildGraph')}
               aria-label={t('docSummary.buildGraph')}
             >
               <Network size={12} className={ingestInFlight ? 'animate-pulse' : undefined} />
-            </button>
+            </Button>
           )}
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => generate().catch(() => {})}
             disabled={status === 'loading'}
-            className="p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-50"
+            className="p-0.5"
             title={summary ? t('docSummary.regenerate') : t('docSummary.generate')}
             aria-label={summary ? t('docSummary.regenerate') : t('docSummary.generate')}
           >
             <RefreshCw size={12} className={status === 'loading' ? 'animate-spin' : undefined} />
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => setDismissedFor(currentFilePath)}
-            className="p-0.5 rounded hover:bg-black/5 dark:hover:bg-white/10"
+            className="p-0.5"
             title={t('docSummary.dismiss')}
             aria-label={t('docSummary.dismiss')}
           >
             <X size={12} />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -265,7 +273,7 @@ export function DocSummary() {
                 className="flex items-center gap-2 pb-2 text-xs"
                 style={{ color: 'var(--text-muted)' }}
               >
-                <Loader2 size={12} className="animate-spin" />
+                <Spinner size={12} />
                 <span>
                   {t(`statusBar.ingest.${ingestStage}`, t('docSummary.graphBuilding'))}
                 </span>
@@ -309,7 +317,7 @@ export function DocSummary() {
         )}
         {status === 'loading' && !summary && (
           <div className="flex items-center gap-2 py-2 text-sm" style={{ color: 'var(--text-muted)' }}>
-            <Loader2 size={14} className="animate-spin" />
+            <Spinner size={14} label={t('docSummary.loading')} />
             <span>{t('docSummary.loading')}</span>
           </div>
         )}

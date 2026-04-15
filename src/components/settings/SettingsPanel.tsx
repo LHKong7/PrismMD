@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { X, Check, Loader2, Globe, Palette, Bot, Eye, EyeOff, Shield, Trash2, Network, AlertTriangle, RefreshCw, Puzzle, FolderOpen, CircleAlert, Info, Download } from 'lucide-react'
+import { X, Check, Globe, Palette, Bot, Eye, EyeOff, Shield, Trash2, Network, AlertTriangle, RefreshCw, Puzzle, FolderOpen, CircleAlert, Info, Download } from 'lucide-react'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
+import { Button } from '../ui/Button'
+import { Spinner } from '../ui/Spinner'
 import { useTranslation } from 'react-i18next'
 import { useSettingsStore, DEFAULT_MODELS, type AIProvider, type InsightGraphDomain } from '../../store/settingsStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
@@ -65,14 +67,16 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
       >
         <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--border-color)' }}>
           <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{t('settings.title')}</h2>
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={onClose}
-            className="p-1.5 rounded hover:bg-black/10 dark:hover:bg-white/10"
+            className="p-1.5"
             aria-label={t('settings.close')}
             title={t('settings.close')}
           >
             <X size={18} style={{ color: 'var(--text-muted)' }} />
-          </button>
+          </Button>
         </div>
 
         <div className="flex flex-1 overflow-hidden">
@@ -456,7 +460,7 @@ function AIProviderCard({
               className="text-xs px-3 py-2 rounded-md border transition-colors disabled:opacity-50"
               style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
             >
-              {testing ? <Loader2 size={14} className="animate-spin" /> : t('settings.ai.testConnection')}
+              {testing ? <Spinner size={14} /> : t('settings.ai.testConnection')}
             </button>
           </div>
           {testResult !== null && (
@@ -476,7 +480,7 @@ function AIProviderCard({
             className="text-xs px-3 py-2 rounded-md border transition-colors disabled:opacity-50"
             style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
           >
-            {testing ? <Loader2 size={14} className="animate-spin" /> : t('settings.ai.testConnection')}
+            {testing ? <Spinner size={14} /> : t('settings.ai.testConnection')}
           </button>
           {testResult !== null && (
             <span className={clsx('text-xs flex items-center', testResult ? 'text-green-500' : 'text-red-500')}>
@@ -673,7 +677,7 @@ function InsightGraphSettings() {
               style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
               type="button"
             >
-              {testing ? <Loader2 size={14} className="animate-spin" /> : t('settings.insightgraph.testConnection')}
+              {testing ? <Spinner size={14} /> : t('settings.insightgraph.testConnection')}
             </button>
           </div>
           {testResult && (
@@ -846,7 +850,7 @@ function PluginsSettings() {
             className="flex items-center gap-1 text-xs px-2 py-1 rounded border hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-50"
             style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
           >
-            {reloading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+            {reloading ? <Spinner size={12} /> : <RefreshCw size={12} />}
             {t('settings.plugins.reload')}
           </button>
         </div>
@@ -1056,7 +1060,7 @@ function McpSettingsSection() {
             style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
           >
             {refreshing ? (
-              <Loader2 size={12} className="animate-spin" />
+              <Spinner size={12} />
             ) : (
               <RefreshCw size={12} />
             )}
@@ -1201,7 +1205,7 @@ function AboutSettings() {
               style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
             >
               {kind === 'checking' ? (
-                <Loader2 size={12} className="animate-spin" />
+                <Spinner size={12} />
               ) : (
                 <RefreshCw size={12} />
               )}

@@ -4,8 +4,9 @@ import { useUIStore, type GraphScope } from '../../store/uiStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useFileStore } from '../../store/fileStore'
-import { Loader2, Network, AlertCircle, Globe, FileText, Target, BookOpen } from 'lucide-react'
+import { Network, AlertCircle, Globe, FileText, Target, BookOpen } from 'lucide-react'
 import ForceGraph2D from 'react-force-graph-2d'
+import { Spinner } from '../ui/Spinner'
 // NOTE: the force-graph library extends the node objects with simulation
 // fields (x, y, vx, …) at runtime — we keep our schema wide (any extra
 // props allowed) to play nice with that.
@@ -323,7 +324,7 @@ export function GraphView() {
       <div ref={containerRef} className="flex-1 relative overflow-hidden">
         {status === 'loading' && (
           <GraphStatus
-            icon={<Loader2 size={14} className="animate-spin" />}
+            icon={<Spinner size={14} />}
             label={slowLoad ? t('graphView.loadingSlow') : t('graphView.loading')}
           />
         )}

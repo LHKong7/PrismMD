@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { AlertCircle, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import * as pdfjsLib from 'pdfjs-dist'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
+import { Spinner } from '../ui/Spinner'
 // The pdfjs worker is shipped alongside pdfjs-dist. Vite's `?url` import
 // rewrites this to a static URL that Electron can load from the renderer
 // bundle without a network request.
@@ -184,9 +185,7 @@ export function PdfViewer() {
         >
           <ChevronRight size={14} style={{ color: 'var(--text-secondary)' }} />
         </button>
-        {loading && (
-          <Loader2 size={14} className="animate-spin" style={{ color: 'var(--text-muted)' }} />
-        )}
+        {loading && <Spinner size={14} />}
       </div>
 
       {/* Canvas viewport. We always mount the canvas so the render effect

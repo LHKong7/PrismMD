@@ -7,6 +7,7 @@ import { useSettingsStore, DEFAULT_MODELS, type AIProvider } from '../../store/s
 import { useUIStore } from '../../store/uiStore'
 import { ChatMessage, renderWithCitations } from './ChatMessage'
 import { useReaderDomStore } from '../../store/readerDomStore'
+import { Button } from '../ui/Button'
 import { clsx } from 'clsx'
 
 export function AgentSidebar() {
@@ -104,23 +105,25 @@ export function AgentSidebar() {
           <div className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px]" style={{ color: 'var(--text-muted)' }}>
             <Brain size={10} />
           </div>
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => exportConversationAsMarkdown(messages, currentFilePath, t)}
             disabled={messages.length === 0}
-            className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-[var(--accent-color)] transition-colors disabled:opacity-30"
             title={t('agent.exportConversation')}
             aria-label={t('agent.exportConversation')}
           >
             <Download size={13} style={{ color: 'var(--text-muted)' }} />
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={clearMessages}
-            className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-[var(--accent-color)] transition-colors"
             title={t('agent.clear')}
             aria-label={t('agent.clear')}
           >
             <Trash2 size={13} style={{ color: 'var(--text-muted)' }} />
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -244,14 +247,15 @@ export function AgentSidebar() {
                 : currentContent ? t('agent.placeholder') : t('agent.noDocument')}
             </p>
             {!hasApiKey && (
-              <button
+              <Button
+                variant="primary"
+                size="md"
                 onClick={() => openSettings('ai')}
-                className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md font-medium focus-visible:ring-2 focus-visible:ring-[var(--accent-color)]"
-                style={{ backgroundColor: 'var(--accent-color)', color: '#fff' }}
+                className="font-medium"
               >
                 <Bot size={12} />
                 {t('agent.configureProvider')}
-              </button>
+              </Button>
             )}
           </div>
         ) : (
@@ -299,13 +303,28 @@ export function AgentSidebar() {
             style={{ color: 'var(--text-primary)' }}
           />
           {isStreaming ? (
-            <button onClick={stopGeneration} className="p-1.5 rounded-md" style={{ backgroundColor: 'var(--accent-color)' }} title={t('agent.stop')}>
-              <Square size={14} color="#fff" />
-            </button>
+            <Button
+              variant="primary"
+              size="icon"
+              onClick={stopGeneration}
+              className="p-1.5 rounded-md"
+              title={t('agent.stop')}
+              aria-label={t('agent.stop')}
+            >
+              <Square size={14} />
+            </Button>
           ) : (
-            <button onClick={handleSend} disabled={!input.trim() || !hasApiKey} className="p-1.5 rounded-md disabled:opacity-30" style={{ backgroundColor: 'var(--accent-color)' }} title={t('agent.send')}>
-              <Send size={14} color="#fff" />
-            </button>
+            <Button
+              variant="primary"
+              size="icon"
+              onClick={handleSend}
+              disabled={!input.trim() || !hasApiKey}
+              className="p-1.5 rounded-md"
+              title={t('agent.send')}
+              aria-label={t('agent.send')}
+            >
+              <Send size={14} />
+            </Button>
           )}
         </div>
       </div>

@@ -10,6 +10,7 @@ import { JsonViewer } from './JsonViewer'
 import { CsvViewer } from './CsvViewer'
 import { XlsxViewer } from './XlsxViewer'
 import { PdfViewer } from './PdfViewer'
+import { Button } from '../ui/Button'
 
 /**
  * DocumentReader — the main content pane's format-aware router.
@@ -88,35 +89,38 @@ export function DocumentReader() {
             {t('app.welcome.subtitle')}
           </p>
           <div className="flex gap-3 justify-center">
-            <button
+            <Button
+              variant="primary"
+              size="md"
               onClick={openFileDialog}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-              style={{ backgroundColor: 'var(--accent-color)', color: '#ffffff' }}
+              className="px-4 py-2 rounded-lg font-medium"
             >
               <FileText size={16} />
               {t('app.welcome.openFile')}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
+              size="md"
               onClick={openFolderDialog}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-              style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+              className="px-4 py-2 rounded-lg font-medium"
             >
               <FolderOpen size={16} />
               {t('app.welcome.openFolder')}
-            </button>
+            </Button>
           </div>
           <p className="text-xs mt-6" style={{ color: 'var(--text-muted)' }}>
             {t('app.welcome.tip', { shortcut: 'Ctrl+P' })}
           </p>
           {aiNotConfigured && (
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => openSettings('ai')}
-              className="mt-4 inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md border transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-              style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+              className="mt-4"
             >
               <Bot size={12} style={{ color: 'var(--accent-color)' }} />
               {t('app.welcome.configureAI')}
-            </button>
+            </Button>
           )}
         </div>
       </div>
