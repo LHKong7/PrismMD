@@ -31,7 +31,7 @@ export function InFileSearchBar({
 
   return (
     <div
-      className="absolute top-2 right-3 z-20 flex items-center gap-1 px-2 py-1 rounded-md border shadow-sm"
+      className="flex items-center gap-1 px-2 py-1 rounded-md border shadow-sm"
       role="search"
       style={{
         backgroundColor: 'color-mix(in srgb, var(--bg-primary) 95%, transparent)',

@@ -80,15 +80,22 @@ export function MarkdownReader() {
       style={{ backgroundColor: 'var(--bg-primary)' }}
     >
       {search.open && (
-        <InFileSearchBar
-          query={search.query}
-          onQueryChange={search.setQuery}
-          matchCount={search.matchCount}
-          currentIdx={search.currentIdx}
-          onPrev={search.prev}
-          onNext={search.next}
-          onClose={() => search.setOpen(false)}
-        />
+        // Sticky wrapper keeps the bar pinned to the top of the scroll
+        // viewport. `pointer-events-none` on the row lets clicks fall
+        // through to the document; the bar itself re-enables them.
+        <div className="sticky top-2 z-20 flex justify-end pr-3 pointer-events-none">
+          <div className="pointer-events-auto">
+            <InFileSearchBar
+              query={search.query}
+              onQueryChange={search.setQuery}
+              matchCount={search.matchCount}
+              currentIdx={search.currentIdx}
+              onPrev={search.prev}
+              onNext={search.next}
+              onClose={() => search.setOpen(false)}
+            />
+          </div>
+        </div>
       )}
       <ContradictionBanner />
       <DocSummary />
