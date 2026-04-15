@@ -8,6 +8,8 @@ import { useReaderDomStore } from '../../store/readerDomStore'
 import { DocSummary } from './DocSummary'
 import { ContradictionBanner } from '../graph/ContradictionBanner'
 import { ErrorBanner } from './components/ErrorBanner'
+import { InFileSearchBar } from './InFileSearchBar'
+import { useInFileSearch } from '../../hooks/useInFileSearch'
 import '../../styles/markdown.css'
 import '../../styles/cjk.css'
 
@@ -28,6 +30,20 @@ export function MarkdownReader() {
 
   useReadingProgress(scrollRef)
   useEntityLinking(markdownBodyRef)
+  const search = useInFileSearch(markdownBodyRef, currentContent)
+
+  // Cmd/Ctrl+F opens the in-file search bar. Scoped to when MarkdownReader
+  // is mounted so it doesn't fight other views' shortcuts.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault()
+        search.setOpen(true)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [search])
 
   // Publish the current markdown-body element so features outside this
   // subtree (e.g. chat citations) can resolve evidence back to ranges.
@@ -60,9 +76,20 @@ export function MarkdownReader() {
   return (
     <div
       ref={scrollRef}
-      className="h-full overflow-y-auto"
+      className="h-full overflow-y-auto relative"
       style={{ backgroundColor: 'var(--bg-primary)' }}
     >
+      {search.open && (
+        <InFileSearchBar
+          query={search.query}
+          onQueryChange={search.setQuery}
+          matchCount={search.matchCount}
+          currentIdx={search.currentIdx}
+          onPrev={search.prev}
+          onNext={search.next}
+          onClose={() => search.setOpen(false)}
+        />
+      )}
       <ContradictionBanner />
       <DocSummary />
       <div className="markdown-body" ref={markdownBodyRef}>

@@ -113,6 +113,14 @@
     "timeline": "Timeline",
     "contradictions": "Contradictions"
   },
+  "inFileSearch": {
+    "placeholder": "Find in document…",
+    "noMatch": "No matches",
+    "position": "{{current}} / {{total}}",
+    "prev": "Previous match (Shift+Enter)",
+    "next": "Next match (Enter)",
+    "close": "Close (Esc)"
+  },
   "commandPalette": {
     "placeholder": "Search files or commands...",
     "noResults": "No results found.",

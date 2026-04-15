@@ -113,6 +113,14 @@
     "timeline": "时间线",
     "contradictions": "矛盾之处"
   },
+  "inFileSearch": {
+    "placeholder": "在当前文档中查找…",
+    "noMatch": "无匹配",
+    "position": "{{current}} / {{total}}",
+    "prev": "上一个匹配（Shift+Enter）",
+    "next": "下一个匹配（Enter）",
+    "close": "关闭（Esc）"
+  },
   "commandPalette": {
     "placeholder": "搜索文件或命令...",
     "noResults": "没有找到结果。",
