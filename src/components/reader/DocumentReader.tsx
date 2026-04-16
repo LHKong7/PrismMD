@@ -10,6 +10,7 @@ import { JsonViewer } from './JsonViewer'
 import { CsvViewer } from './CsvViewer'
 import { XlsxViewer } from './XlsxViewer'
 import { PdfViewer } from './PdfViewer'
+import { ErrorBanner } from './components/ErrorBanner'
 import { Button } from '../ui/Button'
 
 /**
@@ -26,6 +27,7 @@ export function DocumentReader() {
   const { t } = useTranslation()
   const currentFilePath = useFileStore((s) => s.currentFilePath)
   const currentFormat = useFileStore((s) => s.currentFormat)
+  const openError = useFileStore((s) => s.openError)
   const openFileDialog = useFileStore((s) => s.openFileDialog)
   const openFolderDialog = useFileStore((s) => s.openFolderDialog)
   const activeProvider = useSettingsStore((s) => s.activeProvider)
@@ -67,14 +69,26 @@ export function DocumentReader() {
   }, [])
 
   // Welcome screen — unified entry point shared by every format.
+  // If the only thing that happened this session is a failed open, the
+  // welcome screen still renders but with the error strip on top so the
+  // user understands why the click did nothing.
   if (!currentFilePath) {
     return (
       <div
-        className="h-full flex items-center justify-center"
+        className="h-full flex flex-col"
         onDragOver={handleDragOver}
         onDrop={handleDrop}
         style={{ backgroundColor: 'var(--bg-primary)' }}
       >
+        {openError && (
+          <ErrorBanner
+            severity="error"
+            title={t('reader.openError.title')}
+            message={openError}
+            fullPage={false}
+          />
+        )}
+        <div className="flex-1 flex items-center justify-center">
         <div className="text-center max-w-md px-8">
           <div
             className="w-20 h-20 mx-auto mb-6 rounded-2xl flex items-center justify-center"
@@ -123,6 +137,7 @@ export function DocumentReader() {
             </Button>
           )}
         </div>
+        </div>
       </div>
     )
   }
@@ -158,12 +173,20 @@ export function DocumentReader() {
 
   return (
     <div
-      className="h-full"
+      className="h-full flex flex-col"
       onDragOver={handleDragOver}
       onDrop={handleDrop}
       style={{ backgroundColor: 'var(--bg-primary)' }}
     >
-      {body}
+      {openError && (
+        <ErrorBanner
+          severity="error"
+          title={t('reader.openError.title')}
+          message={openError}
+          fullPage={false}
+        />
+      )}
+      <div className="flex-1 min-h-0">{body}</div>
     </div>
   )
 }

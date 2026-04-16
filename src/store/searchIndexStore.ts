@@ -41,6 +41,12 @@ function computeBuildKey(): string {
     .join('|')
 }
 
+// Generation token for in-flight build() calls. Bumped on build() start
+// and on invalidate(); a completing build only commits if its captured
+// generation still matches — otherwise a folder change mid-build would
+// silently overwrite the invalidated state with a stale index.
+let buildGeneration = 0
+
 function snippetFor(body: string, terms: string[]): string {
   if (!body) return ''
   const lower = body.toLowerCase()
@@ -67,6 +73,7 @@ export const useSearchIndexStore = create<SearchIndexStore>((set, get) => ({
     const key = computeBuildKey()
     if (get().status === 'ready' && key === get().lastBuildKey) return
 
+    const gen = ++buildGeneration
     set({ status: 'building', error: null })
     try {
       const folders = useFileStore.getState().openFolders
@@ -95,6 +102,11 @@ export const useSearchIndexStore = create<SearchIndexStore>((set, get) => ({
         }
       }
 
+      // Bail if invalidate() fired (or another build() started) while we
+      // were reading files — otherwise we'd overwrite the invalidated
+      // state with a stale index.
+      if (gen !== buildGeneration) return
+
       const ms = new MiniSearch<IndexedDoc>({
         fields: ['name', 'body'],
         storeFields: ['name', 'path'],
@@ -117,11 +129,13 @@ export const useSearchIndexStore = create<SearchIndexStore>((set, get) => ({
         lastBuildKey: key,
       })
     } catch (err) {
+      if (gen !== buildGeneration) return
       set({ status: 'error', error: err instanceof Error ? err.message : String(err) })
     }
   },
 
   invalidate: () => {
+    buildGeneration++
     set({ index: null, status: 'idle', fileCount: 0, lastBuildKey: '', error: null })
   },
 

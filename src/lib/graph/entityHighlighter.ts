@@ -118,7 +118,10 @@ function isSkippable(node: Node): boolean {
         tag === 'PRE' ||
         tag === 'SCRIPT' ||
         tag === 'STYLE' ||
-        el.classList.contains(ENTITY_WRAP_CLASS)
+        el.classList.contains(ENTITY_WRAP_CLASS) ||
+        // Don't wrap inside an active in-file-search mark — nesting would
+        // leave orphan spans when the user clears the search.
+        (tag === 'MARK' && el.classList.contains('in-file-match'))
       ) {
         return true
       }

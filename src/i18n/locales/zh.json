@@ -21,6 +21,9 @@
     "markdown": {
       "errorTitle": "无法渲染该 Markdown"
     },
+    "openError": {
+      "title": "无法打开"
+    },
     "pageInputAria": "跳转到页码",
     "errorBoundaryTitle": "出错了",
     "errorBoundaryRetry": "重试",

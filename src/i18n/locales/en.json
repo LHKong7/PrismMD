@@ -21,6 +21,9 @@
     "markdown": {
       "errorTitle": "Couldn't render this Markdown"
     },
+    "openError": {
+      "title": "Couldn't open"
+    },
     "pageInputAria": "Go to page",
     "errorBoundaryTitle": "Something went wrong",
     "errorBoundaryRetry": "Try again",

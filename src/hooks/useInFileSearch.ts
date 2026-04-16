@@ -50,12 +50,15 @@ export function useInFileSearch(
           if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT
           const parent = node.parentElement
           if (!parent) return NodeFilter.FILTER_REJECT
-          // Skip code areas to avoid breaking syntax highlight DOM, and
-          // skip inside our own marks (shouldn't exist post-clear, but
-          // belt + suspenders).
-          if (parent.closest('mark.in-file-match')) return NodeFilter.FILTER_REJECT
           const tag = parent.tagName
           if (tag === 'SCRIPT' || tag === 'STYLE') return NodeFilter.FILTER_REJECT
+          // Skip syntax-highlighted code (rehype-highlight emits nested
+          // <span class="hljs-*"> — rewriting text nodes there shreds the
+          // highlight DOM), existing entity-link wrappers, and our own
+          // marks (shouldn't exist post-clear, but belt + suspenders).
+          if (parent.closest('pre, code, .ig-entity-wrap, mark.in-file-match')) {
+            return NodeFilter.FILTER_REJECT
+          }
           return NodeFilter.FILTER_ACCEPT
         },
       })

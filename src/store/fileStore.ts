@@ -31,6 +31,12 @@ interface FileStore {
   openFolders: OpenFolder[]
   recentFiles: string[]
   toc: TocEntry[]
+  /**
+   * Most recent file/folder read failure (deleted file, permission denied,
+   * dead IPC channel). Consumed by `DocumentReader` to render an
+   * `ErrorBanner` above the viewer. Cleared on the next successful open.
+   */
+  openError: string | null
 
   openFile: (filePath: string) => Promise<void>
   openFileWithContent: (filePath: string, content: string) => void
@@ -42,6 +48,7 @@ interface FileStore {
   refreshFolder: (folderPath: string) => Promise<void>
   refreshAllFolders: () => Promise<void>
   addRecentFile: (filePath: string) => void
+  clearOpenError: () => void
   openFileDialog: () => Promise<void>
   openFolderDialog: () => Promise<void>
 }
@@ -58,6 +65,7 @@ export const useFileStore = create<FileStore>((set, get) => ({
   openFolders: [],
   recentFiles: [],
   toc: [],
+  openError: null,
 
   openFile: async (filePath: string) => {
     // Dispatch on extension so the right reader is used for text vs
@@ -66,25 +74,35 @@ export const useFileStore = create<FileStore>((set, get) => ({
     const format = detectFormat(filePath)
     const kind = format ? kindOfFormat(format) : 'text'
 
-    if (kind === 'binary') {
-      const bytes = await window.electronAPI.readFileBytes(filePath)
-      set({
-        currentFilePath: filePath,
-        currentFormat: format,
-        currentContent: null,
-        currentBytes: bytes,
-      })
-    } else {
-      const content = await window.electronAPI.readFile(filePath)
-      set({
-        currentFilePath: filePath,
-        currentFormat: format,
-        currentContent: content,
-        currentBytes: null,
-      })
+    try {
+      if (kind === 'binary') {
+        const bytes = await window.electronAPI.readFileBytes(filePath)
+        set({
+          currentFilePath: filePath,
+          currentFormat: format,
+          currentContent: null,
+          currentBytes: bytes,
+          openError: null,
+        })
+      } else {
+        const content = await window.electronAPI.readFile(filePath)
+        set({
+          currentFilePath: filePath,
+          currentFormat: format,
+          currentContent: content,
+          currentBytes: null,
+          openError: null,
+        })
+      }
+      get().addRecentFile(filePath)
+      window.electronAPI.watchFile(filePath)
+    } catch (err) {
+      // Preserve the currently-open document so a transient failure
+      // doesn't wipe the user's view; don't pollute recentFiles with an
+      // unreadable path; surface the error via `openError`.
+      const msg = err instanceof Error ? err.message : String(err)
+      set({ openError: `${filePath}: ${msg}` })
     }
-    get().addRecentFile(filePath)
-    window.electronAPI.watchFile(filePath)
   },
 
   openFileWithContent: (filePath: string, content: string) => {
@@ -116,15 +134,21 @@ export const useFileStore = create<FileStore>((set, get) => ({
     const { openFolders } = get()
     if (openFolders.some((f) => f.path === folderPath)) return
 
-    const tree = await window.electronAPI.readDirectory(folderPath)
-    set({
-      openFolders: [
-        ...openFolders,
-        { path: folderPath, name: folderName(folderPath), tree },
-      ],
-    })
-    window.electronAPI.watchDirectory(folderPath)
-    invalidateSearchIndex()
+    try {
+      const tree = await window.electronAPI.readDirectory(folderPath)
+      set({
+        openFolders: [
+          ...openFolders,
+          { path: folderPath, name: folderName(folderPath), tree },
+        ],
+        openError: null,
+      })
+      window.electronAPI.watchDirectory(folderPath)
+      invalidateSearchIndex()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      set({ openError: `${folderPath}: ${msg}` })
+    }
   },
 
   closeFolder: (folderPath: string) => {
@@ -144,25 +168,38 @@ export const useFileStore = create<FileStore>((set, get) => ({
   },
 
   refreshFolder: async (folderPath: string) => {
-    const tree = await window.electronAPI.readDirectory(folderPath)
-    set((state) => ({
-      openFolders: state.openFolders.map((f) =>
-        f.path === folderPath ? { ...f, tree } : f
-      ),
-    }))
-    invalidateSearchIndex()
+    try {
+      const tree = await window.electronAPI.readDirectory(folderPath)
+      set((state) => ({
+        openFolders: state.openFolders.map((f) =>
+          f.path === folderPath ? { ...f, tree } : f
+        ),
+      }))
+      invalidateSearchIndex()
+    } catch (err) {
+      // Refresh failures are silent by design — the folder may have been
+      // unmounted / deleted externally. Surface via `openError` so the
+      // user isn't left wondering why the tree is stale.
+      const msg = err instanceof Error ? err.message : String(err)
+      set({ openError: `${folderPath}: ${msg}` })
+    }
   },
 
   refreshAllFolders: async () => {
     const { openFolders } = get()
-    const updated = await Promise.all(
-      openFolders.map(async (f) => {
-        const tree = await window.electronAPI.readDirectory(f.path)
-        return { ...f, tree }
-      })
-    )
-    set({ openFolders: updated })
-    invalidateSearchIndex()
+    try {
+      const updated = await Promise.all(
+        openFolders.map(async (f) => {
+          const tree = await window.electronAPI.readDirectory(f.path)
+          return { ...f, tree }
+        })
+      )
+      set({ openFolders: updated })
+      invalidateSearchIndex()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      set({ openError: msg })
+    }
   },
 
   addRecentFile: (filePath: string) => {
@@ -171,6 +208,8 @@ export const useFileStore = create<FileStore>((set, get) => ({
       return { recentFiles: [filePath, ...filtered].slice(0, 20) }
     })
   },
+
+  clearOpenError: () => set({ openError: null }),
 
   openFileDialog: async () => {
     const result = await window.electronAPI.openFileDialog()
