@@ -24,6 +24,7 @@ export interface ElectronAPI {
   readFile: (filePath: string) => Promise<string>
   readFileBytes: (filePath: string) => Promise<ArrayBuffer>
   readDirectory: (dirPath: string) => Promise<FileTreeNode[]>
+  writeFile: (filePath: string, content: string) => Promise<void>
 
   // File watching
   watchFile: (filePath: string) => void

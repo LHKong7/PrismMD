@@ -5,11 +5,15 @@ import { useFileStore } from '../../store/fileStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useUIStore } from '../../store/uiStore'
 import { detectFormat, kindOfFormat } from '../../lib/fileFormat'
+import { useEditorStore } from '../../store/editorStore'
 import { MarkdownReader } from './MarkdownReader'
 import { JsonViewer } from './JsonViewer'
 import { CsvViewer } from './CsvViewer'
 import { XlsxViewer } from './XlsxViewer'
 import { PdfViewer } from './PdfViewer'
+import { MarkdownEditor } from '../editor/MarkdownEditor'
+import { CodeMirrorEditor } from '../editor/CodeMirrorEditor'
+import { json as jsonLang } from '@codemirror/lang-json'
 import { ErrorBanner } from './components/ErrorBanner'
 import { Button } from '../ui/Button'
 
@@ -35,6 +39,10 @@ export function DocumentReader() {
   // First-run users have no provider configured — surface a fast path
   // to the AI tab so they don't need to discover Settings on their own.
   const aiNotConfigured = !activeProvider
+
+  const editing = useEditorStore((s) => s.editing)
+  const editorContent = useEditorStore((s) => s.editorContent)
+  const setEditorContent = useEditorStore((s) => s.setEditorContent)
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -142,10 +150,27 @@ export function DocumentReader() {
     )
   }
 
+  const isTextFormat = currentFormat ? kindOfFormat(currentFormat) === 'text' : false
+
   // Format-specific viewer. Markdown keeps the existing feature-rich
   // reader (TOC, annotations, entity-linking). New formats get their
   // own lean viewers.
   const body = (() => {
+    // When in editing mode for text formats, render the editor instead
+    // of the read-only viewer.
+    if (editing && isTextFormat) {
+      if (currentFormat === 'markdown') {
+        return <MarkdownEditor />
+      }
+      return (
+        <CodeMirrorEditor
+          content={editorContent ?? ''}
+          onChange={setEditorContent}
+          language={currentFormat === 'json' ? jsonLang() : undefined}
+        />
+      )
+    }
+
     switch (currentFormat) {
       case 'markdown': return <MarkdownReader />
       case 'json':     return <JsonViewer />

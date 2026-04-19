@@ -31,6 +31,8 @@ const electronAPI = {
     ipcRenderer.invoke('fs:read-file-bytes', filePath),
   readDirectory: (dirPath: string): Promise<FileTreeNode[]> =>
     ipcRenderer.invoke('fs:read-directory', dirPath),
+  writeFile: (filePath: string, content: string): Promise<void> =>
+    ipcRenderer.invoke('fs:write-file', filePath, content),
 
   // File watching
   watchFile: (filePath: string): void => { ipcRenderer.send('fs:watch-file', filePath) },

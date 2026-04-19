@@ -37,9 +37,8 @@ interface GraphData {
  * `uiStore.mainViewMode === 'graph'`.
  *
  * Scope selector:
- *   - **Global**   — top N entities + their immediate neighborhoods.
- *   - **Document** — reserved (needs report→entities mapping; currently
- *                    falls back to "recent reports" → entities).
+ *   - **Document** — entities extracted from the currently-open file only.
+ *   - **Global**   — merged view of all ingested documents (opt-in).
  *   - **Entity**   — ego-network around `uiStore.focusedEntityName`.
  *
  * Clicking a node pins it as the focused entity, which also flips the
@@ -54,18 +53,7 @@ export function GraphView() {
   const insightGraphEnabled = useSettingsStore((s) => s.insightGraph.enabled)
   const reports = useInsightGraphStore((s) => s.reports)
   const refreshReports = useInsightGraphStore((s) => s.refreshReports)
-  const ingestStage = useInsightGraphStore((s) => s.ingest.stage)
   const currentFilePath = useFileStore((s) => s.currentFilePath)
-
-  // One-shot guard: right after an ingest completes, if the user hasn't
-  // manually chosen a scope and we can't match the current file to a report,
-  // auto-switch to Global so the newly-built graph is visible instead of
-  // an empty Document view.
-  const autoScopedRef = useRef(false)
-  // When autoScopedRef fires we also flip this so the user sees a
-  // dismissible banner — otherwise the scope change happens silently
-  // and the user has no idea why they're suddenly in Global.
-  const [autoScopeNotice, setAutoScopeNotice] = useState(false)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 800, height: 600 })
@@ -129,21 +117,16 @@ export function GraphView() {
           // Resolve the Neo4j report matching the currently-open file (by
           // filename — Neo4j stores `Report.source_filename`, and the SDK
           // writes its own `report_id` that doesn't line up with the UUID
-          // the ingest response returns). Fall back to the most recent
-          // report, then to the bounded global graph.
-          //
-          // NOTE: we read from the reactive `reports` (captured by the
-          // effect's deps below) so the effect re-runs when ingest finishes
-          // and this branch sees the freshly-loaded reports.
+          // the ingest response returns). No fallback — only show this
+          // document's own graph.
           const targetName = currentFilePath
             ? currentFilePath.split(/[/\\]/).pop()
             : undefined
-          const matched =
-            (targetName &&
-              reports.find(
+          const matched = targetName
+            ? reports.find(
                 (r) => r.filename === targetName || r.filePath === currentFilePath,
-              )) ||
-            reports[0]
+              )
+            : undefined
           if (matched?.reportId) {
             const entitiesRes = await window.electronAPI.insightGraphEntitiesForReport(
               matched.reportId,
@@ -164,9 +147,8 @@ export function GraphView() {
               result = entitiesRes as typeof result
             }
           }
-          if (!result) {
-            result = (await window.electronAPI.insightGraphGlobalGraph(60)) as typeof result
-          }
+          // No fallback to global — document scope shows only this
+          // document's graph.  The user must explicitly switch to Global.
         }
 
         if (cancelled) return
@@ -213,38 +195,21 @@ export function GraphView() {
     if (insightGraphEnabled) refreshReports()
   }, [insightGraphEnabled, refreshReports])
 
-  // Right after a successful ingest, if the user is sitting in Document
-  // scope with no file open that matches a report, pop them into Global so
-  // they actually see the graph that was just built. One-shot — we never
-  // override the user's subsequent scope choice.
-  useEffect(() => {
-    if (autoScopedRef.current) return
-    if (ingestStage !== 'completed') return
-    if (scope !== 'document') return
-    const targetName = currentFilePath
-      ? currentFilePath.split(/[/\\]/).pop()
-      : undefined
-    const matched =
-      targetName &&
-      reports.find(
-        (r) => r.filename === targetName || r.filePath === currentFilePath,
-      )
-    if (!matched && reports.length > 0) {
-      autoScopedRef.current = true
-      setScope('global')
-      setAutoScopeNotice(true)
-      // Auto-dismiss the notice so the user isn't left with stale chrome.
-      window.setTimeout(() => setAutoScopeNotice(false), 6000)
-    }
-  }, [ingestStage, scope, reports, currentFilePath, setScope])
+  // No auto-scope-to-global — the user stays in Document scope after
+  // ingest and must explicitly click Global to see the merged graph.
 
   // Map the SDK's edge shape (source/target strings) to whatever
-  // react-force-graph expects on `graphData.links`.
+  // react-force-graph expects on `graphData.links`. Filter out any
+  // links whose source/target doesn't exist in the node set — dangling
+  // refs crash the force simulation.
   const graphData = useMemo(() => {
     if (!data) return { nodes: [], links: [] }
+    const nodeIds = new Set(data.nodes.map((n) => n.id))
     return {
       nodes: data.nodes,
-      links: data.edges.map((e) => ({ ...e })),
+      links: data.edges
+        .map((e) => ({ ...e }))
+        .filter((e) => nodeIds.has(String(e.source)) && nodeIds.has(String(e.target))),
     }
   }, [data])
 
@@ -298,29 +263,6 @@ export function GraphView() {
       </div>
 
       {/* Canvas */}
-      {autoScopeNotice && (
-        <div
-          className="flex items-center gap-2 px-3 py-1.5 text-[11px] border-b"
-          style={{
-            borderColor: 'var(--border-color)',
-            backgroundColor: 'color-mix(in srgb, var(--accent-color) 10%, transparent)',
-            color: 'var(--text-primary)',
-          }}
-          role="status"
-        >
-          <Globe size={11} style={{ color: 'var(--accent-color)' }} />
-          <span className="flex-1">{t('graphView.autoScopedToGlobal')}</span>
-          <button
-            onClick={() => setAutoScopeNotice(false)}
-            className="p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-[var(--accent-color)]"
-            aria-label={t('common.dismiss')}
-            title={t('common.dismiss')}
-          >
-            <span aria-hidden>×</span>
-          </button>
-        </div>
-      )}
-
       <div ref={containerRef} className="flex-1 relative overflow-hidden">
         {status === 'loading' && (
           <GraphStatus

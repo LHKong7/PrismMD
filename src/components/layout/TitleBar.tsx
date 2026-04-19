@@ -1,10 +1,12 @@
 import { useState, useEffect, type CSSProperties } from 'react'
-import { Minus, Square, X, Palette, PanelLeft, PanelRight, Settings, Bot, Network, BookOpen } from 'lucide-react'
+import { Minus, Square, X, Palette, PanelLeft, PanelRight, Settings, Bot, Network, BookOpen, Pencil } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useUIStore } from '../../store/uiStore'
 import { useFileStore } from '../../store/fileStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useAgentStore } from '../../store/agentStore'
+import { useEditorStore } from '../../store/editorStore'
+import { detectFormat, kindOfFormat } from '../../lib/fileFormat'
 import { themes, applyTheme, getThemeById } from '../../lib/theme/themes'
 import { Button } from '../ui/Button'
 
@@ -28,6 +30,15 @@ export function TitleBar({ onOpenSettings }: TitleBarProps) {
   const setThemeMode = useSettingsStore((s) => s.setThemeMode)
   const graphEnabled = useSettingsStore((s) => s.insightGraph.enabled)
   const toggleAgentSidebar = useAgentStore((s) => s.toggleAgentSidebar)
+  const editing = useEditorStore((s) => s.editing)
+  const isDirty = useEditorStore((s) => s.isDirty)
+  const toggleEditing = useEditorStore((s) => s.toggleEditing)
+
+  const canEdit = (() => {
+    if (!currentFilePath) return false
+    const fmt = detectFormat(currentFilePath)
+    return fmt ? kindOfFormat(fmt) === 'text' : false
+  })()
 
   const isMac = window.electronAPI.platform === 'darwin'
 
@@ -46,9 +57,10 @@ export function TitleBar({ onOpenSettings }: TitleBarProps) {
     applyTheme(next)
   }
 
-  const fileName = currentFilePath
+  const rawFileName = currentFilePath
     ? currentFilePath.split(/[/\\]/).pop()
     : 'PrismMD'
+  const fileName = isDirty ? `● ${rawFileName}` : rawFileName
 
   return (
     <div
@@ -81,6 +93,29 @@ export function TitleBar({ onOpenSettings }: TitleBarProps) {
 
       {/* Right controls */}
       <div className="flex items-center gap-1 px-2" style={noDragStyle}>
+        {canEdit && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => {
+              if (editing && isDirty) {
+                const discard = window.confirm(t('editor.unsavedConfirm', 'You have unsaved changes. Discard them?'))
+                if (!discard) return
+                useEditorStore.getState().discardChanges()
+              }
+              toggleEditing()
+            }}
+            className="p-1.5"
+            title={editing ? `${t('titlebar.showReader', 'Reader')} (Ctrl+E)` : `${t('titlebar.showEditor', 'Edit')} (Ctrl+E)`}
+            aria-label={editing ? t('titlebar.showReader', 'Reader') : t('titlebar.showEditor', 'Edit')}
+          >
+            {editing ? (
+              <BookOpen size={16} style={{ color: 'var(--accent-color)' }} />
+            ) : (
+              <Pencil size={16} style={{ color: 'var(--text-secondary)' }} />
+            )}
+          </Button>
+        )}
         {graphEnabled && (
           <Button
             variant="ghost"

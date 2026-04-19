@@ -68,6 +68,16 @@ export const useFileStore = create<FileStore>((set, get) => ({
   openError: null,
 
   openFile: async (filePath: string) => {
+    // Lazy import to avoid circular init (editorStore imports fileStore).
+    const { useEditorStore } = await import('./editorStore')
+    const editor = useEditorStore.getState()
+    if (editor.editing && editor.isDirty) {
+      const discard = window.confirm('You have unsaved changes. Discard them?')
+      if (!discard) return
+    }
+    // Always drop back to reader mode on file switch.
+    useEditorStore.getState().reset()
+
     // Dispatch on extension so the right reader is used for text vs
     // binary formats. Unknown extensions fall through to text (best-
     // effort for files the user drops in that we haven't catalogued).

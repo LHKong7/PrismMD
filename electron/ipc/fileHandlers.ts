@@ -68,6 +68,11 @@ export function registerFileHandlers() {
     return buildFileTree(dirPath)
   })
 
+  ipcMain.handle('fs:write-file', async (_event, filePath: string, content: string) => {
+    fileWatcher.suppressNextChange(filePath)
+    await fs.writeFile(filePath, content, 'utf-8')
+  })
+
   // File watching
   ipcMain.on('fs:watch-file', (_event, filePath: string) => {
     fileWatcher.watchFile(filePath)

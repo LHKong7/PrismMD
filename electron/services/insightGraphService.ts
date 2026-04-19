@@ -5,6 +5,40 @@ import { InsightGraph } from '@insightgraph/sdk-embedded'
 import neo4j from 'neo4j-driver'
 import { getActiveProvider, getInsightGraphSettings, loadSettings, type InsightGraphSettings } from './settingsStore'
 
+// ---------------------------------------------------------------------------
+// Monkey-patch: the SDK's Neo4j writer crashes with
+//   "Cannot read properties of undefined (reading 'resolved')"
+// when entity-resolver fails (LLM timeout), because
+// `extractions.resolvedEntities` is undefined. Patch the resolver
+// service to guarantee `resolvedEntities` is always an array.
+// ---------------------------------------------------------------------------
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const resolverMod = require('@insightgraph/resolver')
+  const ResolverService = resolverMod.ResolverService
+  if (ResolverService?.prototype?.resolve) {
+    const origResolve = ResolverService.prototype.resolve
+    ResolverService.prototype.resolve = async function patchedResolve(
+      this: unknown,
+      result: Record<string, unknown>,
+    ) {
+      try {
+        const out = await origResolve.call(this, result)
+        // Ensure resolvedEntities is always an array
+        if (!out.resolvedEntities) {
+          out.resolvedEntities = []
+        }
+        return out
+      } catch (err) {
+        console.warn('[InsightGraph] resolver.resolve() threw, returning original extractions with empty resolvedEntities:', err instanceof Error ? err.message : err)
+        return { ...result, resolvedEntities: [] }
+      }
+    }
+  }
+} catch {
+  // SDK internals changed — skip patch
+}
+
 /**
  * LLM configuration supplied to InsightGraph. The SDK only understands
  * OpenAI-compatible endpoints, so Anthropic/Google providers are rejected
@@ -336,17 +370,23 @@ function normalizeEntity(raw: Record<string, unknown> | unknown): RenderedGraphN
   const r = raw as Record<string, unknown>
   const props = (r.properties as Record<string, unknown> | undefined) ?? r
   const name =
+    (props.canonical_name as string | undefined) ??
     (props.name as string | undefined) ??
     (props.entityName as string | undefined) ??
+    (r.canonical_name as string | undefined) ??
     (r.name as string | undefined)
   const id =
+    (r.elementId as string | undefined) ??
     (r.id as string | number | undefined)?.toString() ??
+    (r.identity as { toString(): string } | undefined)?.toString() ??
     (props.id as string | number | undefined)?.toString() ??
+    (props.entity_id as string | undefined) ??
     (props.entityId as string | undefined) ??
     (name ? `name:${name}` : undefined)
   if (!id || !name) return null
   const type =
     (props.type as string | undefined) ??
+    (props.entity_type as string | undefined) ??
     (r.type as string | undefined) ??
     (Array.isArray(r.labels) ? (r.labels as string[])[0] : undefined)
   return { id, name, type, ...props }
@@ -403,19 +443,64 @@ export async function buildSubgraphFromEntities(
   const cap = opts.maxEntities ?? 120
   const names = Array.from(new Set(entityNames)).slice(0, cap)
 
-  const nodes = new Map<string, RenderedGraphNode>()
+  // Use entity name as the canonical ID so nodes and edges always share
+  // the same key space. Neo4j elementIds vary across sessions and don't
+  // match what the SDK returns, which causes dangling links that crash
+  // react-force-graph-2d.
+  const nodesByName = new Map<string, RenderedGraphNode>()
   const edges = new Map<string, RenderedGraphEdge>()
+
+  /** Ensure a node with this name exists and return its stable ID. */
+  function ensureNode(name: string, type?: string): string {
+    const id = `name:${name}`
+    if (!nodesByName.has(name)) {
+      nodesByName.set(name, { id, name, type })
+    }
+    return id
+  }
 
   const ig = await getInstance()
 
-  // Seed nodes with the entities themselves so isolated entities still
-  // appear (some may have no relationships yet).
-  const entities = await ig.findEntities({ limit: Math.max(cap, names.length) })
-  for (const e of entities) {
-    const node = normalizeEntity(e)
-    if (node && names.includes(node.name)) nodes.set(node.id, node)
+  // Seed nodes from the SDK. We normalize and re-key by name.
+  try {
+    const entities = await ig.findEntities({ limit: Math.max(cap, names.length) })
+    for (const e of entities) {
+      const node = normalizeEntity(e)
+      if (node && names.includes(node.name)) {
+        ensureNode(node.name, node.type)
+      }
+    }
+  } catch {
+    // SDK findEntities failed — will seed below
   }
 
+  // If the SDK didn't give us usable seed nodes, query Neo4j directly.
+  if (nodesByName.size === 0 && names.length > 0) {
+    try {
+      await withUserNeo4jSession(async (session) => {
+        const result = await session.run(
+          'MATCH (e:Entity) WHERE coalesce(e.canonical_name, e.name) IN $names ' +
+            'RETURN coalesce(e.canonical_name, e.name) AS name, ' +
+            'coalesce(e.type, e.entity_type) AS type LIMIT $limit',
+          { names, limit: neo4j.int(cap) },
+        )
+        for (const rec of result.records) {
+          const name = String(rec.get('name') ?? '')
+          const type = (rec.get('type') as string | null) ?? undefined
+          if (name) ensureNode(name, type)
+        }
+      })
+    } catch {
+      // best-effort
+    }
+  }
+
+  // Ensure every requested name has at least a placeholder node.
+  for (const name of names) {
+    ensureNode(name)
+  }
+
+  // Fetch relationships via the SDK.
   for (const name of names) {
     let rows: Record<string, unknown>[] = []
     try {
@@ -423,24 +508,55 @@ export async function buildSubgraphFromEntities(
     } catch {
       continue
     }
-    // Seed source node if findEntities missed it.
-    if (!Array.from(nodes.values()).some((n) => n.name === name)) {
-      const seed = normalizeEntity({ name })
-      if (seed) nodes.set(seed.id, seed)
-    }
-    const sourceId =
-      Array.from(nodes.values()).find((n) => n.name === name)?.id ?? `name:${name}`
+    const sourceId = ensureNode(name)
 
     for (const row of rows) {
-      // Row may carry both the peer entity and the edge — handle both.
       const peer = normalizeEntity(row.relatedEntity ?? row.peer ?? row)
-      if (peer) nodes.set(peer.id, peer)
-      const edge = normalizeEdge(row, sourceId)
-      if (edge) edges.set(edge.id, edge)
+      if (peer) {
+        const peerId = ensureNode(peer.name, peer.type)
+        const edge = normalizeEdge(row, sourceId)
+        if (edge) {
+          // Re-point source/target to our stable name-based IDs.
+          edge.source = sourceId
+          edge.target = peerId
+          edges.set(edge.id, edge)
+        }
+      }
     }
   }
 
-  return { nodes: Array.from(nodes.values()), edges: Array.from(edges.values()) }
+  // If we still have zero edges, try a direct Cypher query as fallback.
+  if (edges.size === 0 && nodesByName.size > 0) {
+    try {
+      await withUserNeo4jSession(async (session) => {
+        const nodeNames = Array.from(nodesByName.keys())
+        const result = await session.run(
+          'MATCH (a:Entity)-[rel]->(b:Entity) ' +
+            'WHERE coalesce(a.canonical_name, a.name) IN $names ' +
+            'OR coalesce(b.canonical_name, b.name) IN $names ' +
+            'RETURN coalesce(a.canonical_name, a.name) AS src, ' +
+            'coalesce(b.canonical_name, b.name) AS tgt, type(rel) AS relType ' +
+            'LIMIT 500',
+          { names: nodeNames },
+        )
+        for (const rec of result.records) {
+          const src = String(rec.get('src') ?? '')
+          const tgt = String(rec.get('tgt') ?? '')
+          const relType = (rec.get('relType') as string | null) ?? undefined
+          if (!src || !tgt) continue
+          const srcId = ensureNode(src)
+          const tgtId = ensureNode(tgt)
+          const edgeId = `${src}→${tgt}:${relType ?? ''}`
+          edges.set(edgeId, { id: edgeId, source: srcId, target: tgtId, type: relType })
+        }
+      })
+    } catch {
+      // best-effort
+    }
+  }
+
+  const nodes = Array.from(nodesByName.values())
+  return { nodes, edges: Array.from(edges.values()) }
 }
 
 /**
@@ -454,19 +570,38 @@ export async function getEntityEgoGraph(
   depth = 2,
 ): Promise<RenderedGraph> {
   const ig = await getInstance()
-  const entities = await ig.findEntities({ name: entityName, limit: 1 })
+  let entities: Record<string, unknown>[] = []
+  try {
+    entities = await ig.findEntities({ name: entityName, limit: 1 })
+  } catch {
+    // SDK lookup failed — fall through to buildSubgraph
+  }
   const first = entities[0] ? normalizeEntity(entities[0]) : null
 
   if (first?.id && !first.id.startsWith('name:')) {
     try {
       const sg = await ig.getSubgraph(first.id, depth)
-      const nodes = (sg.nodes as unknown[])
+      const rawNodes = (sg.nodes as unknown[])
         .map(normalizeEntity)
         .filter((n): n is RenderedGraphNode => n !== null)
-      const edges = (sg.edges as unknown[])
-        .map((e) => normalizeEdge(e))
-        .filter((e): e is RenderedGraphEdge => e !== null)
-      return { nodes, edges }
+      if (rawNodes.length > 0) {
+        // Re-key by name for consistent IDs across the graph
+        const nodeMap = new Map<string, RenderedGraphNode>()
+        for (const n of rawNodes) {
+          const stableId = `name:${n.name}`
+          nodeMap.set(n.id, { ...n, id: stableId })
+        }
+        const nodes = Array.from(nodeMap.values())
+        const edges = (sg.edges as unknown[])
+          .map((e) => normalizeEdge(e))
+          .filter((e): e is RenderedGraphEdge => e !== null)
+          .map((e) => ({
+            ...e,
+            source: nodeMap.get(String(e.source))?.id ?? `name:${e.source}`,
+            target: nodeMap.get(String(e.target))?.id ?? `name:${e.target}`,
+          }))
+        return { nodes, edges }
+      }
     } catch {
       // fall through to the union path
     }
@@ -482,10 +617,33 @@ export async function getEntityEgoGraph(
 export async function getGlobalGraph(maxEntities = 80): Promise<RenderedGraph> {
   const ig = await getInstance()
   const all = await ig.findEntities({ limit: maxEntities })
-  const names = all
+  let names = all
     .map(normalizeEntity)
     .filter((n): n is RenderedGraphNode => n !== null)
     .map((n) => n.name)
+
+  // Fallback: if the SDK's findEntities returned nothing usable, query
+  // Neo4j directly. This covers cases where entity-resolver failed (LLM
+  // timeout) or the SDK returns a shape normalizeEntity doesn't handle.
+  if (names.length === 0) {
+    console.log('[InsightGraph] getGlobalGraph: SDK findEntities yielded 0 usable names, trying direct Cypher fallback')
+    try {
+      names = await withUserNeo4jSession(async (session) => {
+        const result = await session.run(
+          'MATCH (e:Entity) RETURN coalesce(e.canonical_name, e.name) AS name, ' +
+            'e.type AS type, elementId(e) AS eid LIMIT $limit',
+          { limit: neo4j.int(maxEntities) },
+        )
+        return result.records
+          .map((rec) => String(rec.get('name') ?? ''))
+          .filter((n) => n.length > 0)
+      })
+      console.log('[InsightGraph] getGlobalGraph: Cypher fallback found', names.length, 'entities')
+    } catch (err) {
+      console.warn('[InsightGraph] getGlobalGraph: Cypher fallback failed:', err instanceof Error ? err.message : err)
+    }
+  }
+
   return buildSubgraphFromEntities(names, { maxEntities })
 }
 
@@ -528,8 +686,11 @@ async function withUserNeo4jSession<T>(fn: (session: ReturnType<ReturnType<typeo
 
 export async function getEntitiesForReport(reportId: string): Promise<string[]> {
   return withUserNeo4jSession(async (session) => {
+    // Try the standard relationship first, then a broader match using
+    // any relationship between Entity and Report (SDK versions differ
+    // in the exact relationship type they write).
     const result = await session.run(
-      'MATCH (r:Report {report_id: $reportId})<-[:SOURCED_FROM]-(e:Entity) ' +
+      'MATCH (r:Report {report_id: $reportId})-[*1]-(e:Entity) ' +
         'RETURN DISTINCT coalesce(e.canonical_name, e.name) AS name',
       { reportId },
     )
