@@ -15,6 +15,10 @@
     <img alt="TypeScript" src="https://img.shields.io/badge/typescript-5.6-3178c6">
     <a href="https://github.com/LHKong7/PrismMD/issues"><img alt="Issues" src="https://img.shields.io/badge/issues-welcome-orange.svg"></a>
   </p>
+
+  <p>
+    English | <a href="./README.zh-CN.md">简体中文</a>
+  </p>
 </div>
 
 ---
