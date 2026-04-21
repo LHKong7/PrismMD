@@ -9,3 +9,6 @@ Thumbs.db
 
 out/
 *.tsbuildinfo
+.env
+
+docs/
