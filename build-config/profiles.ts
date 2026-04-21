@@ -73,7 +73,10 @@ export const prodProfile: BuildProfile = {
     new MakerZIP({}, ['darwin']),
     new MakerSquirrel({
       name: appConfig.name,
-      ...(appConfig.icon ? { iconUrl: `${appConfig.icon}.ico`, setupIcon: `${appConfig.icon}.ico` } : {}),
+      // NOTE: `iconUrl` requires a full URL (https://…) for NuGet — omit it
+      // for local builds. `setupIcon` accepts a local path and sets the
+      // installer/uninstaller icon.
+      ...(appConfig.icon ? { setupIcon: `${appConfig.icon}.ico` } : {}),
     }),
     new MakerDeb({
       options: {
