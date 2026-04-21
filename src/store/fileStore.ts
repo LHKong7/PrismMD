@@ -51,6 +51,7 @@ interface FileStore {
   clearOpenError: () => void
   openFileDialog: () => Promise<void>
   openFolderDialog: () => Promise<void>
+  createNewFile: (defaultDir?: string) => Promise<void>
 }
 
 function folderName(folderPath: string): string {
@@ -235,5 +236,14 @@ export const useFileStore = create<FileStore>((set, get) => ({
     if (result) {
       await get().openFolder(result)
     }
+  },
+
+  createNewFile: async (defaultDir?: string) => {
+    const result = await window.electronAPI.newFileDialog(defaultDir)
+    if (result.cancelled || !result.filePath) return
+    await get().openFile(result.filePath)
+    // Enter edit mode immediately so the user can start typing.
+    const { useEditorStore } = await import('./editorStore')
+    useEditorStore.getState().setEditing(true)
   },
 }))

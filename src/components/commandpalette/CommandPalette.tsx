@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Command } from 'cmdk'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
-import { FileText, Sun, Moon, Monitor, Settings, Bot, Shield, Eye, Network, BookOpen, Puzzle, Search } from 'lucide-react'
+import { FileText, FilePlus, Sun, Moon, Monitor, Settings, Bot, Shield, Eye, Network, BookOpen, Puzzle, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useUIStore } from '../../store/uiStore'
 import { useFileStore } from '../../store/fileStore'
@@ -28,6 +28,7 @@ export function CommandPalette({ onOpenSettings }: CommandPaletteProps) {
   const focusMode = useSettingsStore((s) => s.focusMode)
   const setFocusMode = useSettingsStore((s) => s.setFocusMode)
   const openFile = useFileStore((s) => s.openFile)
+  const createNewFile = useFileStore((s) => s.createNewFile)
   const recentFiles = useFileStore((s) => s.recentFiles)
   const openFolders = useFileStore((s) => s.openFolders)
   const currentFilePath = useFileStore((s) => s.currentFilePath)
@@ -185,6 +186,9 @@ export function CommandPalette({ onOpenSettings }: CommandPaletteProps) {
             )}
 
             <Command.Group heading={t('commandPalette.commands')} style={{ color: 'var(--text-muted)' }}>
+              <Command.Item value="New File" onSelect={() => { createNewFile(); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
+                <FilePlus size={14} /><span>{t('commandPalette.newFile')}</span>
+              </Command.Item>
               <Command.Item value="Light theme" onSelect={() => switchTheme('light')} className={cls} style={{ color: 'var(--text-secondary)' }}>
                 <Sun size={14} /><span>{t('commandPalette.lightTheme')}</span>
               </Command.Item>

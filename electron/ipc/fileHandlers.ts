@@ -49,6 +49,25 @@ export function registerFileHandlers() {
     return result.filePaths[0]
   })
 
+  ipcMain.handle('dialog:new-file', async (_event, defaultDir?: string) => {
+    const win = getMainWindow()
+    if (!win) return { cancelled: true }
+    const result = await dialog.showSaveDialog(win, {
+      title: 'New File',
+      defaultPath: defaultDir ?? undefined,
+      filters: [
+        { name: 'Markdown', extensions: ['md'] },
+        { name: 'JSON', extensions: ['json'] },
+        { name: 'CSV', extensions: ['csv'] },
+      ],
+    })
+    if (result.canceled || !result.filePath) {
+      return { cancelled: true }
+    }
+    await fs.writeFile(result.filePath, '', 'utf-8')
+    return { cancelled: false, filePath: result.filePath }
+  })
+
   ipcMain.handle('fs:read-file', async (_event, filePath: string) => {
     return fs.readFile(filePath, 'utf-8')
   })

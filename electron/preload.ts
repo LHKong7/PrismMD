@@ -33,6 +33,8 @@ const electronAPI = {
     ipcRenderer.invoke('fs:read-directory', dirPath),
   writeFile: (filePath: string, content: string): Promise<void> =>
     ipcRenderer.invoke('fs:write-file', filePath, content),
+  newFileDialog: (defaultDir?: string): Promise<{ cancelled: boolean; filePath?: string }> =>
+    ipcRenderer.invoke('dialog:new-file', defaultDir),
 
   // File watching
   watchFile: (filePath: string): void => { ipcRenderer.send('fs:watch-file', filePath) },

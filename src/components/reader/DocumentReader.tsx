@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FileText, FolderOpen, Upload, Bot } from 'lucide-react'
+import { FileText, FolderOpen, Upload, Bot, FilePlus } from 'lucide-react'
 import { useFileStore } from '../../store/fileStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useUIStore } from '../../store/uiStore'
@@ -34,6 +34,7 @@ export function DocumentReader() {
   const openError = useFileStore((s) => s.openError)
   const openFileDialog = useFileStore((s) => s.openFileDialog)
   const openFolderDialog = useFileStore((s) => s.openFolderDialog)
+  const createNewFile = useFileStore((s) => s.createNewFile)
   const activeProvider = useSettingsStore((s) => s.activeProvider)
   const openSettings = useUIStore((s) => s.openSettings)
   // First-run users have no provider configured — surface a fast path
@@ -113,6 +114,15 @@ export function DocumentReader() {
           <div className="flex gap-3 justify-center">
             <Button
               variant="primary"
+              size="md"
+              onClick={() => createNewFile()}
+              className="px-4 py-2 rounded-lg font-medium"
+            >
+              <FilePlus size={16} />
+              {t('app.welcome.newFile')}
+            </Button>
+            <Button
+              variant="outline"
               size="md"
               onClick={openFileDialog}
               className="px-4 py-2 rounded-lg font-medium"

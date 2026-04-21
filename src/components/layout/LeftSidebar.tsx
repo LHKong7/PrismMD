@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type RefObject } from 'react'
-import { ChevronRight, Database, FolderOpen, Loader2, Pin, PinOff, Plus, X } from 'lucide-react'
+import { ChevronRight, Database, FilePlus, FolderOpen, Loader2, Pin, PinOff, Plus, X } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useTranslation } from 'react-i18next'
 import { useFileStore } from '../../store/fileStore'
@@ -125,6 +125,7 @@ export function LeftSidebar() {
   const openFolders = useFileStore((s) => s.openFolders)
   const closeFolder = useFileStore((s) => s.closeFolder)
   const openFolderDialog = useFileStore((s) => s.openFolderDialog)
+  const createNewFile = useFileStore((s) => s.createNewFile)
   const leftSidebarPinned = useUIStore((s) => s.leftSidebarPinned)
   const pinLeftSidebar = useUIStore((s) => s.pinLeftSidebar)
   // The overflow-y-auto container serves as the scroll parent for all
@@ -146,6 +147,13 @@ export function LeftSidebar() {
           {t('sidebar.explorer')}
         </span>
         <div className="flex items-center gap-1">
+          <button
+            onClick={() => createNewFile()}
+            className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+            title={t('filetree.newFile')}
+          >
+            <FilePlus size={14} style={{ color: 'var(--text-muted)' }} />
+          </button>
           <button
             onClick={openFolderDialog}
             className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"

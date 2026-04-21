@@ -34,9 +34,6 @@ export function AppShell() {
           width: 260,
           transform: leftSidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
         }}
-        onMouseLeave={() => {
-          if (!leftSidebarPinned) setLeftSidebarOpen(false)
-        }}
       >
         <LeftSidebar />
       </div>
@@ -96,9 +93,6 @@ export function AppShell() {
           right: agentSidebarOpen ? 340 : 0,
           transform: rightSidebarOpen ? 'translateX(0)' : 'translateX(100%)',
           transition: 'transform 200ms ease-in-out, right 200ms ease-in-out',
-        }}
-        onMouseLeave={() => {
-          if (!rightSidebarPinned) setRightSidebarOpen(false)
         }}
       >
         <RightSidebar toc={toc} />

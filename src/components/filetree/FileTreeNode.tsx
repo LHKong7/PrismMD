@@ -7,6 +7,7 @@ import {
   File as FileIcon,
   Folder,
   Network,
+  FilePlus,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { clsx } from 'clsx'
@@ -61,6 +62,7 @@ export function FileTreeNodeItem({ node, depth, hasChildren: _hasChildren, expan
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const currentFilePath = useFileStore((s) => s.currentFilePath)
   const openFile = useFileStore((s) => s.openFile)
+  const createNewFile = useFileStore((s) => s.createNewFile)
   const insightGraphEnabled = useSettingsStore((s) => s.insightGraph.enabled)
   const ingestFile = useInsightGraphStore((s) => s.ingestFile)
   const startBatchIngest = useBatchIngestStore((s) => s.startBatchIngest)
@@ -75,6 +77,8 @@ export function FileTreeNodeItem({ node, depth, hasChildren: _hasChildren, expan
   const canIngest =
     insightGraphEnabled &&
     (fileFormat !== null || ingestableFolderFiles.length > 0)
+  // Folders always show a context menu (at least "New File").
+  const hasContextMenu = node.type === 'directory' || canIngest
 
   const FormatIcon = iconForFormat(fileFormat)
 
@@ -87,7 +91,7 @@ export function FileTreeNodeItem({ node, depth, hasChildren: _hasChildren, expan
   }
 
   const handleContextMenu = (e: React.MouseEvent) => {
-    if (!canIngest) return
+    if (!hasContextMenu) return
     e.preventDefault()
     setMenu({ x: e.clientX, y: e.clientY })
   }
@@ -96,7 +100,7 @@ export function FileTreeNodeItem({ node, depth, hasChildren: _hasChildren, expan
     // Keyboard-equivalent of the right-click context menu. Shift+F10 is
     // the platform-standard shortcut; the dedicated ContextMenu key
     // (a.k.a. "menu key") fires the same.
-    if (canIngest && ((e.shiftKey && e.key === 'F10') || e.key === 'ContextMenu')) {
+    if (hasContextMenu && ((e.shiftKey && e.key === 'F10') || e.key === 'ContextMenu')) {
       e.preventDefault()
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
       setMenu({ x: rect.left + 8, y: rect.bottom })
@@ -162,7 +166,7 @@ export function FileTreeNodeItem({ node, depth, hasChildren: _hasChildren, expan
         <span className="truncate">{node.name}</span>
       </button>
 
-      {menu && canIngest && (
+      {menu && hasContextMenu && (
         <div
           className="fixed z-50 min-w-[220px] rounded-md border shadow-lg py-1 text-xs"
           style={{
@@ -174,7 +178,21 @@ export function FileTreeNodeItem({ node, depth, hasChildren: _hasChildren, expan
           }}
           role="menu"
         >
-          {node.type === 'file' ? (
+          {node.type === 'directory' && (
+            <button
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-black/5 dark:hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-[var(--accent-color)]"
+              onClick={(e) => {
+                e.stopPropagation()
+                setMenu(null)
+                void createNewFile(node.path)
+              }}
+              role="menuitem"
+            >
+              <FilePlus size={12} />
+              <span>{t('filetree.newFile')}</span>
+            </button>
+          )}
+          {node.type === 'file' && canIngest && (
             <button
               className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-black/5 dark:hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-[var(--accent-color)]"
               onClick={(e) => {
@@ -187,7 +205,8 @@ export function FileTreeNodeItem({ node, depth, hasChildren: _hasChildren, expan
               <Network size={12} />
               <span>{t('filetree.saveToGraph')}</span>
             </button>
-          ) : (
+          )}
+          {node.type === 'directory' && canIngest && (
             <button
               className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-black/5 dark:hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-[var(--accent-color)]"
               onClick={(e) => {

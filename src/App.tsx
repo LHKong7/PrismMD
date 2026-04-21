@@ -67,6 +67,12 @@ function AppContent() {
         return
       }
 
+      if (e.key === 'n') {
+        e.preventDefault()
+        void useFileStore.getState().createNewFile()
+        return
+      }
+
       if (e.key === 's') {
         e.preventDefault()
         const editor = useEditorStore.getState()

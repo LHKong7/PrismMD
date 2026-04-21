@@ -4,6 +4,7 @@
     "welcome": {
       "title": "Welcome to PrismMD",
       "subtitle": "Open a document or folder to start reading. Markdown, PDF, CSV, JSON and XLSX are all supported — drag and drop works too.",
+      "newFile": "New File",
       "openFile": "Open File",
       "openFolder": "Open Folder",
       "tip": "Tip: Press {{shortcut}} to open the command palette",
@@ -130,6 +131,7 @@
     "recentFiles": "Recent Files",
     "files": "Files",
     "commands": "Commands",
+    "newFile": "New File",
     "lightTheme": "Switch to Light Theme",
     "darkTheme": "Switch to Dark Theme",
     "systemTheme": "Use System Theme",
@@ -364,6 +366,7 @@
     }
   },
   "filetree": {
+    "newFile": "New File",
     "saveToGraph": "Save to Knowledge Graph",
     "savingToGraph": "Saving…",
     "ingestFolder": "Ingest whole folder into Graph ({{count}} files)"
