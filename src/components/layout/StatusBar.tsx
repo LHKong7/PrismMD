@@ -66,7 +66,7 @@ export function StatusBar() {
         <div className="flex items-center gap-1">
           <Bot size={11} />
           <span>{activeModel ?? t('statusBar.noModel')}</span>
-          {activeProvider === 'ollama' && <span className="text-green-600">LOCAL</span>}
+          {activeProvider === 'ollama' && <span className="text-success">LOCAL</span>}
         </div>
 
         {privacyMode && (
@@ -108,7 +108,7 @@ export function StatusBar() {
           </div>
         ) : batchStatus === 'done' && batchTotal > 0 ? (
           <div
-            className={`flex items-center gap-1 ${batchFailed > 0 ? 'text-amber-500' : 'text-green-500'}`}
+            className={`flex items-center gap-1 ${batchFailed > 0 ? 'text-warning' : 'text-success'}`}
           >
             <CheckCircle2 size={11} />
             <span>
@@ -133,13 +133,13 @@ export function StatusBar() {
               </div>
             )}
             {ingest.stage === 'completed' && (
-              <div className="flex items-center gap-1 text-green-500" title={ingestFilename ?? ''}>
+              <div className="flex items-center gap-1 text-success" title={ingestFilename ?? ''}>
                 <CheckCircle2 size={11} />
                 <span>{t('statusBar.ingest.completed')}</span>
               </div>
             )}
             {ingest.stage === 'failed' && (
-              <div className="flex items-center gap-1 text-red-500" title={ingest.error ?? ''}>
+              <div className="flex items-center gap-1 text-error" title={ingest.error ?? ''}>
                 <AlertCircle size={11} />
                 <span>{t('statusBar.ingest.failed')}</span>
               </div>

@@ -316,7 +316,7 @@ function PrivacySettings() {
 
       <div className="space-y-4">
         {/* Privacy Mode */}
-        <div className="flex items-start gap-3 p-4 rounded-lg border" style={{ borderColor: privacyMode ? '#ef4444' : 'var(--border-color)' }}>
+        <div className="flex items-start gap-3 p-4 rounded-lg border" style={{ borderColor: privacyMode ? 'var(--color-error-border)' : 'var(--border-color)' }}>
           <input
             type="checkbox"
             checked={privacyMode}
@@ -356,8 +356,8 @@ function PrivacySettings() {
           </div>
           <button
             onClick={handleClearMemory}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs border transition-colors hover:bg-red-500/10"
-            style={{ borderColor: 'var(--border-color)', color: memoryCleared ? '#22c55e' : '#ef4444' }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs border transition-colors hover:bg-error-bg"
+            style={{ borderColor: 'var(--border-color)', color: memoryCleared ? 'var(--color-success)' : 'var(--color-error)' }}
           >
             {memoryCleared ? <Check size={12} /> : <Trash2 size={12} />}
             {memoryCleared ? t('settings.privacy.cleared') : t('settings.privacy.clearMemory')}
@@ -402,7 +402,7 @@ function AIProviderCard({
           <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
           <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{name}</span>
           {isLocal && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-600">LOCAL</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-success-bg text-success">LOCAL</span>
           )}
         </div>
         <button
@@ -464,7 +464,7 @@ function AIProviderCard({
             </button>
           </div>
           {testResult !== null && (
-            <p className={clsx('text-xs mt-1', testResult ? 'text-green-500' : 'text-red-500')}>
+            <p className={clsx('text-xs mt-1', testResult ? 'text-success' : 'text-error')}>
               {testResult ? t('settings.ai.connectionSuccess') : t('settings.ai.connectionFailed')}
             </p>
           )}
@@ -483,7 +483,7 @@ function AIProviderCard({
             {testing ? <Spinner size={14} /> : t('settings.ai.testConnection')}
           </button>
           {testResult !== null && (
-            <span className={clsx('text-xs flex items-center', testResult ? 'text-green-500' : 'text-red-500')}>
+            <span className={clsx('text-xs flex items-center', testResult ? 'text-success' : 'text-error')}>
               {testResult ? t('settings.ai.connectionSuccess') : t('settings.ai.connectionFailed')}
             </span>
           )}
@@ -590,9 +590,9 @@ function InsightGraphSettings() {
       {providerIncompatible && (
         <div
           className="flex items-start gap-2 p-3 rounded-lg border mb-4 text-xs"
-          style={{ borderColor: '#f59e0b', backgroundColor: '#f59e0b14', color: 'var(--text-primary)' }}
+          style={{ borderColor: 'var(--color-warning-border)', backgroundColor: 'var(--color-warning-bg)', color: 'var(--text-primary)' }}
         >
-          <AlertTriangle size={14} style={{ color: '#f59e0b' }} className="mt-0.5 flex-shrink-0" />
+          <AlertTriangle size={14} style={{ color: 'var(--color-warning)' }} className="mt-0.5 flex-shrink-0" />
           <span>{t('settings.insightgraph.providerWarning')}</span>
         </div>
       )}
@@ -620,13 +620,13 @@ function InsightGraphSettings() {
               // from failing with a confusing driver error.
               borderColor:
                 insightGraph.neo4j.uri && !isValidNeo4jUri(insightGraph.neo4j.uri)
-                  ? '#ef4444'
+                  ? 'var(--color-error-border)'
                   : 'var(--border-color)',
               color: 'var(--text-primary)',
             }}
           />
           {insightGraph.neo4j.uri && !isValidNeo4jUri(insightGraph.neo4j.uri) && (
-            <p className="text-xs text-red-500 mt-1">
+            <p className="text-xs mt-1" style={{ color: 'var(--color-error)' }}>
               {t('settings.insightgraph.uriInvalid')}
             </p>
           )}
@@ -681,7 +681,7 @@ function InsightGraphSettings() {
             </button>
           </div>
           {testResult && (
-            <p className={`text-xs mt-1 ${testResult.ok ? 'text-green-500' : 'text-red-500'}`}>
+            <p className={`text-xs mt-1 ${testResult.ok ? 'text-success' : 'text-error'}`}>
               {testResult.ok
                 ? t('settings.insightgraph.connectionSuccess')
                 : `${t('settings.insightgraph.connectionFailed')}${testResult.error ? ': ' + testResult.error : ''}`}
@@ -812,7 +812,7 @@ function PluginsSettings() {
         className="flex items-start gap-2 p-3 rounded border text-xs"
         style={{ borderColor: 'var(--border-color)' }}
       >
-        <CircleAlert size={14} className="flex-shrink-0 mt-0.5 text-amber-500" />
+        <CircleAlert size={14} className="flex-shrink-0 mt-0.5 text-warning" />
         <span style={{ color: 'var(--text-secondary)' }}>
           {t('settings.plugins.trustWarning')}
         </span>
@@ -918,7 +918,7 @@ function PluginList({
               {error && (
                 <div
                   className="mt-2 flex items-start gap-2 text-xs p-2 rounded"
-                  style={{ backgroundColor: 'rgba(239,68,68,0.08)', color: '#ef4444' }}
+                  style={{ backgroundColor: 'var(--color-error-bg)', color: 'var(--color-error)' }}
                 >
                   <AlertTriangle size={12} className="flex-shrink-0 mt-0.5" />
                   <span className="font-mono break-all">{error}</span>
@@ -1038,12 +1038,12 @@ function McpSettingsSection() {
           className="w-full min-h-[180px] text-xs font-mono p-3 rounded border outline-none"
           style={{
             backgroundColor: 'var(--bg-secondary)',
-            borderColor: draftError ? '#ef4444' : 'var(--border-color)',
+            borderColor: draftError ? 'var(--color-error-border)' : 'var(--border-color)',
             color: 'var(--text-primary)',
           }}
         />
         {draftError && (
-          <p className="mt-1 text-xs text-red-500">{draftError}</p>
+          <p className="mt-1 text-xs" style={{ color: 'var(--color-error)' }}>{draftError}</p>
         )}
         <div className="flex items-center gap-2 mt-2">
           <button
@@ -1083,7 +1083,7 @@ function McpSettingsSection() {
               >
                 <div className="flex items-center gap-2">
                   <span
-                    className={`w-2 h-2 rounded-full ${s.running ? 'bg-green-500' : 'bg-gray-400'}`}
+                    className={`w-2 h-2 rounded-full ${s.running ? 'bg-success' : 'bg-[var(--text-muted)]'}`}
                   />
                   <span className="font-mono" style={{ color: 'var(--text-primary)' }}>
                     {s.id}

@@ -117,14 +117,14 @@ export function ContradictionBanner() {
     <div
       className="mx-auto mt-4 mb-2 max-w-[48rem] rounded-lg border flex items-start gap-2 p-3"
       style={{
-        borderColor: '#f59e0b',
-        backgroundColor: 'color-mix(in srgb, #f59e0b 10%, transparent)',
+        borderColor: 'var(--color-warning-border)',
+        backgroundColor: 'var(--color-warning-bg)',
       }}
     >
       <AlertTriangle
         size={16}
         className="flex-shrink-0 mt-0.5"
-        style={{ color: '#f59e0b' }}
+        style={{ color: 'var(--color-warning)' }}
       />
       <div className="flex-1 min-w-0">
         <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>

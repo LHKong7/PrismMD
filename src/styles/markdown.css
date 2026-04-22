@@ -191,15 +191,17 @@
   outline: none;
 }
 
-/* In-file search highlights (Cmd/Ctrl+F). */
+/* In-file search highlights (Cmd/Ctrl+F). Uses theme-aware tokens so dark
+ * presets don't blind users — the previous hardcoded #facc15 had ~2.5:1
+ * contrast in Dark mode, below WCAG AA. */
 .markdown-body mark.in-file-match {
-  background-color: color-mix(in srgb, #facc15 60%, transparent);
+  background-color: var(--color-search-highlight);
   color: inherit;
   border-radius: 2px;
   padding: 0 1px;
 }
 .markdown-body mark.in-file-match.current {
-  background-color: #f97316;
-  color: #fff;
-  outline: 2px solid color-mix(in srgb, #f97316 50%, transparent);
+  background-color: var(--color-search-highlight-active);
+  color: var(--text-primary);
+  outline: 2px solid color-mix(in srgb, var(--color-search-highlight-active) 60%, transparent);
 }

@@ -7,6 +7,7 @@ import { useFileStore } from '../../store/fileStore'
 import { Network, AlertCircle, Globe, FileText, Target, BookOpen } from 'lucide-react'
 import ForceGraph2D from 'react-force-graph-2d'
 import { Spinner } from '../ui/Spinner'
+import { graphPalette } from '../../lib/theme/tokens'
 // NOTE: the force-graph library extends the node objects with simulation
 // fields (x, y, vx, …) at runtime — we keep our schema wide (any extra
 // props allowed) to play nice with that.
@@ -272,7 +273,7 @@ export function GraphView() {
         )}
         {status === 'error' && (
           <GraphStatus
-            icon={<AlertCircle size={14} className="text-red-500" />}
+            icon={<AlertCircle size={14} className="text-error" />}
             label={classifyGraphError(error, t)}
             tone="error"
           />
@@ -457,7 +458,7 @@ function GraphStatus({
     <div className="absolute inset-0 flex items-center justify-center">
       <div
         className="flex items-center gap-2 text-xs"
-        style={{ color: tone === 'error' ? '#ef4444' : 'var(--text-muted)' }}
+        style={{ color: tone === 'error' ? 'var(--color-error)' : 'var(--text-muted)' }}
       >
         {icon}
         <span>{label}</span>
@@ -506,16 +507,9 @@ function classifyGraphError(raw: string | null, t: (key: string, vars?: Record<s
  * user to pre-register types.
  */
 function makeNodeTypeColorizer(nodes: GraphNode[]) {
-  const palette = [
-    '#6366f1', // indigo
-    '#10b981', // emerald
-    '#f59e0b', // amber
-    '#ef4444', // red
-    '#0ea5e9', // sky
-    '#8b5cf6', // violet
-    '#ec4899', // pink
-    '#14b8a6', // teal
-  ]
+  // Intentionally stable across themes — users memorize "red = conflicts"
+  // etc., and swapping hues on theme change would break that mental model.
+  const palette = graphPalette
   const fallback = '#94a3b8'
   const seen = new Set<string>()
   for (const n of nodes) if (n.type) seen.add(n.type)

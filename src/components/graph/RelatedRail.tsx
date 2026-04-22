@@ -117,7 +117,7 @@ export function RelatedRail() {
 
   if (status === 'error') {
     return (
-      <p className="px-3 py-4 text-xs text-center text-red-500">
+      <p className="px-3 py-4 text-xs text-center text-error">
         {t('related.error')}: {error ?? '—'}
       </p>
     )

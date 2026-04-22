@@ -202,7 +202,7 @@ export function TitleBar({ onOpenSettings }: TitleBarProps) {
               variant="ghost"
               size="icon"
               onClick={() => window.electronAPI.closeWindow()}
-              className="p-1.5 hover:!bg-red-500/20"
+              className="p-1.5 hover:!bg-error-bg"
               aria-label={t('titlebar.close')}
               title={t('titlebar.close')}
             >

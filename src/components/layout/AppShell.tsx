@@ -3,6 +3,7 @@ import { ChevronRight, ChevronLeft } from 'lucide-react'
 import { useUIStore } from '../../store/uiStore'
 import { useFileStore } from '../../store/fileStore'
 import { useAgentStore } from '../../store/agentStore'
+import { useWindowBreakpoint } from '../../lib/hooks/useWindowBreakpoint'
 import { LeftSidebar } from './LeftSidebar'
 import { RightSidebar } from './RightSidebar'
 import { DocumentReader } from '../reader/DocumentReader'
@@ -10,6 +11,10 @@ import { ReadingProgress } from '../reader/ReadingProgress'
 import { AgentSidebar } from '../agent/AgentSidebar'
 import { GraphView } from '../graph/GraphView'
 import { ErrorBoundary } from '../ErrorBoundary'
+
+const LEFT_WIDTH = 260
+const RIGHT_WIDTH = 220
+const AGENT_WIDTH = 340
 
 export function AppShell() {
   const { t } = useTranslation()
@@ -22,16 +27,52 @@ export function AppShell() {
   const mainViewMode = useUIStore((s) => s.mainViewMode)
   const toc = useFileStore((s) => s.toc)
   const agentSidebarOpen = useAgentStore((s) => s.agentSidebarOpen)
+  const setAgentSidebarOpen = useAgentStore((s) => s.setAgentSidebarOpen)
+
+  // On narrow/compact viewports we ignore the user's pinned preference so
+  // the main reader doesn't get squeezed off-screen. The preference itself
+  // is preserved in uiStore and re-takes effect when the window grows back.
+  const breakpoint = useWindowBreakpoint()
+  const isCompact = breakpoint === 'compact'
+  const isNarrow = breakpoint === 'narrow'
+  const effectiveLeftPinned = leftSidebarPinned && !isNarrow && !isCompact
+  const effectiveRightPinned = rightSidebarPinned && !isNarrow && !isCompact
+
+  // Tightened widths in compact mode so a floating overlay doesn't fully
+  // cover the reader (users still want to see what's underneath).
+  const compactLeftWidth = Math.min(LEFT_WIDTH, Math.round(window.innerWidth * 0.85))
+  const compactAgentWidth = Math.min(AGENT_WIDTH, Math.round(window.innerWidth * 0.9))
+
+  const leftWidth = isCompact ? compactLeftWidth : LEFT_WIDTH
+  const agentWidth = isCompact ? compactAgentWidth : AGENT_WIDTH
+  const rightOffsetFromAgent = agentSidebarOpen && !isCompact ? AGENT_WIDTH : 0
+
+  const showBackdrop =
+    isCompact && (leftSidebarOpen || rightSidebarOpen || agentSidebarOpen)
 
   return (
     <div className="flex flex-1 overflow-hidden relative">
       <ReadingProgress />
 
+      {/* Backdrop on compact viewports so tapping outside a floating panel
+          closes it — avoids the user being stuck with no visible close UI. */}
+      {showBackdrop && (
+        <div
+          className="absolute inset-0 z-overlay bg-black/30 prism-fade-in"
+          onClick={() => {
+            if (leftSidebarOpen) setLeftSidebarOpen(false)
+            if (rightSidebarOpen) setRightSidebarOpen(false)
+            if (agentSidebarOpen) setAgentSidebarOpen(false)
+          }}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Left sidebar */}
       <div
-        className="absolute top-0 bottom-0 left-0 z-30 transition-transform duration-200 ease-in-out"
+        className="absolute top-0 bottom-0 left-0 z-sidebar transition-transform duration-base ease-in-out"
         style={{
-          width: 260,
+          width: leftWidth,
           transform: leftSidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
         }}
       >
@@ -45,13 +86,13 @@ export function AppShell() {
       {!leftSidebarOpen && (
         <>
           <div
-            className="absolute top-0 bottom-0 left-0 z-20"
+            className="absolute top-0 bottom-0 left-0 z-overlay"
             style={{ width: 8 }}
             onMouseEnter={() => setLeftSidebarOpen(true)}
           />
           <button
             onClick={() => setLeftSidebarOpen(true)}
-            className="absolute top-1/2 -translate-y-1/2 left-0 z-20 flex items-center justify-center rounded-r-md opacity-50 hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+            className="absolute top-1/2 -translate-y-1/2 left-0 z-overlay flex items-center justify-center rounded-r-md opacity-50 hover:opacity-100 focus-visible:opacity-100 transition-opacity"
             style={{
               width: 14,
               height: 48,
@@ -75,8 +116,8 @@ export function AppShell() {
       <div
         className="flex-1 overflow-hidden"
         style={{
-          marginLeft: leftSidebarOpen && leftSidebarPinned ? 260 : 0,
-          marginRight: rightSidebarOpen && rightSidebarPinned ? 220 : 0,
+          marginLeft: leftSidebarOpen && effectiveLeftPinned ? LEFT_WIDTH : 0,
+          marginRight: rightSidebarOpen && effectiveRightPinned ? RIGHT_WIDTH : 0,
           transition: 'margin 200ms ease-in-out',
         }}
       >
@@ -87,10 +128,10 @@ export function AppShell() {
 
       {/* Right sidebar (TOC) */}
       <div
-        className="absolute top-0 bottom-0 z-30 transition-transform duration-200 ease-in-out"
+        className="absolute top-0 bottom-0 z-sidebar transition-transform duration-base ease-in-out"
         style={{
-          width: 220,
-          right: agentSidebarOpen ? 340 : 0,
+          width: RIGHT_WIDTH,
+          right: rightOffsetFromAgent,
           transform: rightSidebarOpen ? 'translateX(0)' : 'translateX(100%)',
           transition: 'transform 200ms ease-in-out, right 200ms ease-in-out',
         }}
@@ -104,17 +145,17 @@ export function AppShell() {
       {!rightSidebarOpen && (
         <>
           <div
-            className="absolute top-0 bottom-0 right-0 z-20"
-            style={{ width: 8, right: agentSidebarOpen ? 340 : 0 }}
+            className="absolute top-0 bottom-0 right-0 z-overlay"
+            style={{ width: 8, right: rightOffsetFromAgent }}
             onMouseEnter={() => setRightSidebarOpen(true)}
           />
           <button
             onClick={() => setRightSidebarOpen(true)}
-            className="absolute top-1/2 -translate-y-1/2 z-20 flex items-center justify-center rounded-l-md opacity-50 hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+            className="absolute top-1/2 -translate-y-1/2 z-overlay flex items-center justify-center rounded-l-md opacity-50 hover:opacity-100 focus-visible:opacity-100 transition-opacity"
             style={{
               width: 14,
               height: 48,
-              right: agentSidebarOpen ? 340 : 0,
+              right: rightOffsetFromAgent,
               backgroundColor: 'var(--bg-secondary)',
               color: 'var(--text-muted)',
               border: '1px solid var(--border-color)',
@@ -130,9 +171,9 @@ export function AppShell() {
 
       {/* Agent sidebar */}
       <div
-        className="absolute top-0 bottom-0 right-0 z-30 transition-transform duration-200 ease-in-out"
+        className="absolute top-0 bottom-0 right-0 z-sidebar transition-transform duration-base ease-in-out"
         style={{
-          width: 340,
+          width: agentWidth,
           transform: agentSidebarOpen ? 'translateX(0)' : 'translateX(100%)',
         }}
       >

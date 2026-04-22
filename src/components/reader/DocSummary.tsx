@@ -298,7 +298,7 @@ export function DocSummary() {
               </div>
             )}
             {ingestStage === 'failed' && (
-              <div className="text-xs text-red-500 pb-2">
+              <div className="text-xs text-error pb-2">
                 {t('docSummary.graphBuildFailed')}
                 {ingestStatus.error ? `: ${ingestStatus.error}` : ''}
               </div>
@@ -322,7 +322,7 @@ export function DocSummary() {
           </div>
         )}
         {status === 'error' && (
-          <div className="text-xs text-red-500">
+          <div className="text-xs text-error">
             {t('docSummary.error')}: {error ?? '—'}
           </div>
         )}

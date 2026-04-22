@@ -141,7 +141,7 @@ export function PdfViewer() {
         style={{ backgroundColor: 'var(--bg-primary)' }}
       >
         <div className="flex items-start gap-2 max-w-sm text-left">
-          <AlertCircle size={14} className="flex-shrink-0 mt-0.5 text-red-500" />
+          <AlertCircle size={14} className="flex-shrink-0 mt-0.5 text-error" />
           <div>
             <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
               {t('reader.pdf.errorTitle')}

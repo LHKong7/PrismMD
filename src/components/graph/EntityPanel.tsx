@@ -117,7 +117,7 @@ export function EntityPanel() {
 
       {/* Contradictions (surfaced first because they're high-signal) */}
       {contradictions.length > 0 && (
-        <Section icon={<AlertTriangle size={12} className="text-amber-500" />} title={t('entityPanel.contradictions')}>
+        <Section icon={<AlertTriangle size={12} className="text-warning" />} title={t('entityPanel.contradictions')}>
           {contradictions.slice(0, 6).map((c, idx) => (
             <ListItem key={`c-${idx}`}>
               {String(c.description ?? c.summary ?? JSON.stringify(c))}

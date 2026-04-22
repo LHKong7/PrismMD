@@ -31,7 +31,8 @@ const VARIANT_CLASSES: Record<ButtonVariant, string> = {
   ghost:
     'bg-transparent hover:bg-black/10 dark:hover:bg-white/10 text-[var(--text-secondary)]',
   primary: '', // bg set inline via var(--accent-color) for theme awareness
-  danger: 'border border-red-500 text-red-500 bg-red-500/10 hover:bg-red-500/20',
+  danger:
+    'border border-[var(--color-error-border)] text-[var(--color-error)] bg-[var(--color-error-bg)] hover:brightness-110',
   outline:
     'border border-[var(--border-color)] text-[var(--text-secondary)] bg-transparent hover:bg-black/5 dark:hover:bg-white/5',
 }
@@ -52,9 +53,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       ref={ref}
       type={type ?? 'button'}
       className={clsx(
-        'inline-flex items-center justify-center gap-1.5 transition-colors',
+        'inline-flex items-center justify-center gap-1.5 transition-colors duration-fast',
         'focus-visible:ring-2 focus-visible:ring-[var(--accent-color)]',
-        'disabled:opacity-40 disabled:cursor-not-allowed',
+        'active:opacity-80',
+        'disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent',
         SIZE_CLASSES[size],
         VARIANT_CLASSES[variant],
         className,
