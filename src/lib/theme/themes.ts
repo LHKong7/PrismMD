@@ -5,6 +5,21 @@ export interface ThemeDefinition {
   colors: Record<string, string>
 }
 
+/**
+ * Each theme defines both the structural palette (--bg-*, --text-*, --accent-*)
+ * and a set of semantic colors (--color-error/warning/success/info and their
+ * -bg/-border variants). Components must NEVER hardcode hex colors for status
+ * — they should reference these tokens so every preset keeps a consistent feel.
+ *
+ * Semantic colors are chosen per-theme with two constraints:
+ *   - foreground (--color-*) has ≥ 4.5:1 contrast against --bg-primary (WCAG AA)
+ *   - `-bg` is a low-alpha tint so banners read as subdued status, not shouting
+ *   - `-border` sits between the two so outlined callouts still register
+ *
+ * --color-search-highlight is tuned separately because it sits behind text, so
+ * we care about contrast of --text-primary ON TOP of the highlight, not the
+ * highlight vs background.
+ */
 export const themes: ThemeDefinition[] = [
   {
     id: 'light',
@@ -28,6 +43,22 @@ export const themes: ThemeDefinition[] = [
       '--highlight-purple': '#ede9fe',
       '--scrollbar-thumb': '#c1c1c1',
       '--progress-bar': '#228be6',
+      // Semantic colors
+      '--color-error': '#dc2626',
+      '--color-error-bg': 'rgba(220, 38, 38, 0.08)',
+      '--color-error-border': 'rgba(220, 38, 38, 0.4)',
+      '--color-warning': '#d97706',
+      '--color-warning-bg': 'rgba(217, 119, 6, 0.1)',
+      '--color-warning-border': 'rgba(217, 119, 6, 0.4)',
+      '--color-success': '#16a34a',
+      '--color-success-bg': 'rgba(22, 163, 74, 0.1)',
+      '--color-success-border': 'rgba(22, 163, 74, 0.4)',
+      '--color-info': '#2563eb',
+      '--color-info-bg': 'rgba(37, 99, 235, 0.08)',
+      '--color-info-border': 'rgba(37, 99, 235, 0.4)',
+      // Search highlight — WCAG AA against --text-primary (#1a1a2e → ~8:1 on #fde68a)
+      '--color-search-highlight': '#fde68a',
+      '--color-search-highlight-active': '#fbbf24',
     },
   },
   {
@@ -45,13 +76,27 @@ export const themes: ThemeDefinition[] = [
       '--accent-color': '#7aa2f7',
       '--accent-hover': '#89b4fa',
       '--code-bg': '#24283b',
-      '--highlight-yellow': '#3b3520',
-      '--highlight-green': '#1a3a2a',
-      '--highlight-blue': '#1a2a3a',
-      '--highlight-pink': '#3a1a2a',
-      '--highlight-purple': '#2a1a3a',
+      '--highlight-yellow': '#5a4818',
+      '--highlight-green': '#14512f',
+      '--highlight-blue': '#1d3f6b',
+      '--highlight-pink': '#6b1d44',
+      '--highlight-purple': '#4a2670',
       '--scrollbar-thumb': '#414868',
       '--progress-bar': '#7aa2f7',
+      '--color-error': '#f87171',
+      '--color-error-bg': 'rgba(248, 113, 113, 0.12)',
+      '--color-error-border': 'rgba(248, 113, 113, 0.45)',
+      '--color-warning': '#fbbf24',
+      '--color-warning-bg': 'rgba(251, 191, 36, 0.12)',
+      '--color-warning-border': 'rgba(251, 191, 36, 0.45)',
+      '--color-success': '#4ade80',
+      '--color-success-bg': 'rgba(74, 222, 128, 0.12)',
+      '--color-success-border': 'rgba(74, 222, 128, 0.4)',
+      '--color-info': '#60a5fa',
+      '--color-info-bg': 'rgba(96, 165, 250, 0.12)',
+      '--color-info-border': 'rgba(96, 165, 250, 0.4)',
+      '--color-search-highlight': '#854d0e',
+      '--color-search-highlight-active': '#a16207',
     },
   },
   {
@@ -76,6 +121,21 @@ export const themes: ThemeDefinition[] = [
       '--highlight-purple': '#352b3d',
       '--scrollbar-thumb': '#4c566a',
       '--progress-bar': '#88c0d0',
+      // Nord palette: bf616a (red), d08770 (orange), ebcb8b (yellow), a3be8c (green), 81a1c1 (blue)
+      '--color-error': '#bf616a',
+      '--color-error-bg': 'rgba(191, 97, 106, 0.15)',
+      '--color-error-border': 'rgba(191, 97, 106, 0.45)',
+      '--color-warning': '#ebcb8b',
+      '--color-warning-bg': 'rgba(235, 203, 139, 0.12)',
+      '--color-warning-border': 'rgba(235, 203, 139, 0.45)',
+      '--color-success': '#a3be8c',
+      '--color-success-bg': 'rgba(163, 190, 140, 0.12)',
+      '--color-success-border': 'rgba(163, 190, 140, 0.45)',
+      '--color-info': '#81a1c1',
+      '--color-info-bg': 'rgba(129, 161, 193, 0.12)',
+      '--color-info-border': 'rgba(129, 161, 193, 0.45)',
+      '--color-search-highlight': '#4d4228',
+      '--color-search-highlight-active': '#6b5a3a',
     },
   },
   {
@@ -100,6 +160,21 @@ export const themes: ThemeDefinition[] = [
       '--highlight-purple': '#e0d0f0',
       '--scrollbar-thumb': '#c0b8a0',
       '--progress-bar': '#268bd2',
+      // Solarized palette: dc322f (red), cb4b16 (orange), b58900 (yellow), 859900 (green), 268bd2 (blue)
+      '--color-error': '#dc322f',
+      '--color-error-bg': 'rgba(220, 50, 47, 0.1)',
+      '--color-error-border': 'rgba(220, 50, 47, 0.4)',
+      '--color-warning': '#b58900',
+      '--color-warning-bg': 'rgba(181, 137, 0, 0.12)',
+      '--color-warning-border': 'rgba(181, 137, 0, 0.4)',
+      '--color-success': '#859900',
+      '--color-success-bg': 'rgba(133, 153, 0, 0.12)',
+      '--color-success-border': 'rgba(133, 153, 0, 0.4)',
+      '--color-info': '#268bd2',
+      '--color-info-bg': 'rgba(38, 139, 210, 0.1)',
+      '--color-info-border': 'rgba(38, 139, 210, 0.4)',
+      '--color-search-highlight': '#f5e6b8',
+      '--color-search-highlight-active': '#ecd97a',
     },
   },
   {
@@ -124,6 +199,20 @@ export const themes: ThemeDefinition[] = [
       '--highlight-purple': '#1a0a2a',
       '--scrollbar-thumb': '#586e75',
       '--progress-bar': '#268bd2',
+      '--color-error': '#dc322f',
+      '--color-error-bg': 'rgba(220, 50, 47, 0.15)',
+      '--color-error-border': 'rgba(220, 50, 47, 0.45)',
+      '--color-warning': '#b58900',
+      '--color-warning-bg': 'rgba(181, 137, 0, 0.18)',
+      '--color-warning-border': 'rgba(181, 137, 0, 0.5)',
+      '--color-success': '#859900',
+      '--color-success-bg': 'rgba(133, 153, 0, 0.18)',
+      '--color-success-border': 'rgba(133, 153, 0, 0.5)',
+      '--color-info': '#268bd2',
+      '--color-info-bg': 'rgba(38, 139, 210, 0.15)',
+      '--color-info-border': 'rgba(38, 139, 210, 0.45)',
+      '--color-search-highlight': '#3d3d1e',
+      '--color-search-highlight-active': '#5c5b2a',
     },
   },
   {
@@ -148,6 +237,21 @@ export const themes: ThemeDefinition[] = [
       '--highlight-purple': '#2a1a3d',
       '--scrollbar-thumb': '#6272a4',
       '--progress-bar': '#bd93f9',
+      // Dracula palette: ff5555 (red), ffb86c (orange), f1fa8c (yellow), 50fa7b (green), 8be9fd (cyan)
+      '--color-error': '#ff5555',
+      '--color-error-bg': 'rgba(255, 85, 85, 0.12)',
+      '--color-error-border': 'rgba(255, 85, 85, 0.45)',
+      '--color-warning': '#ffb86c',
+      '--color-warning-bg': 'rgba(255, 184, 108, 0.12)',
+      '--color-warning-border': 'rgba(255, 184, 108, 0.45)',
+      '--color-success': '#50fa7b',
+      '--color-success-bg': 'rgba(80, 250, 123, 0.12)',
+      '--color-success-border': 'rgba(80, 250, 123, 0.4)',
+      '--color-info': '#8be9fd',
+      '--color-info-bg': 'rgba(139, 233, 253, 0.12)',
+      '--color-info-border': 'rgba(139, 233, 253, 0.4)',
+      '--color-search-highlight': '#57502a',
+      '--color-search-highlight-active': '#7a6d35',
     },
   },
 ]

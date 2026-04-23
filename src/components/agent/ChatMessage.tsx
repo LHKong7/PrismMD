@@ -115,19 +115,20 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
   return (
     <div
-      className={`group flex gap-2.5 px-4 py-3 ${
+      className="group flex gap-2.5 px-4 py-3"
+      style={
         isError
-          ? 'bg-red-500/[0.06]'
-          : isUser
-            ? ''
-            : 'bg-black/[0.02] dark:bg-white/[0.02]'
-      }`}
+          ? { backgroundColor: 'var(--color-error-bg)' }
+          : !isUser
+            ? { backgroundColor: 'color-mix(in srgb, var(--text-primary) 3%, transparent)' }
+            : undefined
+      }
     >
       <div
         className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5"
         style={{
           backgroundColor: isError
-            ? '#ef4444'
+            ? 'var(--color-error)'
             : isUser
               ? 'var(--accent-color)'
               : 'var(--bg-secondary)',
@@ -152,7 +153,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
             </span>
           )}
           {isError && (
-            <span className="text-[10px] font-semibold text-red-500">
+            <span className="text-[10px] font-semibold" style={{ color: 'var(--color-error)' }}>
               {t('chat.errorLabel')}
             </span>
           )}
@@ -168,7 +169,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
               title={t('chat.copyMessage')}
             >
               {copied ? (
-                <Check size={12} className="text-green-500" />
+                <Check size={12} style={{ color: 'var(--color-success)' }} />
               ) : (
                 <Copy size={12} style={{ color: 'var(--text-muted)' }} />
               )}
@@ -177,7 +178,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
         </div>
         <div
           className="text-sm leading-relaxed whitespace-pre-wrap break-words"
-          style={{ color: isError ? '#ef4444' : 'var(--text-secondary)' }}
+          style={{ color: isError ? 'var(--color-error)' : 'var(--text-secondary)' }}
         >
           {body}
         </div>
@@ -195,9 +196,9 @@ export function ChatMessage({ message }: ChatMessageProps) {
               }
               className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded border focus-visible:ring-2 focus-visible:ring-[var(--accent-color)]"
               style={{
-                borderColor: '#ef4444',
-                color: '#ef4444',
-                backgroundColor: '#ef44441a',
+                borderColor: 'var(--color-error-border)',
+                color: 'var(--color-error)',
+                backgroundColor: 'var(--color-error-bg)',
               }}
               aria-label={t('chat.retry')}
             >

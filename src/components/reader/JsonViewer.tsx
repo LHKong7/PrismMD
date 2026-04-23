@@ -53,7 +53,7 @@ export function JsonViewer() {
           className="flex items-start gap-2 mb-4 p-3 rounded border text-sm"
           style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
         >
-          <AlertCircle size={16} className="flex-shrink-0 mt-0.5 text-red-500" />
+          <AlertCircle size={16} className="flex-shrink-0 mt-0.5 text-error" />
           <div>
             <div className="font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
               {t('reader.json.parseError')}

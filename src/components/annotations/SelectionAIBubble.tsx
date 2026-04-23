@@ -140,7 +140,7 @@ export function SelectionAIBubble({ onSaveAsNote }: SelectionAIBubbleProps) {
           </div>
         )}
         {current.status === 'error' && (
-          <div className="flex items-start gap-2 py-1 text-red-500">
+          <div className="flex items-start gap-2 py-1 text-error">
             <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
             <span className="text-xs">{current.error ?? t('selectionAI.error')}</span>
           </div>

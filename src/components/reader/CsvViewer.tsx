@@ -117,7 +117,7 @@ export function CsvViewer() {
           className="flex items-start gap-2 px-3 py-2 text-xs border-b"
           style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
         >
-          <AlertCircle size={12} className="flex-shrink-0 mt-0.5 text-amber-500" />
+          <AlertCircle size={12} className="flex-shrink-0 mt-0.5 text-warning" />
           <span>{t('reader.csv.parseWarning', { error: parsed.error })}</span>
         </div>
       )}

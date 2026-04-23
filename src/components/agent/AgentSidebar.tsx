@@ -132,7 +132,7 @@ export function AgentSidebar() {
       {privacyMode && (
         <div
           className="px-3 py-1.5 text-[10px] font-semibold text-center"
-          style={{ backgroundColor: '#ef44441a', color: '#ef4444' }}
+          style={{ backgroundColor: 'var(--color-error-bg)', color: 'var(--color-error)' }}
           title={t('agent.privacyBadgeTooltip')}
         >
           {t('agent.privacyBadge')}
@@ -146,9 +146,9 @@ export function AgentSidebar() {
         <div
           className="flex items-start gap-2 px-3 py-2 text-[11px] border-b"
           style={{
-            backgroundColor: '#f59e0b14',
-            color: '#b45309',
-            borderColor: 'var(--border-color)',
+            backgroundColor: 'var(--color-warning-bg)',
+            color: 'var(--color-warning)',
+            borderColor: 'var(--color-warning-border)',
           }}
           role="alert"
         >
@@ -187,7 +187,7 @@ export function AgentSidebar() {
                 <div key={p} className="space-y-1">
                   <p className="text-[10px] font-semibold uppercase px-1 flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
                     {p}
-                    {p === 'ollama' && <span className="text-green-600">LOCAL</span>}
+                    {p === 'ollama' && <span className="text-success">LOCAL</span>}
                     {p === 'custom' && <span className="text-purple-500">CUSTOM</span>}
                   </p>
                   {p === 'custom' ? (
@@ -223,8 +223,17 @@ export function AgentSidebar() {
         )}
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto relative" ref={scrollRef} onScroll={onScroll}>
+      {/* Messages. aria-live="polite" + atomic=false so screen readers
+          announce new/streamed assistant replies as they arrive, without
+          re-reading the entire transcript on each token. */}
+      <div
+        className="flex-1 overflow-y-auto relative"
+        ref={scrollRef}
+        onScroll={onScroll}
+        aria-live="polite"
+        aria-atomic="false"
+        aria-relevant="additions text"
+      >
         {hasNewWhileDetached && (
           <button
             onClick={jumpToLatest}

@@ -22,7 +22,7 @@ export function ErrorBanner({
   fullPage,
 }: ErrorBannerProps) {
   const isError = severity === 'error'
-  const iconColor = isError ? 'text-red-500' : 'text-amber-500'
+  const iconColor = isError ? 'text-error' : 'text-warning'
   const isFullPage = fullPage ?? isError
 
   if (!isFullPage) {

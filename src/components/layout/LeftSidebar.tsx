@@ -95,7 +95,7 @@ function FolderSection({ folderPath, folderName, tree, onClose, scrollParentRef 
               ) : batchStatus === 'done' && batchTotal > 0 ? (
                 <Database
                   size={12}
-                  style={{ color: batchFailed > 0 ? '#ef4444' : 'var(--accent-color)' }}
+                  style={{ color: batchFailed > 0 ? 'var(--color-error)' : 'var(--accent-color)' }}
                 />
               ) : (
                 <Database size={12} style={{ color: 'var(--text-muted)' }} />

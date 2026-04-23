@@ -29,7 +29,7 @@ export function PluginNotificationHost() {
 
   return (
     <div
-      className="fixed right-4 bottom-10 z-[60] flex flex-col gap-2 pointer-events-none"
+      className="fixed right-4 bottom-10 z-toast flex flex-col gap-2 pointer-events-none"
       style={{ maxWidth: 320 }}
     >
       {items.map((n) => {
@@ -37,9 +37,9 @@ export function PluginNotificationHost() {
           n.kind === 'success' ? CheckCircle2 : n.kind === 'error' ? AlertCircle : Info
         const tone =
           n.kind === 'success'
-            ? 'text-green-500'
+            ? 'text-success'
             : n.kind === 'error'
-              ? 'text-red-500'
+              ? 'text-error'
               : ''
         return (
           <div

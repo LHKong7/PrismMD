@@ -21,6 +21,29 @@
   --scrollbar-bg: transparent;
   --scrollbar-thumb: #c1c1c1;
   --progress-bar: #228be6;
+  /* Semantic status colors — overridden per theme in themes.ts. Defaults here
+   * mirror the Light preset so unthemed SSR/initial paint is coherent. */
+  --color-error: #dc2626;
+  --color-error-bg: rgba(220, 38, 38, 0.08);
+  --color-error-border: rgba(220, 38, 38, 0.4);
+  --color-warning: #d97706;
+  --color-warning-bg: rgba(217, 119, 6, 0.1);
+  --color-warning-border: rgba(217, 119, 6, 0.4);
+  --color-success: #16a34a;
+  --color-success-bg: rgba(22, 163, 74, 0.1);
+  --color-success-border: rgba(22, 163, 74, 0.4);
+  --color-info: #2563eb;
+  --color-info-bg: rgba(37, 99, 235, 0.08);
+  --color-info-border: rgba(37, 99, 235, 0.4);
+  --color-search-highlight: #fde68a;
+  --color-search-highlight-active: #fbbf24;
+  /* Motion tokens (kept in sync with src/lib/theme/tokens.ts). Exposed as
+   * CSS variables so animations can respect them without importing TS. */
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-slow: 320ms;
+  --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .dark {
@@ -47,6 +70,34 @@
   --scrollbar-bg: transparent;
   --scrollbar-thumb: #414868;
   --progress-bar: #7aa2f7;
+  --color-error: #f87171;
+  --color-error-bg: rgba(248, 113, 113, 0.12);
+  --color-error-border: rgba(248, 113, 113, 0.45);
+  --color-warning: #fbbf24;
+  --color-warning-bg: rgba(251, 191, 36, 0.12);
+  --color-warning-border: rgba(251, 191, 36, 0.45);
+  --color-success: #4ade80;
+  --color-success-bg: rgba(74, 222, 128, 0.12);
+  --color-success-border: rgba(74, 222, 128, 0.4);
+  --color-info: #60a5fa;
+  --color-info-bg: rgba(96, 165, 250, 0.12);
+  --color-info-border: rgba(96, 165, 250, 0.4);
+  --color-search-highlight: #854d0e;
+  --color-search-highlight-active: #a16207;
+}
+
+/* Respect reduced-motion preferences. We still keep a 0.01ms transition so
+ * styles react synchronously without firing `transitionend` surprises, but
+ * visually it's instant. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Visible keyboard focus ring for all interactive elements. We disable
@@ -112,4 +163,22 @@ html, body, #root {
 ::selection {
   background-color: var(--accent-color);
   color: white;
+}
+
+/* Micro-animations for overlay surfaces (Dialog, Tooltip, ContextMenu).
+ * Kept here — not scoped to a CSS module — because these classes are
+ * consumed by shared ui/ components that already opt in by name. */
+@keyframes prism-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes prism-fade-scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+.prism-fade-in {
+  animation: prism-fade-in var(--motion-fast) var(--motion-ease-out);
+}
+.prism-fade-scale-in {
+  animation: prism-fade-scale-in var(--motion-fast) var(--motion-ease-out);
 }
