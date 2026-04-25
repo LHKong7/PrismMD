@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   ChevronRight,
   FileText,
@@ -8,6 +8,11 @@ import {
   Folder,
   Network,
   FilePlus,
+  FolderPlus,
+  Pencil,
+  Trash2,
+  Copy,
+  ExternalLink,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { clsx } from 'clsx'
@@ -17,6 +22,7 @@ import { useSettingsStore } from '../../store/settingsStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
 import { useBatchIngestStore } from '../../store/batchIngestStore'
 import { detectFormat, isSupported, type FileFormat } from '../../lib/fileFormat'
+import { ContextMenu } from '../ui/ContextMenu'
 
 interface FileTreeNodeItemProps {
   node: FileTreeNode
@@ -52,6 +58,13 @@ function collectIngestableDescendants(node: FileTreeNode): string[] {
   return out
 }
 
+function revealLabel(): string {
+  const p = window.electronAPI?.platform ?? ''
+  if (p === 'darwin') return 'filetree.revealInFinder'
+  if (p === 'win32') return 'filetree.revealInExplorer'
+  return 'filetree.revealInFileManager'
+}
+
 /**
  * Single tree row. Expand/collapse state is lifted to the parent
  * `FileTree` so virtualization can unmount rows without losing it —
@@ -59,13 +72,24 @@ function collectIngestableDescendants(node: FileTreeNode): string[] {
  */
 export function FileTreeNodeItem({ node, depth, hasChildren: _hasChildren, expanded, onToggle }: FileTreeNodeItemProps) {
   const { t } = useTranslation()
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null)
   const currentFilePath = useFileStore((s) => s.currentFilePath)
   const openFile = useFileStore((s) => s.openFile)
   const createNewFile = useFileStore((s) => s.createNewFile)
+  const createFolder = useFileStore((s) => s.createFolder)
+  const renamingPath = useFileStore((s) => s.renamingPath)
+  const setRenamingPath = useFileStore((s) => s.setRenamingPath)
+  const renameItem = useFileStore((s) => s.renameItem)
+  const setPendingDelete = useFileStore((s) => s.setPendingDelete)
+  const duplicateFileFn = useFileStore((s) => s.duplicateFile)
+  const showInFolder = useFileStore((s) => s.showInFolder)
   const insightGraphEnabled = useSettingsStore((s) => s.insightGraph.enabled)
   const ingestFile = useInsightGraphStore((s) => s.ingestFile)
   const startBatchIngest = useBatchIngestStore((s) => s.startBatchIngest)
+
+  const isRenaming = renamingPath === node.path
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [renameValue, setRenameValue] = useState(node.name)
 
   const isActive = node.type === 'file' && node.path === currentFilePath
   const paddingLeft = 8 + depth * 16
@@ -77,12 +101,40 @@ export function FileTreeNodeItem({ node, depth, hasChildren: _hasChildren, expan
   const canIngest =
     insightGraphEnabled &&
     (fileFormat !== null || ingestableFolderFiles.length > 0)
-  // Folders always show a context menu (at least "New File").
-  const hasContextMenu = node.type === 'directory' || canIngest
 
   const FormatIcon = iconForFormat(fileFormat)
 
+  // Reset rename value when renaming starts
+  useEffect(() => {
+    if (isRenaming) {
+      setRenameValue(node.name)
+      // Focus + select on next tick so the input is mounted
+      requestAnimationFrame(() => {
+        const input = inputRef.current
+        if (!input) return
+        input.focus()
+        // Select filename portion (exclude extension for files)
+        if (node.type === 'file') {
+          const dotIdx = node.name.lastIndexOf('.')
+          input.setSelectionRange(0, dotIdx > 0 ? dotIdx : node.name.length)
+        } else {
+          input.select()
+        }
+      })
+    }
+  }, [isRenaming, node.name, node.type])
+
+  const commitRename = () => {
+    const trimmed = renameValue.trim()
+    if (!trimmed || trimmed === node.name) {
+      setRenamingPath(null)
+      return
+    }
+    void renameItem(node.path, trimmed)
+  }
+
   const handleClick = () => {
+    if (isRenaming) return
     if (node.type === 'directory') {
       onToggle(node.path)
     } else {
@@ -91,23 +143,32 @@ export function FileTreeNodeItem({ node, depth, hasChildren: _hasChildren, expan
   }
 
   const handleContextMenu = (e: React.MouseEvent) => {
-    if (!hasContextMenu) return
     e.preventDefault()
-    setMenu({ x: e.clientX, y: e.clientY })
+    setMenuPos({ x: e.clientX, y: e.clientY })
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
-    // Keyboard-equivalent of the right-click context menu. Shift+F10 is
-    // the platform-standard shortcut; the dedicated ContextMenu key
-    // (a.k.a. "menu key") fires the same.
-    if (hasContextMenu && ((e.shiftKey && e.key === 'F10') || e.key === 'ContextMenu')) {
+    if (isRenaming) return
+    // Keyboard-equivalent of the right-click context menu.
+    if ((e.shiftKey && e.key === 'F10') || e.key === 'ContextMenu') {
       e.preventDefault()
       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-      setMenu({ x: rect.left + 8, y: rect.bottom })
+      setMenuPos({ x: rect.left + 8, y: rect.bottom })
+      return
+    }
+    // F2 to rename
+    if (e.key === 'F2') {
+      e.preventDefault()
+      setRenamingPath(node.path)
+      return
+    }
+    // Delete / Backspace to delete
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault()
+      setPendingDelete({ path: node.path, name: node.name, isDirectory: node.type === 'directory' })
       return
     }
     if (node.type === 'directory' && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
-      // Expand / collapse with arrow keys for keyboard users.
       if ((e.key === 'ArrowRight' && !expanded) || (e.key === 'ArrowLeft' && expanded)) {
         e.preventDefault()
         onToggle(node.path)
@@ -115,20 +176,7 @@ export function FileTreeNodeItem({ node, depth, hasChildren: _hasChildren, expan
     }
   }
 
-  useEffect(() => {
-    if (!menu) return
-    const close = () => setMenu(null)
-    window.addEventListener('click', close)
-    window.addEventListener('scroll', close, true)
-    window.addEventListener('resize', close)
-    window.addEventListener('keydown', close)
-    return () => {
-      window.removeEventListener('click', close)
-      window.removeEventListener('scroll', close, true)
-      window.removeEventListener('resize', close)
-      window.removeEventListener('keydown', close)
-    }
-  }, [menu])
+  const closeMenu = () => setMenuPos(null)
 
   return (
     <div>
@@ -138,7 +186,7 @@ export function FileTreeNodeItem({ node, depth, hasChildren: _hasChildren, expan
         onKeyDown={handleKeyDown}
         aria-expanded={node.type === 'directory' ? expanded : undefined}
         className={clsx(
-          'w-full flex items-center gap-1.5 py-1 px-1 text-left text-sm transition-colors',
+          'w-full flex items-center gap-1.5 py-1 px-1 text-left text-sm transition-colors overflow-hidden',
           'hover:bg-black/5 dark:hover:bg-white/5',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-color)]',
           isActive && 'bg-black/10 dark:bg-white/10'
@@ -163,65 +211,145 @@ export function FileTreeNodeItem({ node, depth, hasChildren: _hasChildren, expan
             <FormatIcon size={14} className="flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
           </>
         )}
-        <span className="truncate">{node.name}</span>
+        {isRenaming ? (
+          <input
+            ref={inputRef}
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={(e) => {
+              e.stopPropagation()
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                commitRename()
+              } else if (e.key === 'Escape') {
+                e.preventDefault()
+                setRenamingPath(null)
+              }
+            }}
+            onBlur={commitRename}
+            onClick={(e) => e.stopPropagation()}
+            className="flex-1 min-w-0 text-sm px-1 py-0 rounded border outline-none"
+            style={{
+              backgroundColor: 'var(--bg-primary)',
+              borderColor: 'var(--accent-color)',
+              color: 'var(--text-primary)',
+            }}
+          />
+        ) : (
+          <span className="truncate">{node.name}</span>
+        )}
       </button>
 
-      {menu && hasContextMenu && (
-        <div
-          className="fixed z-50 min-w-[220px] rounded-md border shadow-lg py-1 text-xs"
-          style={{
-            left: menu.x,
-            top: menu.y,
-            backgroundColor: 'var(--bg-primary)',
-            borderColor: 'var(--border-color)',
-            color: 'var(--text-secondary)',
-          }}
-          role="menu"
-        >
-          {node.type === 'directory' && (
+      <ContextMenu
+        open={!!menuPos}
+        x={menuPos?.x ?? 0}
+        y={menuPos?.y ?? 0}
+        onClose={closeMenu}
+        ariaLabel={t('filetree.contextMenu', { defaultValue: 'File actions' })}
+      >
+        {node.type === 'directory' ? (
+          <>
             <button
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-black/5 dark:hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-[var(--accent-color)]"
-              onClick={(e) => {
-                e.stopPropagation()
-                setMenu(null)
-                void createNewFile(node.path)
-              }}
               role="menuitem"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 focus-visible:bg-black/5 dark:focus-visible:bg-white/5 focus-visible:outline-none"
+              onClick={() => { closeMenu(); void createNewFile(node.path) }}
             >
               <FilePlus size={12} />
               <span>{t('filetree.newFile')}</span>
             </button>
-          )}
-          {node.type === 'file' && canIngest && (
             <button
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-black/5 dark:hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-[var(--accent-color)]"
-              onClick={(e) => {
-                e.stopPropagation()
-                setMenu(null)
-                void ingestFile(node.path)
-              }}
               role="menuitem"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 focus-visible:bg-black/5 dark:focus-visible:bg-white/5 focus-visible:outline-none"
+              onClick={() => { closeMenu(); void createFolder(node.path) }}
             >
-              <Network size={12} />
-              <span>{t('filetree.saveToGraph')}</span>
+              <FolderPlus size={12} />
+              <span>{t('filetree.newFolder')}</span>
             </button>
-          )}
-          {node.type === 'directory' && canIngest && (
+            <div className="my-1 border-t" style={{ borderColor: 'var(--border-color)' }} />
             <button
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-black/5 dark:hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-[var(--accent-color)]"
-              onClick={(e) => {
-                e.stopPropagation()
-                setMenu(null)
-                void startBatchIngest(ingestableFolderFiles)
-              }}
               role="menuitem"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 focus-visible:bg-black/5 dark:focus-visible:bg-white/5 focus-visible:outline-none"
+              onClick={() => { closeMenu(); setRenamingPath(node.path) }}
             >
-              <Network size={12} />
-              <span>{t('filetree.ingestFolder', { count: ingestableFolderFiles.length })}</span>
+              <Pencil size={12} />
+              <span>{t('filetree.rename')}</span>
             </button>
-          )}
-        </div>
-      )}
+            <button
+              role="menuitem"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 focus-visible:bg-black/5 dark:focus-visible:bg-white/5 focus-visible:outline-none text-error"
+              onClick={() => { closeMenu(); setPendingDelete({ path: node.path, name: node.name, isDirectory: true }) }}
+            >
+              <Trash2 size={12} />
+              <span>{t('filetree.delete')}</span>
+            </button>
+            <div className="my-1 border-t" style={{ borderColor: 'var(--border-color)' }} />
+            <button
+              role="menuitem"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 focus-visible:bg-black/5 dark:focus-visible:bg-white/5 focus-visible:outline-none"
+              onClick={() => { closeMenu(); showInFolder(node.path) }}
+            >
+              <ExternalLink size={12} />
+              <span>{t(revealLabel())}</span>
+            </button>
+            {canIngest && (
+              <button
+                role="menuitem"
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 focus-visible:bg-black/5 dark:focus-visible:bg-white/5 focus-visible:outline-none"
+                onClick={() => { closeMenu(); void startBatchIngest(ingestableFolderFiles) }}
+              >
+                <Network size={12} />
+                <span>{t('filetree.ingestFolder', { count: ingestableFolderFiles.length })}</span>
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            <button
+              role="menuitem"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 focus-visible:bg-black/5 dark:focus-visible:bg-white/5 focus-visible:outline-none"
+              onClick={() => { closeMenu(); setRenamingPath(node.path) }}
+            >
+              <Pencil size={12} />
+              <span>{t('filetree.rename')}</span>
+            </button>
+            <button
+              role="menuitem"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 focus-visible:bg-black/5 dark:focus-visible:bg-white/5 focus-visible:outline-none"
+              onClick={() => { closeMenu(); void duplicateFileFn(node.path) }}
+            >
+              <Copy size={12} />
+              <span>{t('filetree.duplicate')}</span>
+            </button>
+            <button
+              role="menuitem"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 focus-visible:bg-black/5 dark:focus-visible:bg-white/5 focus-visible:outline-none text-error"
+              onClick={() => { closeMenu(); setPendingDelete({ path: node.path, name: node.name, isDirectory: false }) }}
+            >
+              <Trash2 size={12} />
+              <span>{t('filetree.delete')}</span>
+            </button>
+            <div className="my-1 border-t" style={{ borderColor: 'var(--border-color)' }} />
+            <button
+              role="menuitem"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 focus-visible:bg-black/5 dark:focus-visible:bg-white/5 focus-visible:outline-none"
+              onClick={() => { closeMenu(); showInFolder(node.path) }}
+            >
+              <ExternalLink size={12} />
+              <span>{t(revealLabel())}</span>
+            </button>
+            {canIngest && (
+              <button
+                role="menuitem"
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 focus-visible:bg-black/5 dark:focus-visible:bg-white/5 focus-visible:outline-none"
+                onClick={() => { closeMenu(); void ingestFile(node.path) }}
+              >
+                <Network size={12} />
+                <span>{t('filetree.saveToGraph')}</span>
+              </button>
+            )}
+          </>
+        )}
+      </ContextMenu>
     </div>
   )
 }

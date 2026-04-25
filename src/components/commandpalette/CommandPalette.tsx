@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Command } from 'cmdk'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
-import { FileText, FilePlus, Sun, Moon, Monitor, Settings, Bot, Shield, Eye, Network, BookOpen, Puzzle, Search } from 'lucide-react'
+import { FileText, FilePlus, FolderPlus, Pencil, Trash2, Copy, ExternalLink, Sun, Moon, Monitor, Settings, Bot, Shield, Eye, Network, BookOpen, Puzzle, Search } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useUIStore } from '../../store/uiStore'
 import { useFileStore } from '../../store/fileStore'
@@ -29,6 +29,11 @@ export function CommandPalette({ onOpenSettings }: CommandPaletteProps) {
   const setFocusMode = useSettingsStore((s) => s.setFocusMode)
   const openFile = useFileStore((s) => s.openFile)
   const createNewFile = useFileStore((s) => s.createNewFile)
+  const createFolder = useFileStore((s) => s.createFolder)
+  const setRenamingPath = useFileStore((s) => s.setRenamingPath)
+  const setPendingDelete = useFileStore((s) => s.setPendingDelete)
+  const duplicateFileFn = useFileStore((s) => s.duplicateFile)
+  const showInFolder = useFileStore((s) => s.showInFolder)
   const recentFiles = useFileStore((s) => s.recentFiles)
   const openFolders = useFileStore((s) => s.openFolders)
   const currentFilePath = useFileStore((s) => s.currentFilePath)
@@ -189,6 +194,31 @@ export function CommandPalette({ onOpenSettings }: CommandPaletteProps) {
               <Command.Item value="New File" onSelect={() => { createNewFile(); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
                 <FilePlus size={14} /><span>{t('commandPalette.newFile')}</span>
               </Command.Item>
+              {openFolders.length > 0 && (
+                <Command.Item value="New Folder" onSelect={() => { createFolder(openFolders[0].path); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
+                  <FolderPlus size={14} /><span>{t('commandPalette.newFolder')}</span>
+                </Command.Item>
+              )}
+              {currentFilePath && (
+                <Command.Item value="Rename File" onSelect={() => { setRenamingPath(currentFilePath); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
+                  <Pencil size={14} /><span>{t('commandPalette.renameFile')}</span>
+                </Command.Item>
+              )}
+              {currentFilePath && (
+                <Command.Item value="Duplicate File" onSelect={() => { void duplicateFileFn(currentFilePath); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
+                  <Copy size={14} /><span>{t('commandPalette.duplicateFile')}</span>
+                </Command.Item>
+              )}
+              {currentFilePath && (
+                <Command.Item value="Delete File" onSelect={() => { setPendingDelete({ path: currentFilePath, name: currentFilePath.split(/[/\\]/).pop() ?? '', isDirectory: false }); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
+                  <Trash2 size={14} /><span>{t('commandPalette.deleteFile')}</span>
+                </Command.Item>
+              )}
+              {currentFilePath && (
+                <Command.Item value="Reveal in Finder" onSelect={() => { showInFolder(currentFilePath); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
+                  <ExternalLink size={14} /><span>{t('commandPalette.revealInFinder')}</span>
+                </Command.Item>
+              )}
               <Command.Item value="Light theme" onSelect={() => switchTheme('light')} className={cls} style={{ color: 'var(--text-secondary)' }}>
                 <Sun size={14} /><span>{t('commandPalette.lightTheme')}</span>
               </Command.Item>

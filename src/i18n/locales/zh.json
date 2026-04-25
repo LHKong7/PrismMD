@@ -55,6 +55,7 @@
     "openFolder": "打开文件夹",
     "addFolder": "添加文件夹",
     "closeFolder": "关闭文件夹",
+    "emptyFolder": "此文件夹为空",
     "buildGraph": "构建知识图谱（{{count}} 个文件）",
     "buildGraphEmpty": "没有可索引的 Markdown 文件",
     "ingestingGraph": "正在索引 {{done}} / {{total}}…",
@@ -132,6 +133,11 @@
     "files": "文件",
     "commands": "命令",
     "newFile": "新建文件",
+    "newFolder": "新建文件夹",
+    "renameFile": "重命名文件",
+    "deleteFile": "删除文件",
+    "duplicateFile": "复制文件副本",
+    "revealInFinder": "在 Finder 中显示",
     "lightTheme": "切换到浅色主题",
     "darkTheme": "切换到深色主题",
     "systemTheme": "跟随系统外观",
@@ -365,8 +371,27 @@
       "readyWithVersion": "版本 {{version}} 已就绪，点击重启并安装。"
     }
   },
+  "tabs": {
+    "close": "关闭",
+    "closeOthers": "关闭其他",
+    "closeToRight": "关闭右侧",
+    "copyPath": "复制路径",
+    "contextMenu": "标签操作"
+  },
   "filetree": {
     "newFile": "新建文件",
+    "newFolder": "新建文件夹",
+    "rename": "重命名",
+    "delete": "删除",
+    "duplicate": "复制副本",
+    "revealInFinder": "在 Finder 中显示",
+    "revealInExplorer": "在资源管理器中显示",
+    "revealInFileManager": "在文件管理器中显示",
+    "deleteConfirmTitle": "删除「{{name}}」？",
+    "deleteConfirmFile": "此操作将把文件移至废纸篓。",
+    "deleteConfirmFolder": "此操作将把文件夹及其所有内容移至废纸篓。",
+    "deleteConfirmButton": "移至废纸篓",
+    "cancel": "取消",
     "saveToGraph": "存入知识图谱",
     "ingestFolder": "整个文件夹入图谱（{{count}} 个文件）",
     "savingToGraph": "保存中…"

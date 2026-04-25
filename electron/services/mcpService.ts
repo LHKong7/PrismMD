@@ -63,9 +63,34 @@ async function spawnClient(
   return { client, tools }
 }
 
+/**
+ * Check if a pool entry's subprocess is still alive. The MCP Client
+ * wraps a StdioClientTransport that owns a ChildProcess — if that
+ * process has exited the entry is stale and should be discarded.
+ */
+function isAlive(entry: PoolEntry): boolean {
+  try {
+    // The transport is accessible as a private `_transport` field on the
+    // Client. If the SDK shape changes we fall back to "alive" to avoid
+    // breaking existing functionality.
+    const transport = (entry.client as unknown as { _transport?: StdioClientTransport })._transport
+    if (!transport) return true // can't tell — assume alive
+    const proc = (transport as unknown as { _process?: { exitCode: number | null } })._process
+    if (!proc) return true
+    return proc.exitCode === null // null means "still running"
+  } catch {
+    return true
+  }
+}
+
 async function ensureStarted(id: string): Promise<PoolEntry | null> {
   const existing = pool.get(id)
-  if (existing) return existing
+  if (existing) {
+    if (isAlive(existing)) return existing
+    // Subprocess has exited — discard stale entry and re-spawn.
+    console.warn(`[mcp:${id}] subprocess exited, restarting…`)
+    pool.delete(id)
+  }
 
   const settings = getMcpSettings()
   const config = settings.servers[id]
@@ -146,31 +171,41 @@ export async function callTool(
   toolName: string,
   args: Record<string, unknown>,
 ): Promise<unknown> {
-  const entry = await ensureStarted(serverId)
-  if (!entry) throw new Error(`MCP server "${serverId}" is not running`)
+  const attempt = async (retry: boolean): Promise<unknown> => {
+    const entry = await ensureStarted(serverId)
+    if (!entry) throw new Error(`MCP server "${serverId}" is not running`)
 
-  const settings = getMcpSettings()
-  const timeoutMs = settings.toolTimeoutMs
+    const settings = getMcpSettings()
+    const timeoutMs = settings.toolTimeoutMs
 
-  const callPromise = entry.client.callTool({ name: toolName, arguments: args })
-  // Race the call against a timeout so a misbehaving server can't hang
-  // the agent forever.
-  const result = await Promise.race([
-    callPromise,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`MCP call "${toolName}" timed out after ${timeoutMs}ms`)), timeoutMs),
-    ),
-  ])
+    try {
+      const callPromise = entry.client.callTool({ name: toolName, arguments: args })
+      const result = await Promise.race([
+        callPromise,
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`MCP call "${toolName}" timed out after ${timeoutMs}ms`)), timeoutMs),
+        ),
+      ])
 
-  // MCP tool results come back as `{ content: [{ type: 'text', text: '...' }, ...] }`.
-  // Most callers want the string, so we flatten text blocks. Non-text
-  // blocks pass through so richer clients can inspect them.
-  if (result && typeof result === 'object' && 'content' in result) {
-    const content = (result as { content: Array<{ type: string; text?: string }> }).content
-    const textParts = content.filter((b) => b.type === 'text').map((b) => b.text ?? '')
-    if (textParts.length === content.length) return textParts.join('\n')
+      if (result && typeof result === 'object' && 'content' in result) {
+        const content = (result as { content: Array<{ type: string; text?: string }> }).content
+        const textParts = content.filter((b) => b.type === 'text').map((b) => b.text ?? '')
+        if (textParts.length === content.length) return textParts.join('\n')
+      }
+      return result
+    } catch (err) {
+      // On transport / subprocess errors, discard the stale entry and
+      // retry once with a fresh spawn.
+      if (retry) {
+        console.warn(`[mcp:${serverId}] call failed, retrying with fresh connection…`, err)
+        pool.delete(serverId)
+        return attempt(false)
+      }
+      throw err
+    }
   }
-  return result
+
+  return attempt(true)
 }
 
 /** Snapshot for the settings UI. */

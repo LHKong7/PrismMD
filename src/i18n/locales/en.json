@@ -55,6 +55,7 @@
     "openFolder": "Open Folder",
     "addFolder": "Add Folder",
     "closeFolder": "Close Folder",
+    "emptyFolder": "This folder is empty",
     "buildGraph": "Build knowledge graph ({{count}} files)",
     "buildGraphEmpty": "No markdown files to ingest",
     "ingestingGraph": "Ingesting {{done}} / {{total}}…",
@@ -132,6 +133,11 @@
     "files": "Files",
     "commands": "Commands",
     "newFile": "New File",
+    "newFolder": "New Folder",
+    "renameFile": "Rename File",
+    "deleteFile": "Delete File",
+    "duplicateFile": "Duplicate File",
+    "revealInFinder": "Reveal in Finder",
     "lightTheme": "Switch to Light Theme",
     "darkTheme": "Switch to Dark Theme",
     "systemTheme": "Use System Theme",
@@ -365,8 +371,27 @@
       "readyWithVersion": "Version {{version}} is ready — click to restart and install."
     }
   },
+  "tabs": {
+    "close": "Close",
+    "closeOthers": "Close Others",
+    "closeToRight": "Close to the Right",
+    "copyPath": "Copy Path",
+    "contextMenu": "Tab actions"
+  },
   "filetree": {
     "newFile": "New File",
+    "newFolder": "New Folder",
+    "rename": "Rename",
+    "delete": "Delete",
+    "duplicate": "Duplicate",
+    "revealInFinder": "Reveal in Finder",
+    "revealInExplorer": "Show in Explorer",
+    "revealInFileManager": "Show in File Manager",
+    "deleteConfirmTitle": "Delete \"{{name}}\"?",
+    "deleteConfirmFile": "This will move the file to the Trash.",
+    "deleteConfirmFolder": "This will move the folder and all its contents to the Trash.",
+    "deleteConfirmButton": "Move to Trash",
+    "cancel": "Cancel",
     "saveToGraph": "Save to Knowledge Graph",
     "savingToGraph": "Saving…",
     "ingestFolder": "Ingest whole folder into Graph ({{count}} files)"

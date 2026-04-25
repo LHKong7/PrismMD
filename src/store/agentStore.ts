@@ -251,8 +251,15 @@ export const useAgentStore = create<AgentStore>((set, get) => {
         }
       }
 
-      // Build message history
-      const history = get().messages.map((m) => ({
+      // Build message history — keep only the most recent messages to
+      // avoid token-limit errors and growing latency in long sessions.
+      // The full transcript remains in the store for UI scrollback.
+      const MAX_CONTEXT_MESSAGES = 40
+      const allMsgs = get().messages
+      const trimmed = allMsgs.length > MAX_CONTEXT_MESSAGES
+        ? allMsgs.slice(-MAX_CONTEXT_MESSAGES)
+        : allMsgs
+      const history = trimmed.map((m) => ({
         role: m.role as 'user' | 'assistant' | 'system',
         content: m.content,
       }))

@@ -27,7 +27,20 @@ const SUPPORTED_EXTENSIONS = new Set([
   '.xlsx', '.xls',
 ])
 
-export async function buildFileTree(dirPath: string): Promise<FileTreeNode[]> {
+/**
+ * Build the file tree for a directory.
+ *
+ * @param dirPath - Root directory to read.
+ * @param maxDepth - How many levels deep to recurse. `1` reads only the
+ *   immediate children (directories appear as stubs with `children: undefined`
+ *   so the renderer knows they can be expanded lazily). `Infinity` reads the
+ *   full tree (legacy behavior, used by refresh).
+ */
+export async function buildFileTree(
+  dirPath: string,
+  maxDepth: number = 1,
+  currentDepth: number = 0,
+): Promise<FileTreeNode[]> {
   const entries = await fs.readdir(dirPath, { withFileTypes: true })
   const nodes: FileTreeNode[] = []
 
@@ -38,13 +51,22 @@ export async function buildFileTree(dirPath: string): Promise<FileTreeNode[]> {
     const fullPath = path.join(dirPath, entry.name)
 
     if (entry.isDirectory()) {
-      const children = await buildFileTree(fullPath)
-      if (children.length > 0) {
+      if (currentDepth + 1 < maxDepth) {
+        // Recurse into subdirectory
+        const children = await buildFileTree(fullPath, maxDepth, currentDepth + 1)
         nodes.push({
           name: entry.name,
           path: fullPath,
           type: 'directory',
           children,
+        })
+      } else {
+        // Shallow stub — children will be loaded lazily on expand
+        nodes.push({
+          name: entry.name,
+          path: fullPath,
+          type: 'directory',
+          // children left undefined → renderer knows to lazy-load
         })
       }
     } else if (entry.isFile() && SUPPORTED_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) {

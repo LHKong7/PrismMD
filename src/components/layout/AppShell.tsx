@@ -6,15 +6,15 @@ import { useAgentStore } from '../../store/agentStore'
 import { useWindowBreakpoint } from '../../lib/hooks/useWindowBreakpoint'
 import { LeftSidebar } from './LeftSidebar'
 import { RightSidebar } from './RightSidebar'
+import { ResizeHandle } from './ResizeHandle'
+import { TabBar } from './TabBar'
+import { Breadcrumb } from './Breadcrumb'
 import { DocumentReader } from '../reader/DocumentReader'
 import { ReadingProgress } from '../reader/ReadingProgress'
 import { AgentSidebar } from '../agent/AgentSidebar'
 import { GraphView } from '../graph/GraphView'
 import { ErrorBoundary } from '../ErrorBoundary'
-
-const LEFT_WIDTH = 260
-const RIGHT_WIDTH = 220
-const AGENT_WIDTH = 340
+import { DeleteConfirmDialog } from '../filetree/DeleteConfirmDialog'
 
 export function AppShell() {
   const { t } = useTranslation()
@@ -25,6 +25,12 @@ export function AppShell() {
   const setLeftSidebarOpen = useUIStore((s) => s.setLeftSidebarOpen)
   const setRightSidebarOpen = useUIStore((s) => s.setRightSidebarOpen)
   const mainViewMode = useUIStore((s) => s.mainViewMode)
+  const LEFT_WIDTH = useUIStore((s) => s.leftSidebarWidth)
+  const RIGHT_WIDTH = useUIStore((s) => s.rightSidebarWidth)
+  const AGENT_WIDTH = useUIStore((s) => s.agentSidebarWidth)
+  const setLeftSidebarWidth = useUIStore((s) => s.setLeftSidebarWidth)
+  const setRightSidebarWidth = useUIStore((s) => s.setRightSidebarWidth)
+  const setAgentSidebarWidth = useUIStore((s) => s.setAgentSidebarWidth)
   const toc = useFileStore((s) => s.toc)
   const agentSidebarOpen = useAgentStore((s) => s.agentSidebarOpen)
   const setAgentSidebarOpen = useAgentStore((s) => s.setAgentSidebarOpen)
@@ -77,6 +83,13 @@ export function AppShell() {
         }}
       >
         <LeftSidebar />
+        {leftSidebarOpen && !isCompact && (
+          <ResizeHandle
+            side="left"
+            currentWidth={LEFT_WIDTH}
+            onResize={setLeftSidebarWidth}
+          />
+        )}
       </div>
 
       {/* Left hover trigger + visible handle. The hover-only zone fails
@@ -121,6 +134,8 @@ export function AppShell() {
           transition: 'margin 200ms ease-in-out',
         }}
       >
+        <TabBar />
+        <Breadcrumb />
         <ErrorBoundary>
           {mainViewMode === 'graph' ? <GraphView /> : <DocumentReader />}
         </ErrorBoundary>
@@ -137,6 +152,13 @@ export function AppShell() {
         }}
       >
         <RightSidebar toc={toc} />
+        {rightSidebarOpen && !isCompact && (
+          <ResizeHandle
+            side="right"
+            currentWidth={RIGHT_WIDTH}
+            onResize={setRightSidebarWidth}
+          />
+        )}
       </div>
 
       {/* Right hover trigger + handle. Mirrors the left side. We anchor
@@ -169,6 +191,8 @@ export function AppShell() {
         </>
       )}
 
+      <DeleteConfirmDialog />
+
       {/* Agent sidebar */}
       <div
         className="absolute top-0 bottom-0 right-0 z-sidebar transition-transform duration-base ease-in-out"
@@ -178,6 +202,13 @@ export function AppShell() {
         }}
       >
         <AgentSidebar />
+        {agentSidebarOpen && !isCompact && (
+          <ResizeHandle
+            side="agent"
+            currentWidth={AGENT_WIDTH}
+            onResize={setAgentSidebarWidth}
+          />
+        )}
       </div>
     </div>
   )

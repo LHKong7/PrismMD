@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState, useCallback, useEffect, type RefObject } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { FileTreeNode } from '../../types/electron'
+import { useFileStore } from '../../store/fileStore'
 import { FileTreeNodeItem } from './FileTreeNode'
 
 interface FileTreeProps {
@@ -37,25 +38,88 @@ const VIRTUAL_THRESHOLD = 200
  * scroll out of view — component-local state would reset on every
  * scroll past them.
  */
+/**
+ * Recursively find a node by path in the tree.
+ */
+function findNode(nodes: FileTreeNode[], path: string): FileTreeNode | undefined {
+  for (const node of nodes) {
+    if (node.path === path) return node
+    if (node.children && path.startsWith(node.path + '/')) {
+      const found = findNode(node.children, path)
+      if (found) return found
+    }
+  }
+  return undefined
+}
+
 export function FileTree({ nodes, depth = 0, scrollParentRef }: FileTreeProps) {
+  const loadChildren = useFileStore((s) => s.loadChildren)
   const [expanded, setExpanded] = useState<Set<string>>(
     () => new Set(depth === 0 ? nodes.filter((n) => n.type === 'directory').map((n) => n.path) : []),
   )
+  const [loading, setLoading] = useState<Set<string>>(() => new Set())
 
   const toggle = useCallback((path: string) => {
     setExpanded((prev) => {
       const next = new Set(prev)
-      if (next.has(path)) next.delete(path)
-      else next.add(path)
+      if (next.has(path)) {
+        next.delete(path)
+      } else {
+        next.add(path)
+        // Lazy-load children if this directory hasn't been loaded yet
+        const node = findNode(nodes, path)
+        if (node && node.type === 'directory' && node.children === undefined) {
+          setLoading((prev) => { const s = new Set(prev); s.add(path); return s })
+          void loadChildren(path).finally(() => {
+            setLoading((prev) => { const s = new Set(prev); s.delete(path); return s })
+          })
+        }
+      }
       return next
     })
-  }, [])
+  }, [nodes, loadChildren])
+
+  // Auto-expand a newly created folder so it's visible and ready for rename.
+  const autoExpandPath = useFileStore((s) => s.autoExpandPath)
+  const setAutoExpandPath = useFileStore((s) => s.setAutoExpandPath)
+  useEffect(() => {
+    if (autoExpandPath) {
+      setExpanded((prev) => {
+        if (prev.has(autoExpandPath)) return prev
+        const next = new Set(prev)
+        next.add(autoExpandPath)
+        return next
+      })
+      setAutoExpandPath(null)
+    }
+  }, [autoExpandPath, setAutoExpandPath])
+
+  // When top-level directories are auto-expanded but their children haven't
+  // been loaded yet (lazy stubs), kick off the load so the tree populates.
+  useEffect(() => {
+    for (const node of nodes) {
+      if (
+        node.type === 'directory' &&
+        expanded.has(node.path) &&
+        node.children === undefined &&
+        !loading.has(node.path)
+      ) {
+        setLoading((prev) => { const s = new Set(prev); s.add(node.path); return s })
+        void loadChildren(node.path).finally(() => {
+          setLoading((prev) => { const s = new Set(prev); s.delete(node.path); return s })
+        })
+      }
+    }
+  }, [nodes, expanded, loading, loadChildren])
 
   const rows = useMemo<FlatRow[]>(() => {
     const out: FlatRow[] = []
     const walk = (items: FileTreeNode[], d: number) => {
       for (const node of items) {
-        const hasChildren = node.type === 'directory' && !!node.children && node.children.length > 0
+        // A directory is expandable if it has children loaded OR if children
+        // are undefined (lazy stub — not yet loaded).
+        const hasChildren = node.type === 'directory' &&
+          (node.children === undefined || node.children.length > 0)
         out.push({ node, depth: d, hasChildren })
         if (node.type === 'directory' && expanded.has(node.path) && node.children) {
           walk(node.children, d + 1)

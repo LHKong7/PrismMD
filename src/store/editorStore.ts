@@ -58,11 +58,18 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     const filePath = useFileStore.getState().currentFilePath
     if (!filePath || editorContent == null) return
 
-    await window.electronAPI.writeFile(filePath, editorContent)
-    // Sync the saved content back to fileStore so the reader shows the
-    // latest version when the user switches back to reading mode.
-    useFileStore.getState().setContent(editorContent)
-    set({ savedContent: editorContent, isDirty: false })
+    try {
+      await window.electronAPI.writeFile(filePath, editorContent)
+      useFileStore.getState().setContent(editorContent)
+      set({ savedContent: editorContent, isDirty: false })
+      // Lazy import to avoid circular init.
+      const { useToastStore } = await import('./toastStore')
+      useToastStore.getState().show('success', 'File saved')
+    } catch (err) {
+      const { useToastStore } = await import('./toastStore')
+      const msg = err instanceof Error ? err.message : String(err)
+      useToastStore.getState().show('error', `Save failed: ${msg}`, 5000)
+    }
   },
 
   discardChanges: () => {

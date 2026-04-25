@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type RefObject } from 'react'
-import { ChevronRight, Database, FilePlus, FolderOpen, Loader2, Pin, PinOff, Plus, X } from 'lucide-react'
+import { ChevronRight, Database, FilePlus, FolderOpen, FolderPlus, Loader2, Pin, PinOff, Plus, X } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useTranslation } from 'react-i18next'
 import { useFileStore } from '../../store/fileStore'
@@ -42,6 +42,8 @@ function FolderSection({ folderPath, folderName, tree, onClose, scrollParentRef 
   const batchFailed = useBatchIngestStore((s) => s.failed.length)
   const batchTotal = useBatchIngestStore((s) => s.total)
 
+  const createFolder = useFileStore((s) => s.createFolder)
+  const createNewFile = useFileStore((s) => s.createNewFile)
   const ingestableFiles = useMemo(() => collectIngestableFiles(tree), [tree])
 
   const handleBuildGraph = (e: React.MouseEvent) => {
@@ -78,7 +80,14 @@ function FolderSection({ folderPath, folderName, tree, onClose, scrollParentRef 
             {folderName}
           </span>
         </div>
-        <div className="flex items-center gap-0.5">
+        <div className="flex items-center gap-0.5 flex-shrink-0">
+          <button
+            onClick={(e) => { e.stopPropagation(); createFolder(folderPath) }}
+            className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 transition-all"
+            title={t('filetree.newFolder')}
+          >
+            <FolderPlus size={12} style={{ color: 'var(--text-muted)' }} />
+          </button>
           {insightGraphEnabled && (
             <button
               onClick={handleBuildGraph}
@@ -113,7 +122,31 @@ function FolderSection({ folderPath, folderName, tree, onClose, scrollParentRef 
       </div>
       {expanded && (
         <div className="pb-1">
-          <FileTree nodes={tree} scrollParentRef={scrollParentRef} />
+          {tree.length > 0 ? (
+            <FileTree nodes={tree} scrollParentRef={scrollParentRef} />
+          ) : (
+            <div className="px-3 py-3 text-center" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-xs mb-2">{t('sidebar.emptyFolder')}</p>
+              <div className="flex items-center justify-center gap-2">
+                <button
+                  onClick={() => createNewFile(folderPath)}
+                  className="text-xs px-2 py-1 rounded border transition-colors hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-1"
+                  style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+                >
+                  <FilePlus size={12} />
+                  {t('filetree.newFile')}
+                </button>
+                <button
+                  onClick={() => createFolder(folderPath)}
+                  className="text-xs px-2 py-1 rounded border transition-colors hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-1"
+                  style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+                >
+                  <FolderPlus size={12} />
+                  {t('filetree.newFolder')}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -126,6 +159,7 @@ export function LeftSidebar() {
   const closeFolder = useFileStore((s) => s.closeFolder)
   const openFolderDialog = useFileStore((s) => s.openFolderDialog)
   const createNewFile = useFileStore((s) => s.createNewFile)
+  const createFolder = useFileStore((s) => s.createFolder)
   const leftSidebarPinned = useUIStore((s) => s.leftSidebarPinned)
   const pinLeftSidebar = useUIStore((s) => s.pinLeftSidebar)
   // The overflow-y-auto container serves as the scroll parent for all
@@ -143,16 +177,24 @@ export function LeftSidebar() {
         className="flex items-center justify-between px-3 py-2 border-b"
         style={{ borderColor: 'var(--border-color)' }}
       >
-        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+        <span className="text-xs font-semibold uppercase tracking-wider truncate min-w-0" style={{ color: 'var(--text-muted)' }}>
           {t('sidebar.explorer')}
         </span>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-shrink-0">
           <button
             onClick={() => createNewFile()}
             className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
             title={t('filetree.newFile')}
           >
             <FilePlus size={14} style={{ color: 'var(--text-muted)' }} />
+          </button>
+          <button
+            onClick={() => openFolders.length > 0 ? createFolder(openFolders[0].path) : undefined}
+            disabled={openFolders.length === 0}
+            className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            title={t('filetree.newFolder')}
+          >
+            <FolderPlus size={14} style={{ color: 'var(--text-muted)' }} />
           </button>
           <button
             onClick={openFolderDialog}

@@ -106,7 +106,7 @@ export function ContextMenu({
   return createPortal(
     <div
       ref={ref}
-      className="fixed z-overlay rounded-md border shadow-md py-1 text-xs prism-fade-scale-in"
+      className="fixed z-modal rounded-md border shadow-md py-1 text-xs prism-fade-scale-in"
       style={{
         left: x,
         top: y,

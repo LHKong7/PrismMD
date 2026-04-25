@@ -24,8 +24,15 @@ export interface ElectronAPI {
   readFile: (filePath: string) => Promise<string>
   readFileBytes: (filePath: string) => Promise<ArrayBuffer>
   readDirectory: (dirPath: string) => Promise<FileTreeNode[]>
+  readDirectoryChildren: (dirPath: string) => Promise<FileTreeNode[]>
   writeFile: (filePath: string, content: string) => Promise<void>
   newFileDialog: (defaultDir?: string) => Promise<{ cancelled: boolean; filePath?: string }>
+  createDirectory: (dirPath: string) => Promise<void>
+  rename: (oldPath: string, newPath: string) => Promise<void>
+  trash: (itemPath: string) => Promise<void>
+  duplicateFile: (srcPath: string, destPath: string) => Promise<void>
+  showInFolder: (itemPath: string) => Promise<void>
+  exists: (itemPath: string) => Promise<boolean>
 
   // File watching
   watchFile: (filePath: string) => void

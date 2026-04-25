@@ -1,4 +1,4 @@
-import { dialog, ipcMain } from 'electron'
+import { dialog, ipcMain, shell } from 'electron'
 import fs from 'fs/promises'
 import { buildFileTree } from '../services/fileTree'
 import { FileWatcherService } from '../services/fileWatcher'
@@ -68,7 +68,18 @@ export function registerFileHandlers() {
     return { cancelled: false, filePath: result.filePath }
   })
 
+  // Size limits to prevent OOM on huge files.
+  const MAX_TEXT_FILE_BYTES = 50 * 1024 * 1024   // 50 MB
+  const MAX_BINARY_FILE_BYTES = 200 * 1024 * 1024 // 200 MB
+
   ipcMain.handle('fs:read-file', async (_event, filePath: string) => {
+    const stat = await fs.stat(filePath)
+    if (stat.size > MAX_TEXT_FILE_BYTES) {
+      throw new Error(
+        `File is too large to open (${(stat.size / 1024 / 1024).toFixed(1)} MB). ` +
+        `Text files are limited to ${MAX_TEXT_FILE_BYTES / 1024 / 1024} MB.`
+      )
+    }
     return fs.readFile(filePath, 'utf-8')
   })
 
@@ -77,19 +88,63 @@ export function registerFileHandlers() {
   // over IPC handles it natively and the renderer can feed it straight to
   // pdfjs-dist / SheetJS without a base64 round-trip.
   ipcMain.handle('fs:read-file-bytes', async (_event, filePath: string) => {
+    const stat = await fs.stat(filePath)
+    if (stat.size > MAX_BINARY_FILE_BYTES) {
+      throw new Error(
+        `File is too large to open (${(stat.size / 1024 / 1024).toFixed(1)} MB). ` +
+        `Binary files are limited to ${MAX_BINARY_FILE_BYTES / 1024 / 1024} MB.`
+      )
+    }
     const buf = await fs.readFile(filePath)
     // Slice to a standalone ArrayBuffer (the underlying Buffer may share
     // memory with Node's internal pool).
     return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)
   })
 
+  // Full recursive read — used by refreshFolder to reload the entire tree.
   ipcMain.handle('fs:read-directory', async (_event, dirPath: string) => {
-    return buildFileTree(dirPath)
+    return buildFileTree(dirPath, 10)
+  })
+
+  // Shallow read (1 level) — used by openFolder for initial fast load and
+  // by lazy-expand to load children on demand.
+  ipcMain.handle('fs:read-directory-children', async (_event, dirPath: string) => {
+    return buildFileTree(dirPath, 1)
   })
 
   ipcMain.handle('fs:write-file', async (_event, filePath: string, content: string) => {
     fileWatcher.suppressNextChange(filePath)
     await fs.writeFile(filePath, content, 'utf-8')
+  })
+
+  ipcMain.handle('fs:create-directory', async (_event, dirPath: string) => {
+    await fs.mkdir(dirPath, { recursive: false })
+  })
+
+  ipcMain.handle('fs:rename', async (_event, oldPath: string, newPath: string) => {
+    fileWatcher.suppressNextChange(oldPath)
+    await fs.rename(oldPath, newPath)
+  })
+
+  ipcMain.handle('fs:trash', async (_event, itemPath: string) => {
+    await shell.trashItem(itemPath)
+  })
+
+  ipcMain.handle('fs:duplicate-file', async (_event, srcPath: string, destPath: string) => {
+    await fs.copyFile(srcPath, destPath)
+  })
+
+  ipcMain.handle('fs:show-in-folder', (_event, itemPath: string) => {
+    shell.showItemInFolder(itemPath)
+  })
+
+  ipcMain.handle('fs:exists', async (_event, itemPath: string) => {
+    try {
+      await fs.access(itemPath)
+      return true
+    } catch {
+      return false
+    }
   })
 
   // File watching

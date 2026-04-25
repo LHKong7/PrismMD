@@ -10,6 +10,7 @@ import { SettingsPanel } from './components/settings/SettingsPanel'
 import { GhostText } from './components/ghosttext/GhostText'
 import { FocusOverlay } from './components/focusmode/FocusOverlay'
 import { PluginNotificationHost } from './components/plugins/PluginNotificationHost'
+import { ToastHost } from './components/ui/Toast'
 import { useFileWatcher } from './hooks/useFileWatcher'
 import { useAutoHide } from './hooks/useAutoHide'
 import { useAnnotations } from './hooks/useAnnotations'
@@ -18,6 +19,7 @@ import { useSettingsStore } from './store/settingsStore'
 import { useUIStore } from './store/uiStore'
 import { useEditorStore } from './store/editorStore'
 import { useFileStore } from './store/fileStore'
+import { useToastStore } from './store/toastStore'
 import { detectFormat, kindOfFormat } from './lib/fileFormat'
 import { bootstrapExternalPlugins } from './lib/plugins/externalLoader'
 import { initI18n } from './i18n'
@@ -32,9 +34,13 @@ function AppContent() {
   const settingsOpen = useUIStore((s) => s.settingsOpen)
   const openSettings = useUIStore((s) => s.openSettings)
   const closeSettings = useUIStore((s) => s.closeSettings)
+  const toasts = useToastStore((s) => s.toasts)
+  const dismissToast = useToastStore((s) => s.dismiss)
   const loadSettings = useSettingsStore((s) => s.loadSettings)
+  const loadLayout = useUIStore((s) => s.loadLayout)
 
   useEffect(() => { loadSettings() }, [loadSettings])
+  useEffect(() => { loadLayout() }, [loadLayout])
 
   // Prevent accidental close with unsaved editor changes.
   useEffect(() => {
@@ -96,7 +102,44 @@ function AppContent() {
           }
           editor.toggleEditing()
         }
+        return
       }
+
+      // Cmd+W — close active tab
+      if (e.key === 'w') {
+        e.preventDefault()
+        const { activeTabId, closeTab } = useFileStore.getState()
+        if (activeTabId) closeTab(activeTabId)
+        return
+      }
+
+      // Cmd+Shift+T — reopen last closed tab
+      if (e.key === 't' && e.shiftKey) {
+        e.preventDefault()
+        void useFileStore.getState().reopenClosedTab()
+        return
+      }
+
+      // Cmd+1..9 — switch to tab by index
+      if (e.key >= '1' && e.key <= '9') {
+        e.preventDefault()
+        const { tabs, switchTab } = useFileStore.getState()
+        const idx = parseInt(e.key, 10) - 1
+        if (idx < tabs.length) switchTab(tabs[idx].id)
+        return
+      }
+    }
+
+    // Ctrl+Tab / Ctrl+Shift+Tab — cycle tabs
+    if (e.ctrlKey && e.key === 'Tab') {
+      e.preventDefault()
+      const { tabs, activeTabId, switchTab } = useFileStore.getState()
+      if (tabs.length < 2) return
+      const idx = tabs.findIndex((t) => t.id === activeTabId)
+      const next = e.shiftKey
+        ? (idx - 1 + tabs.length) % tabs.length
+        : (idx + 1) % tabs.length
+      switchTab(tabs[next].id)
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
@@ -116,6 +159,7 @@ function AppContent() {
       <GhostText />
       <SettingsPanel open={settingsOpen} onClose={closeSettings} />
       <PluginNotificationHost />
+      <ToastHost items={toasts} onDismiss={dismissToast} />
     </div>
   )
 }

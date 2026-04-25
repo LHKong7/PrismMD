@@ -31,10 +31,24 @@ const electronAPI = {
     ipcRenderer.invoke('fs:read-file-bytes', filePath),
   readDirectory: (dirPath: string): Promise<FileTreeNode[]> =>
     ipcRenderer.invoke('fs:read-directory', dirPath),
+  readDirectoryChildren: (dirPath: string): Promise<FileTreeNode[]> =>
+    ipcRenderer.invoke('fs:read-directory-children', dirPath),
   writeFile: (filePath: string, content: string): Promise<void> =>
     ipcRenderer.invoke('fs:write-file', filePath, content),
   newFileDialog: (defaultDir?: string): Promise<{ cancelled: boolean; filePath?: string }> =>
     ipcRenderer.invoke('dialog:new-file', defaultDir),
+  createDirectory: (dirPath: string): Promise<void> =>
+    ipcRenderer.invoke('fs:create-directory', dirPath),
+  rename: (oldPath: string, newPath: string): Promise<void> =>
+    ipcRenderer.invoke('fs:rename', oldPath, newPath),
+  trash: (itemPath: string): Promise<void> =>
+    ipcRenderer.invoke('fs:trash', itemPath),
+  duplicateFile: (srcPath: string, destPath: string): Promise<void> =>
+    ipcRenderer.invoke('fs:duplicate-file', srcPath, destPath),
+  showInFolder: (itemPath: string): Promise<void> =>
+    ipcRenderer.invoke('fs:show-in-folder', itemPath),
+  exists: (itemPath: string): Promise<boolean> =>
+    ipcRenderer.invoke('fs:exists', itemPath),
 
   // File watching
   watchFile: (filePath: string): void => { ipcRenderer.send('fs:watch-file', filePath) },

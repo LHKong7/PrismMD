@@ -11,13 +11,42 @@ function invalidateSearchIndex() {
   )
 }
 
+function showToast(tone: 'info' | 'success' | 'error' | 'warning', message: string, duration?: number) {
+  void import('./toastStore').then((m) =>
+    m.useToastStore.getState().show(tone, message, duration),
+  )
+}
+
 interface OpenFolder {
   path: string
   name: string
   tree: FileTreeNode[]
 }
 
+interface PendingDelete {
+  path: string
+  name: string
+  isDirectory: boolean
+}
+
+/** A single open tab. */
+export interface Tab {
+  id: string
+  filePath: string
+  format: FileFormat | null
+  content: string | null
+  bytes: ArrayBuffer | null
+  scrollY: number
+}
+
+const MAX_TABS = 20
+
 interface FileStore {
+  // --- Tab state ---
+  tabs: Tab[]
+  activeTabId: string | null
+
+  // --- Compatibility layer (derived from active tab) ---
   currentFilePath: string | null
   currentFormat: FileFormat | null
   /** Text-format content (markdown / csv / json). `null` for binary formats. */
@@ -37,6 +66,11 @@ interface FileStore {
    * `ErrorBanner` above the viewer. Cleared on the next successful open.
    */
   openError: string | null
+  renamingPath: string | null
+  autoExpandPath: string | null
+  pendingDelete: PendingDelete | null
+  /** Stack of recently closed tab file paths (for Cmd+Shift+T reopen). */
+  recentlyClosedPaths: string[]
 
   openFile: (filePath: string) => Promise<void>
   openFileWithContent: (filePath: string, content: string) => void
@@ -52,13 +86,76 @@ interface FileStore {
   openFileDialog: () => Promise<void>
   openFolderDialog: () => Promise<void>
   createNewFile: (defaultDir?: string) => Promise<void>
+  createFolder: (parentDir: string) => Promise<void>
+  renameItem: (oldPath: string, newName: string) => Promise<void>
+  deleteItem: () => Promise<void>
+  setPendingDelete: (info: PendingDelete) => void
+  cancelDelete: () => void
+  duplicateFile: (filePath: string) => Promise<void>
+  showInFolder: (itemPath: string) => void
+  setRenamingPath: (path: string | null) => void
+  setAutoExpandPath: (path: string | null) => void
+  loadChildren: (dirPath: string) => Promise<void>
+
+  // --- Tab actions ---
+  closeTab: (tabId: string) => void
+  switchTab: (tabId: string) => void
+  moveTab: (fromIndex: number, toIndex: number) => void
+  closeOtherTabs: (tabId: string) => void
+  closeTabsToRight: (tabId: string) => void
+  reopenClosedTab: () => Promise<void>
 }
 
 function folderName(folderPath: string): string {
   return folderPath.split(/[/\\]/).pop() ?? folderPath
 }
 
+/**
+ * Recursively walk the tree and replace the `children` of the node whose
+ * `path` matches `targetPath`. Returns a new tree (immutable update).
+ */
+function patchChildren(
+  nodes: FileTreeNode[],
+  targetPath: string,
+  children: FileTreeNode[],
+): FileTreeNode[] {
+  return nodes.map((node) => {
+    if (node.path === targetPath) {
+      return { ...node, children }
+    }
+    if (node.children && targetPath.startsWith(node.path + '/')) {
+      return { ...node, children: patchChildren(node.children, targetPath, children) }
+    }
+    return node
+  })
+}
+
+/**
+ * Sync the "compatibility layer" fields from the active tab so every
+ * existing consumer of `currentFilePath` / `currentContent` / etc
+ * continues to work unchanged.
+ */
+function syncFromActiveTab(tabs: Tab[], activeTabId: string | null) {
+  const tab = tabs.find((t) => t.id === activeTabId)
+  if (!tab) {
+    return {
+      currentFilePath: null,
+      currentFormat: null,
+      currentContent: null,
+      currentBytes: null,
+    }
+  }
+  return {
+    currentFilePath: tab.filePath,
+    currentFormat: tab.format,
+    currentContent: tab.content,
+    currentBytes: tab.bytes,
+  }
+}
+
 export const useFileStore = create<FileStore>((set, get) => ({
+  tabs: [],
+  activeTabId: null,
   currentFilePath: null,
   currentFormat: null,
   currentContent: null,
@@ -67,8 +164,19 @@ export const useFileStore = create<FileStore>((set, get) => ({
   recentFiles: [],
   toc: [],
   openError: null,
+  renamingPath: null,
+  autoExpandPath: null,
+  pendingDelete: null,
+  recentlyClosedPaths: [],
 
   openFile: async (filePath: string) => {
+    // If the file is already open in a tab, just switch to it.
+    const existing = get().tabs.find((t) => t.filePath === filePath)
+    if (existing) {
+      get().switchTab(existing.id)
+      return
+    }
+
     // Lazy import to avoid circular init (editorStore imports fileStore).
     const { useEditorStore } = await import('./editorStore')
     const editor = useEditorStore.getState()
@@ -79,62 +187,111 @@ export const useFileStore = create<FileStore>((set, get) => ({
     // Always drop back to reader mode on file switch.
     useEditorStore.getState().reset()
 
-    // Dispatch on extension so the right reader is used for text vs
-    // binary formats. Unknown extensions fall through to text (best-
-    // effort for files the user drops in that we haven't catalogued).
     const format = detectFormat(filePath)
     const kind = format ? kindOfFormat(format) : 'text'
 
     try {
+      let content: string | null = null
+      let bytes: ArrayBuffer | null = null
+
       if (kind === 'binary') {
-        const bytes = await window.electronAPI.readFileBytes(filePath)
-        set({
-          currentFilePath: filePath,
-          currentFormat: format,
-          currentContent: null,
-          currentBytes: bytes,
-          openError: null,
-        })
+        bytes = await window.electronAPI.readFileBytes(filePath)
       } else {
-        const content = await window.electronAPI.readFile(filePath)
-        set({
-          currentFilePath: filePath,
-          currentFormat: format,
-          currentContent: content,
-          currentBytes: null,
-          openError: null,
-        })
+        content = await window.electronAPI.readFile(filePath)
       }
+
+      const newTab: Tab = {
+        id: crypto.randomUUID(),
+        filePath,
+        format,
+        content,
+        bytes,
+        scrollY: 0,
+      }
+
+      set((state) => {
+        // Evict oldest tab if at limit.
+        let tabs = [...state.tabs, newTab]
+        if (tabs.length > MAX_TABS) {
+          const evicted = tabs.shift()!
+          window.electronAPI.unwatchFile(evicted.filePath)
+        }
+        return {
+          tabs,
+          activeTabId: newTab.id,
+          ...syncFromActiveTab(tabs, newTab.id),
+          openError: null,
+        }
+      })
+
       get().addRecentFile(filePath)
       window.electronAPI.watchFile(filePath)
     } catch (err) {
-      // Preserve the currently-open document so a transient failure
-      // doesn't wipe the user's view; don't pollute recentFiles with an
-      // unreadable path; surface the error via `openError`.
       const msg = err instanceof Error ? err.message : String(err)
       set({ openError: `${filePath}: ${msg}` })
+      showToast('error', msg, 5000)
     }
   },
 
   openFileWithContent: (filePath: string, content: string) => {
+    const existing = get().tabs.find((t) => t.filePath === filePath)
+    if (existing) {
+      get().switchTab(existing.id)
+      return
+    }
+
     const format = detectFormat(filePath)
-    set({
-      currentFilePath: filePath,
-      currentFormat: format,
-      currentContent: content,
-      currentBytes: null,
+    const newTab: Tab = {
+      id: crypto.randomUUID(),
+      filePath,
+      format,
+      content,
+      bytes: null,
+      scrollY: 0,
+    }
+    set((state) => {
+      let tabs = [...state.tabs, newTab]
+      if (tabs.length > MAX_TABS) {
+        const evicted = tabs.shift()!
+        window.electronAPI.unwatchFile(evicted.filePath)
+      }
+      return {
+        tabs,
+        activeTabId: newTab.id,
+        ...syncFromActiveTab(tabs, newTab.id),
+      }
     })
     get().addRecentFile(filePath)
     window.electronAPI.watchFile(filePath)
   },
 
   openFileWithBytes: (filePath: string, bytes: ArrayBuffer) => {
+    const existing = get().tabs.find((t) => t.filePath === filePath)
+    if (existing) {
+      get().switchTab(existing.id)
+      return
+    }
+
     const format = detectFormat(filePath)
-    set({
-      currentFilePath: filePath,
-      currentFormat: format,
-      currentContent: null,
-      currentBytes: bytes,
+    const newTab: Tab = {
+      id: crypto.randomUUID(),
+      filePath,
+      format,
+      content: null,
+      bytes,
+      scrollY: 0,
+    }
+    set((state) => {
+      let tabs = [...state.tabs, newTab]
+      if (tabs.length > MAX_TABS) {
+        const evicted = tabs.shift()!
+        window.electronAPI.unwatchFile(evicted.filePath)
+      }
+      return {
+        tabs,
+        activeTabId: newTab.id,
+        ...syncFromActiveTab(tabs, newTab.id),
+      }
     })
     get().addRecentFile(filePath)
     window.electronAPI.watchFile(filePath)
@@ -146,7 +303,9 @@ export const useFileStore = create<FileStore>((set, get) => ({
     if (openFolders.some((f) => f.path === folderPath)) return
 
     try {
-      const tree = await window.electronAPI.readDirectory(folderPath)
+      // Shallow read (1 level) for fast initial load — subdirectories
+      // appear as stubs and their children are loaded lazily on expand.
+      const tree = await window.electronAPI.readDirectoryChildren(folderPath)
       set({
         openFolders: [
           ...openFolders,
@@ -171,7 +330,12 @@ export const useFileStore = create<FileStore>((set, get) => ({
   },
 
   setContent: (content: string) => {
-    set({ currentContent: content })
+    set((state) => {
+      const tabs = state.tabs.map((t) =>
+        t.id === state.activeTabId ? { ...t, content } : t,
+      )
+      return { currentContent: content, tabs }
+    })
   },
 
   setToc: (toc: TocEntry[]) => {
@@ -245,5 +409,267 @@ export const useFileStore = create<FileStore>((set, get) => ({
     // Enter edit mode immediately so the user can start typing.
     const { useEditorStore } = await import('./editorStore')
     useEditorStore.getState().setEditing(true)
+  },
+
+  createFolder: async (parentDir: string) => {
+    // Find the owning top-level open folder for refresh.
+    const owning = get().openFolders.find((f) =>
+      parentDir === f.path || parentDir.startsWith(f.path + '/') || parentDir.startsWith(f.path + '\\'),
+    )
+    // Generate a unique name.
+    let name = 'New Folder'
+    let fullPath = `${parentDir}/${name}`
+    let counter = 2
+    while (await window.electronAPI.exists(fullPath)) {
+      name = `New Folder (${counter})`
+      fullPath = `${parentDir}/${name}`
+      counter++
+    }
+    try {
+      await window.electronAPI.createDirectory(fullPath)
+      if (owning) await get().refreshFolder(owning.path)
+      set({ autoExpandPath: fullPath, renamingPath: fullPath })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      set({ openError: msg })
+    }
+  },
+
+  renameItem: async (oldPath: string, newName: string) => {
+    // Validate
+    if (!newName || newName.includes('/') || newName.includes('\\')) return
+    const sep = oldPath.includes('\\') ? '\\' : '/'
+    const dir = oldPath.substring(0, oldPath.lastIndexOf(sep))
+    const newPath = `${dir}${sep}${newName}`
+    if (newPath === oldPath) {
+      set({ renamingPath: null })
+      return
+    }
+    const owning = get().openFolders.find((f) =>
+      oldPath === f.path || oldPath.startsWith(f.path + '/') || oldPath.startsWith(f.path + '\\'),
+    )
+    try {
+      await window.electronAPI.rename(oldPath, newPath)
+      // Update any open tabs whose paths are affected by the rename.
+      set((state) => {
+        const tabs = state.tabs.map((t) => {
+          if (t.filePath === oldPath) {
+            window.electronAPI.unwatchFile(oldPath)
+            window.electronAPI.watchFile(newPath)
+            return { ...t, filePath: newPath, format: detectFormat(newPath) }
+          }
+          if (t.filePath.startsWith(oldPath + sep)) {
+            const updated = newPath + t.filePath.substring(oldPath.length)
+            window.electronAPI.unwatchFile(t.filePath)
+            window.electronAPI.watchFile(updated)
+            return { ...t, filePath: updated, format: detectFormat(updated) }
+          }
+          return t
+        })
+        return {
+          tabs,
+          ...syncFromActiveTab(tabs, state.activeTabId),
+          renamingPath: null,
+        }
+      })
+      if (owning) await get().refreshFolder(owning.path)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      set({ openError: msg, renamingPath: null })
+    }
+  },
+
+  deleteItem: async () => {
+    const pending = get().pendingDelete
+    if (!pending) return
+    const owning = get().openFolders.find((f) =>
+      pending.path === f.path || pending.path.startsWith(f.path + '/') || pending.path.startsWith(f.path + '\\'),
+    )
+    try {
+      await window.electronAPI.trash(pending.path)
+      // Close any tabs whose files were deleted.
+      set((state) => {
+        const affected = state.tabs.filter((t) =>
+          t.filePath === pending.path ||
+          t.filePath.startsWith(pending.path + '/') ||
+          t.filePath.startsWith(pending.path + '\\'),
+        )
+        for (const t of affected) {
+          window.electronAPI.unwatchFile(t.filePath)
+        }
+        const affectedIds = new Set(affected.map((t) => t.id))
+        const tabs = state.tabs.filter((t) => !affectedIds.has(t.id))
+        let activeTabId = state.activeTabId
+        if (activeTabId && affectedIds.has(activeTabId)) {
+          activeTabId = tabs.length > 0 ? tabs[tabs.length - 1].id : null
+        }
+        return {
+          tabs,
+          activeTabId,
+          ...syncFromActiveTab(tabs, activeTabId),
+          pendingDelete: null,
+        }
+      })
+      if (owning) await get().refreshFolder(owning.path)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      set({ openError: msg, pendingDelete: null })
+    }
+  },
+
+  setPendingDelete: (info: PendingDelete) => set({ pendingDelete: info }),
+  cancelDelete: () => set({ pendingDelete: null }),
+
+  duplicateFile: async (filePath: string) => {
+    const sep = filePath.includes('\\') ? '\\' : '/'
+    const lastSep = filePath.lastIndexOf(sep)
+    const dir = filePath.substring(0, lastSep)
+    const fullName = filePath.substring(lastSep + 1)
+    const dotIdx = fullName.lastIndexOf('.')
+    const baseName = dotIdx > 0 ? fullName.substring(0, dotIdx) : fullName
+    const ext = dotIdx > 0 ? fullName.substring(dotIdx) : ''
+
+    let destPath = `${dir}${sep}${baseName}-copy${ext}`
+    let counter = 2
+    while (await window.electronAPI.exists(destPath)) {
+      destPath = `${dir}${sep}${baseName}-copy-${counter}${ext}`
+      counter++
+    }
+
+    const owning = get().openFolders.find((f) =>
+      filePath.startsWith(f.path + '/') || filePath.startsWith(f.path + '\\'),
+    )
+    try {
+      await window.electronAPI.duplicateFile(filePath, destPath)
+      if (owning) await get().refreshFolder(owning.path)
+      await get().openFile(destPath)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      set({ openError: msg })
+    }
+  },
+
+  showInFolder: (itemPath: string) => {
+    void window.electronAPI.showInFolder(itemPath)
+  },
+
+  setRenamingPath: (path: string | null) => set({ renamingPath: path }),
+  setAutoExpandPath: (path: string | null) => set({ autoExpandPath: path }),
+
+  loadChildren: async (dirPath: string) => {
+    try {
+      const children = await window.electronAPI.readDirectoryChildren(dirPath)
+      set((state) => ({
+        openFolders: state.openFolders.map((f) => ({
+          ...f,
+          tree: patchChildren(f.tree, dirPath, children),
+        })),
+      }))
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      set({ openError: `${dirPath}: ${msg}` })
+    }
+  },
+
+  // --- Tab actions ---
+
+  closeTab: (tabId: string) => {
+    set((state) => {
+      const idx = state.tabs.findIndex((t) => t.id === tabId)
+      if (idx < 0) return {}
+      const closing = state.tabs[idx]
+      window.electronAPI.unwatchFile(closing.filePath)
+      const tabs = state.tabs.filter((t) => t.id !== tabId)
+
+      let activeTabId = state.activeTabId
+      if (activeTabId === tabId) {
+        // Activate the nearest remaining tab.
+        if (tabs.length === 0) {
+          activeTabId = null
+        } else if (idx < tabs.length) {
+          activeTabId = tabs[idx].id
+        } else {
+          activeTabId = tabs[tabs.length - 1].id
+        }
+      }
+
+      return {
+        tabs,
+        activeTabId,
+        ...syncFromActiveTab(tabs, activeTabId),
+        recentlyClosedPaths: [closing.filePath, ...state.recentlyClosedPaths].slice(0, 10),
+      }
+    })
+  },
+
+  switchTab: (tabId: string) => {
+    const { tabs, activeTabId } = get()
+    if (tabId === activeTabId) return
+    // Reset editor mode when switching.
+    void import('./editorStore').then(({ useEditorStore }) => {
+      const editor = useEditorStore.getState()
+      if (editor.editing && editor.isDirty) {
+        const discard = window.confirm('You have unsaved changes. Discard them?')
+        if (!discard) return
+      }
+      useEditorStore.getState().reset()
+      set({
+        activeTabId: tabId,
+        ...syncFromActiveTab(tabs, tabId),
+        toc: [],
+      })
+    })
+  },
+
+  moveTab: (fromIndex: number, toIndex: number) => {
+    set((state) => {
+      const tabs = [...state.tabs]
+      const [moved] = tabs.splice(fromIndex, 1)
+      tabs.splice(toIndex, 0, moved)
+      return { tabs }
+    })
+  },
+
+  closeOtherTabs: (tabId: string) => {
+    set((state) => {
+      const keep = state.tabs.find((t) => t.id === tabId)
+      if (!keep) return {}
+      for (const t of state.tabs) {
+        if (t.id !== tabId) window.electronAPI.unwatchFile(t.filePath)
+      }
+      const tabs = [keep]
+      return {
+        tabs,
+        activeTabId: tabId,
+        ...syncFromActiveTab(tabs, tabId),
+      }
+    })
+  },
+
+  closeTabsToRight: (tabId: string) => {
+    set((state) => {
+      const idx = state.tabs.findIndex((t) => t.id === tabId)
+      if (idx < 0) return {}
+      const closing = state.tabs.slice(idx + 1)
+      for (const t of closing) window.electronAPI.unwatchFile(t.filePath)
+      const tabs = state.tabs.slice(0, idx + 1)
+      let activeTabId = state.activeTabId
+      if (activeTabId && !tabs.some((t) => t.id === activeTabId)) {
+        activeTabId = tabId
+      }
+      return {
+        tabs,
+        activeTabId,
+        ...syncFromActiveTab(tabs, activeTabId),
+      }
+    })
+  },
+
+  reopenClosedTab: async () => {
+    const { recentlyClosedPaths } = get()
+    if (recentlyClosedPaths.length === 0) return
+    const [filePath, ...rest] = recentlyClosedPaths
+    set({ recentlyClosedPaths: rest })
+    await get().openFile(filePath)
   },
 }))
