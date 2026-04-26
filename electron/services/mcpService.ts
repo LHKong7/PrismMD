@@ -45,7 +45,7 @@ async function spawnClient(
     env: { ...process.env, ...(config.env ?? {}) } as Record<string, string>,
   })
   const client = new Client(
-    { name: 'prismmd', version: '0.1.0' },
+    { name: 'prismmd', version: '0.2.0' },
     { capabilities: {} },
   )
   await client.connect(transport)

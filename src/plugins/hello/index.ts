@@ -13,7 +13,7 @@ import type { Plugin } from '../../lib/plugins/types'
 const hello: Plugin = {
   id: 'prismmd.hello',
   name: 'Hello Plugin',
-  version: '0.1.0',
+  version: '0.2.0',
   description: 'Minimal example — registers a "Say hello" command.',
 
   activate(host) {

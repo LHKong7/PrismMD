@@ -1,7 +1,7 @@
 {
   "name": "prismmd",
   "productName": "PrismMD",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A beautiful cross-platform Markdown reader",
   "main": ".vite/build/main.js",
   "author": "LHKong7",
