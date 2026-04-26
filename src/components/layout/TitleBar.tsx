@@ -1,5 +1,6 @@
 import { useState, useEffect, type CSSProperties } from 'react'
-import { Minus, Square, X, Palette, PanelLeft, PanelRight, Settings, Bot, Network, BookOpen, Pencil } from 'lucide-react'
+import { Minus, Square, X, Palette, PanelLeft, PanelRight, Settings, Bot, Network, BookOpen, Pencil, Columns2, Rows2, XCircle } from 'lucide-react'
+import { Tooltip } from '../ui/Tooltip'
 import { useTranslation } from 'react-i18next'
 import { useUIStore } from '../../store/uiStore'
 import { useFileStore } from '../../store/fileStore'
@@ -29,6 +30,10 @@ export function TitleBar({ onOpenSettings }: TitleBarProps) {
   const setThemeId = useSettingsStore((s) => s.setThemeId)
   const setThemeMode = useSettingsStore((s) => s.setThemeMode)
   const graphEnabled = useSettingsStore((s) => s.insightGraph.enabled)
+  const splitLayout = useUIStore((s) => s.splitLayout)
+  const splitPane = useUIStore((s) => s.splitPane)
+  const unsplit = useUIStore((s) => s.unsplit)
+  const toggleSplitDirection = useUIStore((s) => s.toggleSplitDirection)
   const toggleAgentSidebar = useAgentStore((s) => s.toggleAgentSidebar)
   const editing = useEditorStore((s) => s.editing)
   const isDirty = useEditorStore((s) => s.isDirty)
@@ -74,16 +79,17 @@ export function TitleBar({ onOpenSettings }: TitleBarProps) {
     >
       {/* Left controls */}
       <div className="flex items-center gap-1 px-2" style={noDragStyle}>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={toggleLeftSidebar}
-          className="p-1.5"
-          title={`${t('titlebar.toggleFileTree')} (Ctrl+B)`}
-          aria-label={t('titlebar.toggleFileTree')}
-        >
-          <PanelLeft size={16} style={{ color: 'var(--text-secondary)' }} />
-        </Button>
+        <Tooltip label={`${t('titlebar.toggleFileTree')} (${isMac ? '⌘' : 'Ctrl'}+B)`} side="bottom">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleLeftSidebar}
+            className="p-1.5"
+            aria-label={t('titlebar.toggleFileTree')}
+          >
+            <PanelLeft size={16} style={{ color: 'var(--text-secondary)' }} />
+          </Button>
+        </Tooltip>
       </div>
 
       {/* Title */}
@@ -94,88 +100,133 @@ export function TitleBar({ onOpenSettings }: TitleBarProps) {
       {/* Right controls */}
       <div className="flex items-center gap-1 px-2" style={noDragStyle}>
         {canEdit && (
+          <Tooltip label={editing ? `${t('titlebar.showReader', 'Reader')} (${isMac ? '⌘' : 'Ctrl'}+E)` : `${t('titlebar.showEditor', 'Edit')} (${isMac ? '⌘' : 'Ctrl'}+E)`} side="bottom">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                if (editing && isDirty) {
+                  const discard = window.confirm(t('editor.unsavedConfirm', 'You have unsaved changes. Discard them?'))
+                  if (!discard) return
+                  useEditorStore.getState().discardChanges()
+                }
+                toggleEditing()
+              }}
+              className="p-1.5"
+              aria-label={editing ? t('titlebar.showReader', 'Reader') : t('titlebar.showEditor', 'Edit')}
+            >
+              {editing ? (
+                <BookOpen size={16} style={{ color: 'var(--accent-color)' }} />
+              ) : (
+                <Pencil size={16} style={{ color: 'var(--text-secondary)' }} />
+              )}
+            </Button>
+          </Tooltip>
+        )}
+        {graphEnabled && (
+          <Tooltip label={mainViewMode === 'graph' ? t('titlebar.showReader') : t('titlebar.showGraph')} side="bottom">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleMainViewMode}
+              className="p-1.5"
+              aria-label={mainViewMode === 'graph' ? t('titlebar.showReader') : t('titlebar.showGraph')}
+            >
+              {mainViewMode === 'graph' ? (
+                <BookOpen size={16} style={{ color: 'var(--accent-color)' }} />
+              ) : (
+                <Network size={16} style={{ color: 'var(--text-secondary)' }} />
+              )}
+            </Button>
+          </Tooltip>
+        )}
+        <Tooltip label={`${t('split.horizontal')} (${isMac ? '⌘' : 'Ctrl'}+\\)`} side="bottom">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => {
-              if (editing && isDirty) {
-                const discard = window.confirm(t('editor.unsavedConfirm', 'You have unsaved changes. Discard them?'))
-                if (!discard) return
-                useEditorStore.getState().discardChanges()
-              }
-              toggleEditing()
+              if (!splitLayout.split) splitPane('horizontal')
+              else if (splitLayout.direction !== 'horizontal') toggleSplitDirection()
             }}
             className="p-1.5"
-            title={editing ? `${t('titlebar.showReader', 'Reader')} (Ctrl+E)` : `${t('titlebar.showEditor', 'Edit')} (Ctrl+E)`}
-            aria-label={editing ? t('titlebar.showReader', 'Reader') : t('titlebar.showEditor', 'Edit')}
+            aria-label={t('split.horizontal')}
           >
-            {editing ? (
-              <BookOpen size={16} style={{ color: 'var(--accent-color)' }} />
-            ) : (
-              <Pencil size={16} style={{ color: 'var(--text-secondary)' }} />
-            )}
+            <Columns2 size={16} style={{ color: splitLayout.split && splitLayout.direction === 'horizontal' ? 'var(--accent-color)' : 'var(--text-secondary)' }} />
           </Button>
-        )}
-        {graphEnabled && (
+        </Tooltip>
+        <Tooltip label={`${t('split.vertical')} (${isMac ? '⌘⇧' : 'Ctrl+Shift'}+\\)`} side="bottom">
           <Button
             variant="ghost"
             size="icon"
-            onClick={toggleMainViewMode}
+            onClick={() => {
+              if (!splitLayout.split) splitPane('vertical')
+              else if (splitLayout.direction !== 'vertical') toggleSplitDirection()
+            }}
             className="p-1.5"
-            title={mainViewMode === 'graph' ? t('titlebar.showReader') : t('titlebar.showGraph')}
-            aria-label={mainViewMode === 'graph' ? t('titlebar.showReader') : t('titlebar.showGraph')}
+            aria-label={t('split.vertical')}
           >
-            {mainViewMode === 'graph' ? (
-              <BookOpen size={16} style={{ color: 'var(--accent-color)' }} />
-            ) : (
-              <Network size={16} style={{ color: 'var(--text-secondary)' }} />
-            )}
+            <Rows2 size={16} style={{ color: splitLayout.split && splitLayout.direction === 'vertical' ? 'var(--accent-color)' : 'var(--text-secondary)' }} />
           </Button>
+        </Tooltip>
+        {splitLayout.split && (
+          <Tooltip label={t('split.unsplit')} side="bottom">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={unsplit}
+              className="p-1.5"
+              aria-label={t('split.unsplit')}
+            >
+              <XCircle size={16} style={{ color: 'var(--text-secondary)' }} />
+            </Button>
+          </Tooltip>
         )}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={toggleAgentSidebar}
-          className="p-1.5"
-          title={t('titlebar.toggleAgent')}
-          aria-label={t('titlebar.toggleAgent')}
-        >
-          <Bot size={16} style={{ color: 'var(--text-secondary)' }} />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={toggleRightSidebar}
-          className="p-1.5"
-          title={`${t('titlebar.toggleOutline')} (Ctrl+Shift+B)`}
-          aria-label={t('titlebar.toggleOutline')}
-        >
-          <PanelRight size={16} style={{ color: 'var(--text-secondary)' }} />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={cycleTheme}
-          className="p-1.5"
-          title={`${t('titlebar.theme')}: ${getThemeById(themeId)?.name ?? themeId} (Ctrl+T)`}
-          aria-label={t('titlebar.theme')}
-        >
-          <Palette size={16} style={{ color: 'var(--text-secondary)' }} />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onOpenSettings}
-          className="p-1.5"
-          title={`${t('titlebar.settings')} (Ctrl+,)`}
-          aria-label={t('titlebar.settings')}
-        >
-          <Settings size={16} style={{ color: 'var(--text-secondary)' }} />
-        </Button>
+        <Tooltip label={`${t('titlebar.toggleAgent')} (${isMac ? '⌘' : 'Ctrl'}+J)`} side="bottom">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleAgentSidebar}
+            className="p-1.5"
+            aria-label={t('titlebar.toggleAgent')}
+          >
+            <Bot size={16} style={{ color: 'var(--text-secondary)' }} />
+          </Button>
+        </Tooltip>
+        <Tooltip label={`${t('titlebar.toggleOutline')} (${isMac ? '⌘⇧' : 'Ctrl+Shift'}+B)`} side="bottom">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleRightSidebar}
+            className="p-1.5"
+            aria-label={t('titlebar.toggleOutline')}
+          >
+            <PanelRight size={16} style={{ color: 'var(--text-secondary)' }} />
+          </Button>
+        </Tooltip>
+        <Tooltip label={`${t('titlebar.theme')}: ${getThemeById(themeId)?.name ?? themeId} (${isMac ? '⌘' : 'Ctrl'}+T)`} side="bottom">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={cycleTheme}
+            className="p-1.5"
+            aria-label={t('titlebar.theme')}
+          >
+            <Palette size={16} style={{ color: 'var(--text-secondary)' }} />
+          </Button>
+        </Tooltip>
+        <Tooltip label={`${t('titlebar.settings')} (${isMac ? '⌘' : 'Ctrl'}+,)`} side="bottom">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onOpenSettings}
+            className="p-1.5"
+            aria-label={t('titlebar.settings')}
+          >
+            <Settings size={16} style={{ color: 'var(--text-secondary)' }} />
+          </Button>
+        </Tooltip>
 
-        {/* Window controls (non-macOS). Close button keeps its red-tinted
-            hover since it's the "destructive" window action — overrides
-            the ghost variant's default hover. */}
+        {/* Window controls (non-macOS) — no tooltips, native title is fine */}
         {!isMac && (
           <>
             <Button

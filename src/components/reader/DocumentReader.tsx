@@ -6,6 +6,7 @@ import { useSettingsStore } from '../../store/settingsStore'
 import { useUIStore } from '../../store/uiStore'
 import { detectFormat, kindOfFormat } from '../../lib/fileFormat'
 import { useEditorStore } from '../../store/editorStore'
+import { usePaneFileData } from '../../hooks/usePaneFileData'
 import { MarkdownReader } from './MarkdownReader'
 import { JsonViewer } from './JsonViewer'
 import { CsvViewer } from './CsvViewer'
@@ -29,8 +30,7 @@ import { Button } from '../ui/Button'
  */
 export function DocumentReader() {
   const { t } = useTranslation()
-  const currentFilePath = useFileStore((s) => s.currentFilePath)
-  const currentFormat = useFileStore((s) => s.currentFormat)
+  const { filePath: currentFilePath, format: currentFormat, isActivePane } = usePaneFileData()
   const openError = useFileStore((s) => s.openError)
   const openFileDialog = useFileStore((s) => s.openFileDialog)
   const openFolderDialog = useFileStore((s) => s.openFolderDialog)
@@ -168,7 +168,7 @@ export function DocumentReader() {
   const body = (() => {
     // When in editing mode for text formats, render the editor instead
     // of the read-only viewer.
-    if (editing && isTextFormat) {
+    if (editing && isTextFormat && isActivePane) {
       if (currentFormat === 'markdown') {
         return <MarkdownEditor />
       }

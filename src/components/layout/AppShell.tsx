@@ -9,7 +9,7 @@ import { RightSidebar } from './RightSidebar'
 import { ResizeHandle } from './ResizeHandle'
 import { TabBar } from './TabBar'
 import { Breadcrumb } from './Breadcrumb'
-import { DocumentReader } from '../reader/DocumentReader'
+import { SplitContainer } from './SplitContainer'
 import { ReadingProgress } from '../reader/ReadingProgress'
 import { AgentSidebar } from '../agent/AgentSidebar'
 import { GraphView } from '../graph/GraphView'
@@ -53,8 +53,11 @@ export function AppShell() {
   const agentWidth = isCompact ? compactAgentWidth : AGENT_WIDTH
   const rightOffsetFromAgent = agentSidebarOpen && !isCompact ? AGENT_WIDTH : 0
 
+  // Show a backdrop on narrow/compact so tapping outside dismisses the
+  // floating sidebar. On wide viewports, unpinned sidebars auto-close
+  // on mouse leave instead.
   const showBackdrop =
-    isCompact && (leftSidebarOpen || rightSidebarOpen || agentSidebarOpen)
+    (isCompact || isNarrow) && (leftSidebarOpen || rightSidebarOpen || agentSidebarOpen)
 
   return (
     <div className="flex flex-1 overflow-hidden relative">
@@ -80,6 +83,12 @@ export function AppShell() {
         style={{
           width: leftWidth,
           transform: leftSidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
+        }}
+        onMouseLeave={() => {
+          // On narrow/compact, the backdrop handles dismissal instead.
+          if (isNarrow || isCompact) return
+          const s = useUIStore.getState()
+          if (s.leftSidebarOpen && !s.leftSidebarPinned) setLeftSidebarOpen(false)
         }}
       >
         <LeftSidebar />
@@ -127,7 +136,7 @@ export function AppShell() {
           TOC context is preserved when the user toggles between the
           reader and the graph. */}
       <div
-        className="flex-1 overflow-hidden"
+        className="flex-1 flex flex-col overflow-hidden"
         style={{
           marginLeft: leftSidebarOpen && effectiveLeftPinned ? LEFT_WIDTH : 0,
           marginRight: rightSidebarOpen && effectiveRightPinned ? RIGHT_WIDTH : 0,
@@ -135,10 +144,18 @@ export function AppShell() {
         }}
       >
         <TabBar />
-        <Breadcrumb />
-        <ErrorBoundary>
-          {mainViewMode === 'graph' ? <GraphView /> : <DocumentReader />}
-        </ErrorBoundary>
+        {mainViewMode === 'graph' ? (
+          <>
+            <Breadcrumb />
+            <ErrorBoundary>
+              <GraphView />
+            </ErrorBoundary>
+          </>
+        ) : (
+          <div className="flex-1 min-h-0">
+            <SplitContainer />
+          </div>
+        )}
       </div>
 
       {/* Right sidebar (TOC) */}
@@ -149,6 +166,11 @@ export function AppShell() {
           right: rightOffsetFromAgent,
           transform: rightSidebarOpen ? 'translateX(0)' : 'translateX(100%)',
           transition: 'transform 200ms ease-in-out, right 200ms ease-in-out',
+        }}
+        onMouseLeave={() => {
+          if (isNarrow || isCompact) return
+          const s = useUIStore.getState()
+          if (s.rightSidebarOpen && !s.rightSidebarPinned) setRightSidebarOpen(false)
         }}
       >
         <RightSidebar toc={toc} />

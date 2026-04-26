@@ -144,6 +144,8 @@
     "openSettings": "Open Settings",
     "toggleAgent": "Toggle AI Assistant",
     "toggleFocusMode": "Toggle Focus Mode",
+    "toggleZenMode": "Toggle Zen Mode",
+    "keyboardShortcuts": "Keyboard Shortcuts",
     "togglePrivacy": "Toggle Privacy Mode",
     "insightGraphIngest": "Save Document to Knowledge Graph",
     "showGraph": "Show Knowledge Graph",
@@ -291,6 +293,39 @@
       "body": "Open an entity to see the conflicting statements side by side.",
       "dismiss": "Dismiss"
     },
+    "shortcuts": {
+      "title": "Keyboard Shortcuts",
+      "description": "All available keyboard shortcuts in PrismMD. On macOS, Ctrl is replaced by ⌘.",
+      "general": "General",
+      "commandPalette": "Command Palette",
+      "openSettings": "Open Settings",
+      "newFile": "New File",
+      "zenMode": "Toggle Zen Mode",
+      "findInDocument": "Find in Document",
+      "tabs": "Tabs",
+      "closeTab": "Close Tab",
+      "reopenTab": "Reopen Closed Tab",
+      "switchTabByIndex": "Switch to Tab by Index",
+      "nextTab": "Next Tab",
+      "prevTab": "Previous Tab",
+      "splitPane": "Split Pane",
+      "splitHorizontal": "Split Horizontal",
+      "splitVertical": "Split Vertical",
+      "focusNextPane": "Focus Next Pane",
+      "focusPrevPane": "Focus Previous Pane",
+      "editor": "Editor",
+      "toggleEdit": "Toggle Edit Mode",
+      "save": "Save File",
+      "sidebars": "Sidebars & Panels",
+      "toggleFileTree": "Toggle File Tree",
+      "toggleOutline": "Toggle Outline",
+      "toggleAgent": "Toggle AI Assistant",
+      "cycleTheme": "Cycle Theme",
+      "fileTree": "File Tree",
+      "rename": "Rename",
+      "delete": "Delete",
+      "expandCollapse": "Expand / Collapse"
+    },
     "close": "Close"
   },
   "highlightPopover": {
@@ -354,6 +389,8 @@
     "words": "{{count}} words",
     "chars": "{{count}} chars",
     "readingTime": "{{count}} min read",
+    "saved": "Saved",
+    "unsaved": "Unsaved",
     "noModel": "No AI model",
     "ready": "Ready",
     "privacyOn": "Privacy Mode",
@@ -409,6 +446,18 @@
     "errorLabel": "Error",
     "retry": "Retry",
     "copyMessage": "Copy message"
+  },
+  "split": {
+    "horizontal": "Split Right",
+    "vertical": "Split Down",
+    "unsplit": "Close Split",
+    "focusNext": "Focus Next Pane",
+    "focusPrev": "Focus Previous Pane",
+    "toggleDirection": "Toggle Split Direction"
+  },
+  "zenMode": {
+    "exit": "Exit Zen Mode",
+    "toggle": "Toggle Zen Mode"
   },
   "common": {
     "dismiss": "Dismiss",

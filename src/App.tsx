@@ -9,6 +9,7 @@ import { SelectionAIBubble } from './components/annotations/SelectionAIBubble'
 import { SettingsPanel } from './components/settings/SettingsPanel'
 import { GhostText } from './components/ghosttext/GhostText'
 import { FocusOverlay } from './components/focusmode/FocusOverlay'
+import { ZenMode } from './components/zenmode/ZenMode'
 import { PluginNotificationHost } from './components/plugins/PluginNotificationHost'
 import { ToastHost } from './components/ui/Toast'
 import { useFileWatcher } from './hooks/useFileWatcher'
@@ -36,6 +37,7 @@ function AppContent() {
   const closeSettings = useUIStore((s) => s.closeSettings)
   const toasts = useToastStore((s) => s.toasts)
   const dismissToast = useToastStore((s) => s.dismiss)
+  const zenMode = useUIStore((s) => s.zenMode)
   const loadSettings = useSettingsStore((s) => s.loadSettings)
   const loadLayout = useUIStore((s) => s.loadLayout)
 
@@ -64,7 +66,76 @@ function AppContent() {
   // Ctrl/Cmd + , : settings  |  Ctrl/Cmd + S : save  |  Ctrl/Cmd + E : toggle edit
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+Tab / Ctrl+Shift+Tab — cycle tabs (no meta required)
+      if (e.ctrlKey && e.key === 'Tab') {
+        e.preventDefault()
+        const { tabs, activeTabId, switchTab } = useFileStore.getState()
+        if (tabs.length < 2) return
+        const idx = tabs.findIndex((t) => t.id === activeTabId)
+        const next = e.shiftKey
+          ? (idx - 1 + tabs.length) % tabs.length
+          : (idx + 1) % tabs.length
+        switchTab(tabs[next].id)
+        return
+      }
+
+      // ? — open keyboard shortcuts help (only when not typing in an input)
+      if (e.key === '?' && !e.metaKey && !e.ctrlKey) {
+        const tag = (e.target as HTMLElement)?.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
+        e.preventDefault()
+        useUIStore.getState().openSettings('shortcuts')
+        return
+      }
+
       if (!(e.metaKey || e.ctrlKey)) return
+
+      // Cmd+Shift+Z — toggle zen mode (must check before undo which is Cmd+Z)
+      if (e.key === 'z' && e.shiftKey) {
+        e.preventDefault()
+        useUIStore.getState().toggleZenMode()
+        return
+      }
+
+      // Cmd+\ — toggle horizontal split
+      if (e.key === '\\' && !e.shiftKey) {
+        e.preventDefault()
+        const { splitLayout, splitPane, unsplit, toggleSplitDirection } = useUIStore.getState()
+        if (!splitLayout.split) splitPane('horizontal')
+        else if (splitLayout.direction === 'horizontal') unsplit()
+        else toggleSplitDirection()
+        return
+      }
+
+      // Cmd+Shift+\ — toggle vertical split
+      if (e.key === '\\' && e.shiftKey) {
+        e.preventDefault()
+        const { splitLayout, splitPane, unsplit, toggleSplitDirection } = useUIStore.getState()
+        if (!splitLayout.split) splitPane('vertical')
+        else if (splitLayout.direction === 'vertical') unsplit()
+        else toggleSplitDirection()
+        return
+      }
+
+      // Cmd+Shift+] — focus next pane
+      if (e.key === ']' && e.shiftKey) {
+        e.preventDefault()
+        const { splitLayout, setActivePaneId } = useUIStore.getState()
+        if (!splitLayout.split) return
+        const next = splitLayout.activePaneId === 'pane-1' ? 'pane-2' : 'pane-1'
+        setActivePaneId(next)
+        return
+      }
+
+      // Cmd+Shift+[ — focus previous pane
+      if (e.key === '[' && e.shiftKey) {
+        e.preventDefault()
+        const { splitLayout, setActivePaneId } = useUIStore.getState()
+        if (!splitLayout.split) return
+        const prev = splitLayout.activePaneId === 'pane-1' ? 'pane-2' : 'pane-1'
+        setActivePaneId(prev)
+        return
+      }
 
       if (e.key === ',') {
         e.preventDefault()
@@ -129,28 +200,17 @@ function AppContent() {
         return
       }
     }
-
-    // Ctrl+Tab / Ctrl+Shift+Tab — cycle tabs
-    if (e.ctrlKey && e.key === 'Tab') {
-      e.preventDefault()
-      const { tabs, activeTabId, switchTab } = useFileStore.getState()
-      if (tabs.length < 2) return
-      const idx = tabs.findIndex((t) => t.id === activeTabId)
-      const next = e.shiftKey
-        ? (idx - 1 + tabs.length) % tabs.length
-        : (idx + 1) % tabs.length
-      switchTab(tabs[next].id)
-    }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [openSettings, closeSettings])
 
   return (
     <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--bg-primary)' }}>
-      <TitleBar onOpenSettings={() => openSettings()} />
+      {!zenMode && <TitleBar onOpenSettings={() => openSettings()} />}
       <FocusOverlay />
-      <AppShell />
-      <StatusBar />
+      {!zenMode && <AppShell />}
+      {!zenMode && <StatusBar />}
+      <ZenMode />
       <CommandPalette onOpenSettings={() => openSettings()} />
       <HighlightPopover onHighlight={addAnnotation} />
       <SelectionAIBubble

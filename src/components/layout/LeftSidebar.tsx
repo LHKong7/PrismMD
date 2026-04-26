@@ -9,6 +9,7 @@ import { useBatchIngestStore } from '../../store/batchIngestStore'
 import { FileTree } from '../filetree/FileTree'
 import type { FileTreeNode } from '../../types/electron'
 import { isSupported } from '../../lib/fileFormat'
+import { useWindowBreakpoint } from '../../lib/hooks/useWindowBreakpoint'
 
 /**
  * Walk the tree and collect paths of every file the knowledge-graph SDK
@@ -162,6 +163,8 @@ export function LeftSidebar() {
   const createFolder = useFileStore((s) => s.createFolder)
   const leftSidebarPinned = useUIStore((s) => s.leftSidebarPinned)
   const pinLeftSidebar = useUIStore((s) => s.pinLeftSidebar)
+  const breakpoint = useWindowBreakpoint()
+  const canPin = breakpoint === 'wide'
   // The overflow-y-auto container serves as the scroll parent for all
   // FileTree virtualizers so huge folders don't spawn a DOM node per
   // file. We pass the ref down instead of letting FileTree introduce
@@ -207,17 +210,19 @@ export function LeftSidebar() {
               <FolderOpen size={14} style={{ color: 'var(--text-muted)' }} />
             )}
           </button>
-          <button
-            onClick={pinLeftSidebar}
-            className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-            title={leftSidebarPinned ? t('sidebar.unpinSidebar') : t('sidebar.pinSidebar')}
-          >
-            {leftSidebarPinned ? (
-              <PinOff size={14} style={{ color: 'var(--accent-color)' }} />
-            ) : (
-              <Pin size={14} style={{ color: 'var(--text-muted)' }} />
-            )}
-          </button>
+          {canPin && (
+            <button
+              onClick={pinLeftSidebar}
+              className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+              title={leftSidebarPinned ? t('sidebar.unpinSidebar') : t('sidebar.pinSidebar')}
+            >
+              {leftSidebarPinned ? (
+                <PinOff size={14} style={{ color: 'var(--accent-color)' }} />
+              ) : (
+                <Pin size={14} style={{ color: 'var(--text-muted)' }} />
+              )}
+            </button>
+          )}
         </div>
       </div>
 

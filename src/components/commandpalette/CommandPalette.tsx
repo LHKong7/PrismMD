@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Command } from 'cmdk'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
-import { FileText, FilePlus, FolderPlus, Pencil, Trash2, Copy, ExternalLink, Sun, Moon, Monitor, Settings, Bot, Shield, Eye, Network, BookOpen, Puzzle, Search } from 'lucide-react'
+import { FileText, FilePlus, FolderPlus, Pencil, Trash2, Copy, ExternalLink, Sun, Moon, Monitor, Settings, Bot, Shield, Eye, Network, BookOpen, Puzzle, Search, Maximize2, Columns2, Rows2, X, Keyboard } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useUIStore } from '../../store/uiStore'
 import { useFileStore } from '../../store/fileStore'
@@ -231,6 +231,9 @@ export function CommandPalette({ onOpenSettings }: CommandPaletteProps) {
               <Command.Item value="Open Settings" onSelect={() => { onOpenSettings(); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
                 <Settings size={14} /><span>{t('commandPalette.openSettings')}</span>
               </Command.Item>
+              <Command.Item value="Keyboard Shortcuts" onSelect={() => { useUIStore.getState().openSettings('shortcuts'); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
+                <Keyboard size={14} /><span>{t('commandPalette.keyboardShortcuts')}</span>
+              </Command.Item>
               <Command.Item value="Toggle AI" onSelect={() => { toggleAgentSidebar(); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
                 <Bot size={14} /><span>{t('commandPalette.toggleAgent')}</span>
               </Command.Item>
@@ -240,6 +243,20 @@ export function CommandPalette({ onOpenSettings }: CommandPaletteProps) {
               <Command.Item value="Toggle Focus" onSelect={() => { setFocusMode(!focusMode); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
                 <Eye size={14} /><span>{t('commandPalette.toggleFocusMode')}</span>
               </Command.Item>
+              <Command.Item value="Toggle Zen Mode" onSelect={() => { useUIStore.getState().toggleZenMode(); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
+                <Maximize2 size={14} /><span>{t('commandPalette.toggleZenMode')}</span>
+              </Command.Item>
+              <Command.Item value="Split Right" onSelect={() => { const s = useUIStore.getState(); if (!s.splitLayout.split) s.splitPane('horizontal'); else if (s.splitLayout.direction !== 'horizontal') s.toggleSplitDirection(); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
+                <Columns2 size={14} /><span>{t('split.horizontal')}</span>
+              </Command.Item>
+              <Command.Item value="Split Down" onSelect={() => { const s = useUIStore.getState(); if (!s.splitLayout.split) s.splitPane('vertical'); else if (s.splitLayout.direction !== 'vertical') s.toggleSplitDirection(); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
+                <Rows2 size={14} /><span>{t('split.vertical')}</span>
+              </Command.Item>
+              {useUIStore.getState().splitLayout.split && (
+                <Command.Item value="Close Split" onSelect={() => { useUIStore.getState().unsplit(); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
+                  <X size={14} /><span>{t('split.unsplit')}</span>
+                </Command.Item>
+              )}
               {insightGraphEnabled && currentFilePath && (
                 <Command.Item
                   value="Save Document to Knowledge Graph"

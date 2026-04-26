@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useFileStore } from '../../store/fileStore'
+import { usePaneFileData } from '../../hooks/usePaneFileData'
 import { useMarkdown } from '../../hooks/useMarkdown'
 import { useReadingProgress } from '../../hooks/useReadingProgress'
 import { useEntityLinking } from '../../hooks/useEntityLinking'
@@ -23,7 +23,7 @@ import '../../styles/cjk.css'
  */
 export function MarkdownReader() {
   const { t } = useTranslation()
-  const currentContent = useFileStore((s) => s.currentContent)
+  const { content: currentContent } = usePaneFileData()
   const { content, isProcessing, error } = useMarkdown(currentContent)
   const scrollRef = useRef<HTMLDivElement>(null)
   const markdownBodyRef = useRef<HTMLDivElement>(null)

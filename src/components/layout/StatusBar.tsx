@@ -1,19 +1,29 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useFileStore } from '../../store/fileStore'
+import { useEditorStore } from '../../store/editorStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
 import { useBatchIngestStore } from '../../store/batchIngestStore'
 import { useUpdaterStore } from '../../store/updaterStore'
-import { Bot, Globe, Shield, Network, Loader2, AlertCircle, CheckCircle2, X, Download } from 'lucide-react'
+import { useUIStore } from '../../store/uiStore'
+import {
+  Bot, Globe, Shield, Network, Loader2, AlertCircle,
+  CheckCircle2, X, Download, MoreHorizontal, Circle,
+} from 'lucide-react'
 
 export function StatusBar() {
   const { t } = useTranslation()
+  const zenMode = useUIStore((s) => s.zenMode)
   const currentContent = useFileStore((s) => s.currentContent)
+  const editing = useEditorStore((s) => s.editing)
+  const isDirty = useEditorStore((s) => s.isDirty)
   const language = useSettingsStore((s) => s.language)
   const activeProvider = useSettingsStore((s) => s.activeProvider)
   const providers = useSettingsStore((s) => s.providers)
   const privacyMode = useSettingsStore((s) => s.privacyMode)
+  const [expanded, setExpanded] = useState(false)
+
   const stats = useMemo(() => {
     if (!currentContent) return null
     const chars = currentContent.length
@@ -31,10 +41,6 @@ export function StatusBar() {
     ingest.stage !== 'idle' && ingest.stage !== 'completed' && ingest.stage !== 'failed'
   const ingestFilename = ingest.filePath ? ingest.filePath.split(/[/\\]/).pop() : null
 
-  // Batch-ingest progress (right-click → "Ingest whole folder" or the
-  // Build-Graph button). When a batch is running, its progress is the
-  // headline status — the per-file ingest stage lives *inside* the
-  // batch so we don't need to show both.
   const batchStatus = useBatchIngestStore((s) => s.status)
   const batchDone = useBatchIngestStore((s) => s.done.length)
   const batchFailed = useBatchIngestStore((s) => s.failed.length)
@@ -45,12 +51,12 @@ export function StatusBar() {
     ? Math.min(100, Math.round(((batchDone + batchFailed) / batchTotal) * 100))
     : 0
 
-  // Auto-update: only surface a chip when an update is actually ready
-  // to install. "Checking" / "not-available" are uninteresting and would
-  // just add noise to an already-busy status bar.
   const updaterKind = useUpdaterStore((s) => s.kind)
   const updaterVersion = useUpdaterStore((s) => s.version)
   const quitAndInstall = useUpdaterStore((s) => s.quitAndInstall)
+
+  // Hide entirely in zen mode.
+  if (zenMode) return null
 
   return (
     <div
@@ -58,27 +64,58 @@ export function StatusBar() {
       style={{ backgroundColor: 'var(--bg-sidebar)', borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
     >
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-1">
-          <Globe size={11} />
-          <span>{language.toUpperCase()}</span>
-        </div>
-
-        <div className="flex items-center gap-1">
-          <Bot size={11} />
-          <span>{activeModel ?? t('statusBar.noModel')}</span>
-          {activeProvider === 'ollama' && <span className="text-success">LOCAL</span>}
-        </div>
-
-        {privacyMode && (
-          <div className="flex items-center gap-1 text-red-400">
-            <Shield size={11} />
-            <span>{t('statusBar.privacyOn')}</span>
+        {/* Save state indicator — always visible when editing */}
+        {editing && (
+          <div className="flex items-center gap-1">
+            <Circle
+              size={7}
+              fill={isDirty ? 'var(--color-warning)' : 'var(--color-success)'}
+              stroke="none"
+            />
+            <span>{isDirty ? t('statusBar.unsaved') : t('statusBar.saved')}</span>
           </div>
         )}
 
-        {/* Batch ingest takes precedence — when a queue is running we
-            hide the single-file stage so the user sees one coherent
-            progress indicator. */}
+        {/* Expandable secondary info — AI model, language, privacy, ingest */}
+        {expanded ? (
+          <>
+            <div className="flex items-center gap-1">
+              <Globe size={11} />
+              <span>{language.toUpperCase()}</span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <Bot size={11} />
+              <span>{activeModel ?? t('statusBar.noModel')}</span>
+              {activeProvider === 'ollama' && <span className="text-success">LOCAL</span>}
+            </div>
+
+            {privacyMode && (
+              <div className="flex items-center gap-1 text-red-400">
+                <Shield size={11} />
+                <span>{t('statusBar.privacyOn')}</span>
+              </div>
+            )}
+
+            <button
+              onClick={() => setExpanded(false)}
+              className="p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10"
+              aria-label="Collapse status details"
+            >
+              <X size={10} />
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={() => setExpanded(true)}
+            className="p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 opacity-60 hover:opacity-100 transition-opacity"
+            aria-label="Show status details"
+          >
+            <MoreHorizontal size={12} />
+          </button>
+        )}
+
+        {/* Batch ingest takes precedence */}
         {batchStatus === 'running' ? (
           <div className="flex items-center gap-2" style={{ color: 'var(--accent-color)' }}>
             <Loader2 size={11} className="animate-spin" />
@@ -146,7 +183,6 @@ export function StatusBar() {
             )}
           </>
         )}
-
       </div>
 
       <div className="flex items-center gap-3">
@@ -167,11 +203,7 @@ export function StatusBar() {
         )}
 
         {stats ? (
-          <>
-            <span>{t('statusBar.words', { count: stats.words })}</span>
-            <span>{t('statusBar.chars', { count: stats.chars })}</span>
-            <span>{t('statusBar.readingTime', { count: stats.readingTime })}</span>
-          </>
+          <span>{t('statusBar.words', { count: stats.words })}</span>
         ) : (
           <span>{t('statusBar.ready')}</span>
         )}

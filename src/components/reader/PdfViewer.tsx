@@ -4,6 +4,7 @@ import { AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import * as pdfjsLib from 'pdfjs-dist'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { Spinner } from '../ui/Spinner'
+import { usePaneFileData } from '../../hooks/usePaneFileData'
 // The pdfjs worker is shipped alongside pdfjs-dist. Vite's `?url` import
 // rewrites this to a static URL that Electron can load from the renderer
 // bundle without a network request.
@@ -29,7 +30,7 @@ if (typeof window !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
  */
 export function PdfViewer() {
   const { t } = useTranslation()
-  const bytes = useFileStore((s) => s.currentBytes)
+  const { bytes } = usePaneFileData()
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)

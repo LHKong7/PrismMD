@@ -4,9 +4,13 @@ import { useEffect, useState } from 'react'
  * Viewport breakpoint used by AppShell to collapse sidebars when the window
  * is too narrow to comfortably host all three panels.
  *
- *   wide    (>= 1100px)   default — left + right + agent can coexist pinned
- *   narrow  (900–1099px)  pinning is ignored; sidebars slide over content
- *   compact (< 900px)     sidebars open as full-width overlays with backdrop
+ *   wide    (>= 800px)    default — sidebars can be pinned to push content
+ *   narrow  (600–799px)   pinning is ignored; sidebars slide over content
+ *   compact (< 600px)     sidebars open as full-width overlays with backdrop
+ *
+ * Breakpoints were lowered from the original 1100/900 to better suit
+ * typical laptop screens (1280–1440px) where pinning a sidebar should
+ * still be possible.
  *
  * Implemented as a JS hook rather than CSS media queries because the layout
  * logic (marginLeft/marginRight, backdrop rendering, absolute vs static
@@ -14,8 +18,8 @@ import { useEffect, useState } from 'react'
  */
 export type WindowBreakpoint = 'wide' | 'narrow' | 'compact'
 
-const NARROW_MAX = 1100
-const COMPACT_MAX = 900
+const NARROW_MAX = 800
+const COMPACT_MAX = 600
 
 function classify(width: number): WindowBreakpoint {
   if (width < COMPACT_MAX) return 'compact'

@@ -2,9 +2,10 @@ import { useMemo } from 'react'
 import { ChevronRight, Copy } from 'lucide-react'
 import { useFileStore } from '../../store/fileStore'
 import { useToastStore } from '../../store/toastStore'
+import { usePaneFileData } from '../../hooks/usePaneFileData'
 
 export function Breadcrumb() {
-  const currentFilePath = useFileStore((s) => s.currentFilePath)
+  const { filePath: currentFilePath } = usePaneFileData()
   const openFolders = useFileStore((s) => s.openFolders)
   const setAutoExpandPath = useFileStore((s) => s.setAutoExpandPath)
 

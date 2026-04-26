@@ -4,7 +4,7 @@ import { AlertCircle } from 'lucide-react'
 import JsonView from '@uiw/react-json-view'
 import { lightTheme } from '@uiw/react-json-view/light'
 import { darkTheme } from '@uiw/react-json-view/dark'
-import { useFileStore } from '../../store/fileStore'
+import { usePaneFileData } from '../../hooks/usePaneFileData'
 
 /**
  * JsonViewer — collapsible tree view of the currently-open JSON file.
@@ -16,7 +16,7 @@ import { useFileStore } from '../../store/fileStore'
  */
 export function JsonViewer() {
   const { t } = useTranslation()
-  const content = useFileStore((s) => s.currentContent)
+  const { content } = usePaneFileData()
 
   // `@uiw/react-json-view` takes a style object; we pick between its two
   // shipped themes by observing the `dark` class on the root element

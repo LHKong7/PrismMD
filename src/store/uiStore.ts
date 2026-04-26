@@ -5,6 +5,32 @@ const DEFAULT_LEFT_WIDTH = 260
 const DEFAULT_RIGHT_WIDTH = 220
 const DEFAULT_AGENT_WIDTH = 340
 
+export type SplitDirection = 'horizontal' | 'vertical'
+
+export interface PaneState {
+  id: string
+  tabId: string | null
+}
+
+export interface SplitLayout {
+  split: boolean
+  direction: SplitDirection
+  panes: [PaneState, PaneState]
+  activePaneId: string
+  splitRatio: number
+}
+
+const DEFAULT_SPLIT_LAYOUT: SplitLayout = {
+  split: false,
+  direction: 'horizontal',
+  panes: [
+    { id: 'pane-1', tabId: null },
+    { id: 'pane-2', tabId: null },
+  ],
+  activePaneId: 'pane-1',
+  splitRatio: 0.5,
+}
+
 export type MainViewMode = 'reader' | 'graph'
 export type GraphScope = 'global' | 'document' | 'entity'
 /**
@@ -25,6 +51,9 @@ export interface LayoutState {
   rightSidebarOpen: boolean
   leftSidebarPinned: boolean
   rightSidebarPinned: boolean
+  splitActive?: boolean
+  splitDirection?: SplitDirection
+  splitRatio?: number
 }
 
 interface UIStore {
@@ -40,6 +69,12 @@ interface UIStore {
   leftSidebarWidth: number
   rightSidebarWidth: number
   agentSidebarWidth: number
+
+  /** Zen mode — fullscreen immersive document view. */
+  zenMode: boolean
+
+  /** Split-pane layout. */
+  splitLayout: SplitLayout
 
   /** Which component fills the center slot of AppShell. */
   mainViewMode: MainViewMode
@@ -72,6 +107,15 @@ interface UIStore {
   setCommandPaletteOpen: (open: boolean) => void
   setTheme: (theme: 'light' | 'dark' | 'system') => void
   setResolvedTheme: (theme: 'light' | 'dark') => void
+  toggleZenMode: () => void
+  setZenMode: (on: boolean) => void
+
+  splitPane: (direction: SplitDirection) => void
+  unsplit: () => void
+  setActivePaneId: (paneId: string) => void
+  setPaneTabId: (paneId: string, tabId: string | null) => void
+  setSplitRatio: (ratio: number) => void
+  toggleSplitDirection: () => void
 
   setLeftSidebarWidth: (w: number) => void
   setRightSidebarWidth: (w: number) => void
@@ -119,6 +163,10 @@ export const useUIStore = create<UIStore>((set, get) => {
   leftSidebarWidth: DEFAULT_LEFT_WIDTH,
   rightSidebarWidth: DEFAULT_RIGHT_WIDTH,
   agentSidebarWidth: DEFAULT_AGENT_WIDTH,
+
+  zenMode: false,
+
+  splitLayout: { ...DEFAULT_SPLIT_LAYOUT },
 
   mainViewMode: 'reader',
   graphScope: 'document',
@@ -175,7 +223,8 @@ export const useUIStore = create<UIStore>((set, get) => {
   pinLeftSidebar: () => {
     set((state) => ({
       leftSidebarPinned: !state.leftSidebarPinned,
-      leftSidebarOpen: true,
+      // Unpinning should collapse the panel into hover/click-to-open mode.
+      leftSidebarOpen: state.leftSidebarPinned ? false : true,
     }))
     debouncedSaveLayout(storeRef)
   },
@@ -199,6 +248,97 @@ export const useUIStore = create<UIStore>((set, get) => {
 
   setResolvedTheme: (resolvedTheme: 'light' | 'dark') =>
     set({ resolvedTheme }),
+
+  toggleZenMode: () => set((state) => ({ zenMode: !state.zenMode })),
+  setZenMode: (on: boolean) => set({ zenMode: on }),
+
+  splitPane: (direction) => {
+    // Use dynamic import to avoid circular dependency with fileStore.
+    void import('./fileStore').then(({ useFileStore }) => {
+      const { activeTabId, tabs } = useFileStore.getState()
+      const secondTab = tabs.find((t) => t.id !== activeTabId) ?? tabs[0] ?? null
+      set((state) => ({
+        splitLayout: {
+          ...state.splitLayout,
+          split: true,
+          direction,
+          panes: [
+            { id: 'pane-1', tabId: activeTabId },
+            { id: 'pane-2', tabId: secondTab?.id ?? activeTabId },
+          ] as [PaneState, PaneState],
+          activePaneId: 'pane-1',
+        },
+      }))
+      debouncedSaveLayout(storeRef)
+    })
+  },
+
+  unsplit: () => {
+    const s = get()
+    const activePane = s.splitLayout.panes.find((p) => p.id === s.splitLayout.activePaneId)
+    set((state) => ({
+      splitLayout: { ...state.splitLayout, split: false },
+    }))
+    debouncedSaveLayout(storeRef)
+    // Sync global activeTabId to the focused pane's tab.
+    if (activePane?.tabId) {
+      void import('./fileStore').then(({ useFileStore }) => {
+        useFileStore.getState().switchTab(activePane.tabId!)
+      })
+    }
+  },
+
+  setActivePaneId: (paneId) => {
+    const s = get()
+    if (paneId === s.splitLayout.activePaneId) return
+    // Reset editor when switching panes to prevent stale editing state.
+    void import('./editorStore').then(({ useEditorStore }) => {
+      const editor = useEditorStore.getState()
+      if (editor.editing) editor.reset()
+    })
+    // Update active pane immediately.
+    set((state) => ({
+      splitLayout: { ...state.splitLayout, activePaneId: paneId },
+    }))
+    // Sync global activeTabId to the new pane's tab.
+    const pane = s.splitLayout.panes.find((p) => p.id === paneId)
+    if (pane?.tabId) {
+      void import('./fileStore').then(({ useFileStore }) => {
+        useFileStore.getState().switchTab(pane.tabId!)
+      })
+    }
+  },
+
+  setPaneTabId: (paneId, tabId) => {
+    set((state) => ({
+      splitLayout: {
+        ...state.splitLayout,
+        panes: state.splitLayout.panes.map((p) =>
+          p.id === paneId ? { ...p, tabId } : p,
+        ) as [PaneState, PaneState],
+      },
+    }))
+    debouncedSaveLayout(storeRef)
+  },
+
+  setSplitRatio: (ratio) => {
+    set((state) => ({
+      splitLayout: {
+        ...state.splitLayout,
+        splitRatio: Math.max(0.2, Math.min(0.8, ratio)),
+      },
+    }))
+  },
+
+  toggleSplitDirection: () => {
+    set((state) => ({
+      splitLayout: {
+        ...state.splitLayout,
+        direction: state.splitLayout.direction === 'horizontal' ? 'vertical' : 'horizontal',
+      },
+    }))
+    debouncedSaveLayout(storeRef)
+  },
 
   setLeftSidebarWidth: (w) => {
     set({ leftSidebarWidth: w })
@@ -227,6 +367,12 @@ export const useUIStore = create<UIStore>((set, get) => {
           rightSidebarOpen: layout.rightSidebarOpen ?? false,
           leftSidebarPinned: layout.leftSidebarPinned ?? true,
           rightSidebarPinned: layout.rightSidebarPinned ?? false,
+          splitLayout: {
+            ...DEFAULT_SPLIT_LAYOUT,
+            split: layout.splitActive ?? false,
+            direction: layout.splitDirection ?? 'horizontal',
+            splitRatio: layout.splitRatio ?? 0.5,
+          },
         })
       }
     } catch {
@@ -247,6 +393,9 @@ export const useUIStore = create<UIStore>((set, get) => {
         rightSidebarOpen: s.rightSidebarOpen,
         leftSidebarPinned: s.leftSidebarPinned,
         rightSidebarPinned: s.rightSidebarPinned,
+        splitActive: s.splitLayout.split,
+        splitDirection: s.splitLayout.direction,
+        splitRatio: s.splitLayout.splitRatio,
       }
       await window.electronAPI.saveSettings({ ...settings, layout })
     } catch {

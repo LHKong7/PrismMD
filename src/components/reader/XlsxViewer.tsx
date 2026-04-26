@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import * as XLSX from 'xlsx'
-import { useFileStore } from '../../store/fileStore'
+import { usePaneFileData } from '../../hooks/usePaneFileData'
 import { VirtualTable } from './VirtualTable'
 import { TableSkeleton } from './TableSkeleton'
 import { ErrorBanner } from './components/ErrorBanner'
@@ -22,7 +22,7 @@ const ASYNC_PARSE_THRESHOLD_BYTES = 512 * 1024 // 512 KB (xlsx is denser than CS
  */
 export function XlsxViewer() {
   const { t } = useTranslation()
-  const bytes = useFileStore((s) => s.currentBytes)
+  const { bytes } = usePaneFileData()
   const [activeSheet, setActiveSheet] = useState<string | null>(null)
   const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null)
   const [loading, setLoading] = useState(false)

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Sparkles, RefreshCw, X, ChevronRight, Network } from 'lucide-react'
 import { useFileStore } from '../../store/fileStore'
 import { useAgentStore } from '../../store/agentStore'
+import { usePaneFileData } from '../../hooks/usePaneFileData'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
 import { useUIStore } from '../../store/uiStore'
@@ -41,8 +42,7 @@ function signatureForContent(content: string): string {
  */
 export function DocSummary() {
   const { t } = useTranslation()
-  const currentFilePath = useFileStore((s) => s.currentFilePath)
-  const currentContent = useFileStore((s) => s.currentContent)
+  const { filePath: currentFilePath, content: currentContent } = usePaneFileData()
   const activeProvider = useSettingsStore((s) => s.activeProvider)
   const neo4jUri = useSettingsStore((s) => s.insightGraph.neo4j.uri)
   const insightGraphEnabled = useSettingsStore((s) => s.insightGraph.enabled)

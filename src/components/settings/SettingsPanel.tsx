@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { X, Check, Globe, Palette, Bot, Eye, EyeOff, Shield, Trash2, Network, AlertTriangle, RefreshCw, Puzzle, FolderOpen, CircleAlert, Info, Download } from 'lucide-react'
+import { X, Check, Globe, Palette, Bot, Eye, EyeOff, Shield, Trash2, Network, AlertTriangle, RefreshCw, Puzzle, FolderOpen, CircleAlert, Info, Download, Keyboard } from 'lucide-react'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
 import { Button } from '../ui/Button'
 import { Spinner } from '../ui/Spinner'
@@ -19,7 +19,7 @@ interface SettingsPanelProps {
   onClose: () => void
 }
 
-type Tab = 'language' | 'theme' | 'ai' | 'privacy' | 'insightgraph' | 'plugins' | 'mcp' | 'about'
+type Tab = 'language' | 'theme' | 'ai' | 'privacy' | 'insightgraph' | 'plugins' | 'mcp' | 'shortcuts' | 'about'
 
 export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const { t } = useTranslation()
@@ -89,6 +89,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
               { id: 'plugins' as Tab, icon: Puzzle, label: t('settings.plugins.title') },
               { id: 'mcp' as Tab, icon: Bot, label: t('settings.mcp.title') },
               { id: 'privacy' as Tab, icon: Shield, label: t('settings.privacy.title') },
+              { id: 'shortcuts' as Tab, icon: Keyboard, label: t('settings.shortcuts.title') },
               { id: 'about' as Tab, icon: Info, label: t('settings.about.title') },
             ]).map(({ id, icon: Icon, label }) => (
               <button
@@ -117,6 +118,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             {activeTab === 'plugins' && <PluginsSettings />}
             {activeTab === 'mcp' && <McpSettingsSection />}
             {activeTab === 'privacy' && <PrivacySettings />}
+            {activeTab === 'shortcuts' && <ShortcutsHelp />}
             {activeTab === 'about' && <AboutSettings />}
           </ScrollPaneWithFade>
         </div>
@@ -1109,6 +1111,131 @@ function McpSettingsSection() {
  * only runs in packaged mac/win builds — dev runs and linux packages
  * show the "dev / unsupported" banner instead of a non-functional button.
  */
+
+// ---------------------------------------------------------------------------
+// Keyboard Shortcuts Help
+// ---------------------------------------------------------------------------
+
+interface ShortcutEntry {
+  keys: string
+  label: string
+}
+
+interface ShortcutGroup {
+  title: string
+  shortcuts: ShortcutEntry[]
+}
+
+function ShortcutsHelp() {
+  const { t } = useTranslation()
+  const isMac = window.electronAPI?.platform === 'darwin'
+  const mod = isMac ? '⌘' : 'Ctrl'
+
+  const groups: ShortcutGroup[] = [
+    {
+      title: t('settings.shortcuts.general'),
+      shortcuts: [
+        { keys: `${mod}+P`, label: t('settings.shortcuts.commandPalette') },
+        { keys: `${mod}+,`, label: t('settings.shortcuts.openSettings') },
+        { keys: `${mod}+N`, label: t('settings.shortcuts.newFile') },
+        { keys: `${mod}+${isMac ? '⇧' : 'Shift'}+Z`, label: t('settings.shortcuts.zenMode') },
+        { keys: `${mod}+F`, label: t('settings.shortcuts.findInDocument') },
+      ],
+    },
+    {
+      title: t('settings.shortcuts.tabs'),
+      shortcuts: [
+        { keys: `${mod}+W`, label: t('settings.shortcuts.closeTab') },
+        { keys: `${mod}+${isMac ? '⇧' : 'Shift'}+T`, label: t('settings.shortcuts.reopenTab') },
+        { keys: `${mod}+1–9`, label: t('settings.shortcuts.switchTabByIndex') },
+        { keys: `Ctrl+Tab`, label: t('settings.shortcuts.nextTab') },
+        { keys: `Ctrl+${isMac ? '⇧' : 'Shift'}+Tab`, label: t('settings.shortcuts.prevTab') },
+      ],
+    },
+    {
+      title: t('settings.shortcuts.splitPane'),
+      shortcuts: [
+        { keys: `${mod}+\\`, label: t('settings.shortcuts.splitHorizontal') },
+        { keys: `${mod}+${isMac ? '⇧' : 'Shift'}+\\`, label: t('settings.shortcuts.splitVertical') },
+        { keys: `${mod}+${isMac ? '⇧' : 'Shift'}+]`, label: t('settings.shortcuts.focusNextPane') },
+        { keys: `${mod}+${isMac ? '⇧' : 'Shift'}+[`, label: t('settings.shortcuts.focusPrevPane') },
+      ],
+    },
+    {
+      title: t('settings.shortcuts.editor'),
+      shortcuts: [
+        { keys: `${mod}+E`, label: t('settings.shortcuts.toggleEdit') },
+        { keys: `${mod}+S`, label: t('settings.shortcuts.save') },
+      ],
+    },
+    {
+      title: t('settings.shortcuts.sidebars'),
+      shortcuts: [
+        { keys: `${mod}+B`, label: t('settings.shortcuts.toggleFileTree') },
+        { keys: `${mod}+${isMac ? '⇧' : 'Shift'}+B`, label: t('settings.shortcuts.toggleOutline') },
+        { keys: `${mod}+J`, label: t('settings.shortcuts.toggleAgent') },
+        { keys: `${mod}+T`, label: t('settings.shortcuts.cycleTheme') },
+      ],
+    },
+    {
+      title: t('settings.shortcuts.fileTree'),
+      shortcuts: [
+        { keys: 'F2', label: t('settings.shortcuts.rename') },
+        { keys: isMac ? '⌫' : 'Delete', label: t('settings.shortcuts.delete') },
+        { keys: '→ / ←', label: t('settings.shortcuts.expandCollapse') },
+      ],
+    },
+  ]
+
+  return (
+    <div className="p-6 space-y-6">
+      <div>
+        <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+          {t('settings.shortcuts.title')}
+        </h3>
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          {t('settings.shortcuts.description')}
+        </p>
+      </div>
+
+      {groups.map((group) => (
+        <div key={group.title}>
+          <h4 className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
+            {group.title}
+          </h4>
+          <div
+            className="rounded-lg border overflow-hidden"
+            style={{ borderColor: 'var(--border-color)' }}
+          >
+            {group.shortcuts.map((s, i) => (
+              <div
+                key={s.keys}
+                className="flex items-center justify-between px-3 py-2 text-sm"
+                style={{
+                  color: 'var(--text-secondary)',
+                  borderTop: i > 0 ? '1px solid var(--border-color)' : undefined,
+                }}
+              >
+                <span>{s.label}</span>
+                <kbd
+                  className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded text-xs font-mono"
+                  style={{
+                    backgroundColor: 'var(--bg-secondary)',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--border-color)',
+                  }}
+                >
+                  {s.keys}
+                </kbd>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function AboutSettings() {
   const { t } = useTranslation()
   const currentVersion = useUpdaterStore((s) => s.currentVersion)

@@ -144,6 +144,8 @@
     "openSettings": "打开设置",
     "toggleAgent": "切换 AI 助手",
     "toggleFocusMode": "切换专注模式",
+    "toggleZenMode": "切换沉浸模式",
+    "keyboardShortcuts": "快捷键帮助",
     "togglePrivacy": "切换隐私模式",
     "insightGraphIngest": "将当前文档存入知识图谱",
     "showGraph": "打开知识图谱",
@@ -291,6 +293,39 @@
       "body": "打开对应实体即可并排查看冲突的论述。",
       "dismiss": "关闭"
     },
+    "shortcuts": {
+      "title": "快捷键",
+      "description": "PrismMD 所有可用的快捷键。macOS 上 Ctrl 显示为 ⌘。",
+      "general": "通用",
+      "commandPalette": "命令面板",
+      "openSettings": "打开设置",
+      "newFile": "新建文件",
+      "zenMode": "切换沉浸模式",
+      "findInDocument": "在文档中查找",
+      "tabs": "标签页",
+      "closeTab": "关闭标签",
+      "reopenTab": "恢复已关闭标签",
+      "switchTabByIndex": "按序号切换标签",
+      "nextTab": "下一个标签",
+      "prevTab": "上一个标签",
+      "splitPane": "分屏",
+      "splitHorizontal": "水平分屏",
+      "splitVertical": "垂直分屏",
+      "focusNextPane": "聚焦下一窗格",
+      "focusPrevPane": "聚焦上一窗格",
+      "editor": "编辑器",
+      "toggleEdit": "切换编辑模式",
+      "save": "保存文件",
+      "sidebars": "侧栏与面板",
+      "toggleFileTree": "切换文件树",
+      "toggleOutline": "切换大纲",
+      "toggleAgent": "切换 AI 助手",
+      "cycleTheme": "切换主题",
+      "fileTree": "文件树",
+      "rename": "重命名",
+      "delete": "删除",
+      "expandCollapse": "展开 / 折叠"
+    },
     "close": "关闭"
   },
   "highlightPopover": {
@@ -354,6 +389,8 @@
     "words": "{{count}} 字",
     "chars": "{{count}} 字符",
     "readingTime": "约 {{count}} 分钟阅读",
+    "saved": "已保存",
+    "unsaved": "未保存",
     "noModel": "无 AI 模型",
     "ready": "就绪",
     "privacyOn": "隐私模式",
@@ -409,6 +446,18 @@
     "errorLabel": "错误",
     "retry": "重试",
     "copyMessage": "复制这条消息"
+  },
+  "split": {
+    "horizontal": "向右分屏",
+    "vertical": "向下分屏",
+    "unsplit": "关闭分屏",
+    "focusNext": "聚焦下一窗格",
+    "focusPrev": "聚焦上一窗格",
+    "toggleDirection": "���换分屏方向"
+  },
+  "zenMode": {
+    "exit": "退出沉浸模式",
+    "toggle": "切换沉浸模式"
   },
   "common": {
     "dismiss": "关闭",

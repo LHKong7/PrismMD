@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { clsx } from 'clsx'
 import { useUIStore, type RightSidebarTab } from '../../store/uiStore'
 import { useSettingsStore } from '../../store/settingsStore'
+import { useWindowBreakpoint } from '../../lib/hooks/useWindowBreakpoint'
 import { useSidebarPanelRegistry } from '../../store/sidebarPanelRegistry'
 import { TableOfContents } from '../toc/TableOfContents'
 import { EntityPanel } from '../graph/EntityPanel'
@@ -31,6 +32,7 @@ export function RightSidebar({ toc }: RightSidebarProps) {
   const setTab = useUIStore((s) => s.setRightSidebarTab)
   const graphEnabled = useSettingsStore((s) => s.insightGraph.enabled)
   const pluginPanels = useSidebarPanelRegistry((s) => s.panels)
+  const canPin = useWindowBreakpoint() === 'wide'
 
   const tabs: {
     id: RightSidebarTab
@@ -84,17 +86,19 @@ export function RightSidebar({ toc }: RightSidebarProps) {
               </button>
             ))}
         </div>
-        <button
-          onClick={pinRightSidebar}
-          className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors flex-shrink-0"
-          title={rightSidebarPinned ? t('sidebar.unpinSidebar') : t('sidebar.pinSidebar')}
-        >
-          {rightSidebarPinned ? (
-            <PinOff size={14} style={{ color: 'var(--accent-color)' }} />
-          ) : (
-            <Pin size={14} style={{ color: 'var(--text-muted)' }} />
-          )}
-        </button>
+        {canPin && (
+          <button
+            onClick={pinRightSidebar}
+            className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors flex-shrink-0"
+            title={rightSidebarPinned ? t('sidebar.unpinSidebar') : t('sidebar.pinSidebar')}
+          >
+            {rightSidebarPinned ? (
+              <PinOff size={14} style={{ color: 'var(--accent-color)' }} />
+            ) : (
+              <Pin size={14} style={{ color: 'var(--text-muted)' }} />
+            )}
+          </button>
+        )}
       </div>
 
       <div className="flex-1 overflow-hidden">

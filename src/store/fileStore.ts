@@ -593,6 +593,20 @@ export const useFileStore = create<FileStore>((set, get) => ({
         }
       }
 
+      // Clean up pane references for the closed tab.
+      void import('./uiStore').then(({ useUIStore }) => {
+        const { splitLayout, setPaneTabId } = useUIStore.getState()
+        if (splitLayout.split) {
+          for (const pane of splitLayout.panes) {
+            if (pane.tabId === tabId) {
+              // Assign next available tab or null.
+              const next = tabs.length > 0 ? tabs[0].id : null
+              setPaneTabId(pane.id, next)
+            }
+          }
+        }
+      })
+
       return {
         tabs,
         activeTabId,
@@ -617,6 +631,13 @@ export const useFileStore = create<FileStore>((set, get) => ({
         activeTabId: tabId,
         ...syncFromActiveTab(tabs, tabId),
         toc: [],
+      })
+      // Sync the active pane's tab reference in split mode.
+      void import('./uiStore').then(({ useUIStore }) => {
+        const { splitLayout, setPaneTabId } = useUIStore.getState()
+        if (splitLayout.split) {
+          setPaneTabId(splitLayout.activePaneId, tabId)
+        }
       })
     })
   },

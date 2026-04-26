@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import Papa from 'papaparse'
 import { AlertCircle } from 'lucide-react'
-import { useFileStore } from '../../store/fileStore'
+import { usePaneFileData } from '../../hooks/usePaneFileData'
 import { VirtualTable } from './VirtualTable'
 import { TableSkeleton } from './TableSkeleton'
 
@@ -48,7 +48,7 @@ function parseCsv(content: string): ParsedCsv {
  */
 export function CsvViewer() {
   const { t } = useTranslation()
-  const content = useFileStore((s) => s.currentContent)
+  const { content } = usePaneFileData()
   const [parsed, setParsed] = useState<ParsedCsv | null>(null)
   const [loading, setLoading] = useState(false)
 
