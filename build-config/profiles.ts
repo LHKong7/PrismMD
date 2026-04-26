@@ -62,7 +62,10 @@ export const prodProfile: BuildProfile = {
   name: 'prod',
   packagerOverrides: {
     asar: {
-      unpack: '**/node_modules/{chokidar,fsevents}/**',
+      // All external node_modules (and their transitive deps) are included
+      // by the custom `ignore` function in forge.config.ts. Unpack everything
+      // under node_modules so require() can resolve them at runtime.
+      unpack: '**/node_modules/**',
     },
     appCopyright: `Copyright © ${new Date().getFullYear()} ${appConfig.name}`,
   },
