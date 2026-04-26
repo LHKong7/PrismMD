@@ -388,7 +388,7 @@ function AIProviderCard({
     setTesting(true)
     setTestResult(null)
     try {
-      const success = await window.electronAPI.testAgentConnection(id, config.apiKey, config.baseUrl)
+      const success = await window.electronAPI.testAgentConnection(id, config.apiKey, config.baseUrl, config.model)
       setTestResult(success)
     } catch { setTestResult(false) }
     setTesting(false)
@@ -495,15 +495,30 @@ function AIProviderCard({
       {/* Model */}
       <div>
         <label className="text-xs mb-1 block" style={{ color: 'var(--text-muted)' }}>{t('settings.ai.model')}</label>
-        {isCustom ? (
-          <input
-            type="text"
-            value={config.model}
-            onChange={(e) => onUpdate({ model: e.target.value })}
-            placeholder={t('settings.ai.customModelPlaceholder')}
-            className="w-full text-sm px-3 py-2 rounded-md border bg-transparent outline-none focus:border-[var(--accent-color)]"
-            style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
-          />
+        {(isCustom || isLocal) ? (
+          <>
+            <input
+              type="text"
+              list={isLocal ? `models-${id}` : undefined}
+              value={config.model}
+              onChange={(e) => onUpdate({ model: e.target.value })}
+              placeholder={isLocal ? t('settings.ai.ollamaModelPlaceholder') : t('settings.ai.customModelPlaceholder')}
+              className="w-full text-sm px-3 py-2 rounded-md border bg-transparent outline-none focus:border-[var(--accent-color)]"
+              style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+            />
+            {isLocal && (
+              <datalist id={`models-${id}`}>
+                {DEFAULT_MODELS[id].map((model) => (
+                  <option key={model} value={model} />
+                ))}
+              </datalist>
+            )}
+            {isLocal && (
+              <p className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                {t('settings.ai.ollamaModelHint')}
+              </p>
+            )}
+          </>
         ) : (
           <select
             value={config.model}

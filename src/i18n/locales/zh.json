@@ -191,6 +191,8 @@
       "custom": "自定义服务商",
       "customBaseUrlPlaceholder": "https://api.example.com/v1",
       "customModelPlaceholder": "输入模型名称...",
+      "ollamaModelPlaceholder": "例如 llama3, deepseek-r1, phi4...",
+      "ollamaModelHint": "输入你通过 `ollama pull` 拉取的本地模型名称",
       "customNote": "支持任何 OpenAI 兼容的 API 端点。输入服务地址、API 密钥和模型名称。"
     },
     "privacy": {

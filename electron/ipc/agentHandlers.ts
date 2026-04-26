@@ -20,8 +20,8 @@ export function registerAgentHandlers() {
     stopGeneration()
   })
 
-  ipcMain.handle('agent:test-connection', async (_event, provider: string, apiKey: string, baseUrl?: string) => {
-    return testConnection(provider, apiKey, baseUrl)
+  ipcMain.handle('agent:test-connection', async (_event, provider: string, apiKey: string, baseUrl?: string, model?: string) => {
+    return testConnection(provider, apiKey, baseUrl, model)
   })
 
   ipcMain.handle(

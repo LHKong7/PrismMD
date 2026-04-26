@@ -1,6 +1,7 @@
 import { unified } from 'unified'
 import remarkParse from 'remark-parse'
 import remarkGfm from 'remark-gfm'
+import remarkBreaks from 'remark-breaks'
 import remarkMath from 'remark-math'
 import remarkRehype from 'remark-rehype'
 import rehypeSlug from 'rehype-slug'
@@ -26,6 +27,7 @@ export async function processMarkdown(source: string): Promise<MarkdownResult> {
   const result = await unified()
     .use(remarkParse)
     .use(remarkGfm)
+    .use(remarkBreaks)
     .use(remarkMath)
     .use(remarkCjkSpacing)
     .use(remarkToc, { onExtract: (entries: TocEntry[]) => { toc.push(...entries) } })

@@ -122,8 +122,8 @@ const electronAPI = {
     return () => ipcRenderer.removeListener('agent:mcp-warning', handler)
   },
   stopAgentGeneration: (): void => { ipcRenderer.send('agent:stop') },
-  testAgentConnection: (provider: string, apiKey: string, baseUrl?: string): Promise<boolean> =>
-    ipcRenderer.invoke('agent:test-connection', provider, apiKey, baseUrl),
+  testAgentConnection: (provider: string, apiKey: string, baseUrl?: string, model?: string): Promise<boolean> =>
+    ipcRenderer.invoke('agent:test-connection', provider, apiKey, baseUrl, model),
 
   /**
    * Fire-and-wait AI call. Used by selection AI actions, doc TL;DRs,

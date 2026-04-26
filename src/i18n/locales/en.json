@@ -191,6 +191,8 @@
       "custom": "Custom Provider",
       "customBaseUrlPlaceholder": "https://api.example.com/v1",
       "customModelPlaceholder": "Enter model name...",
+      "ollamaModelPlaceholder": "e.g. llama3, deepseek-r1, phi4...",
+      "ollamaModelHint": "Type any model name you have pulled locally with `ollama pull`",
       "customNote": "Any OpenAI-compatible API endpoint. Enter the base URL, API key, and model name."
     },
     "privacy": {

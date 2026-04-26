@@ -26,7 +26,6 @@ const profile = resolveProfile()
 // transitive dependency tree so they get copied into the package.
 // ---------------------------------------------------------------------------
 const externalSeeds = [
-  'borderless-agent',
   '@insightgraph/sdk-embedded',
   '@insightgraph/core',
   '@insightgraph/agent-runtime',

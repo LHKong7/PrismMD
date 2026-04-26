@@ -1,19 +1,9 @@
-import type { AgentBuilder as AgentBuilderType, AgentInstance, LLMConfig } from 'borderless-agent'
+// IMPORTANT: agentEnv must be imported before borderless-agent so that
+// process.env.AGENT_*_DIR are set before the module reads them at top level.
+import './agentEnv'
+import { AgentBuilder, type AgentInstance, type LLMConfig } from 'borderless-agent'
+import type { AgentBuilder as AgentBuilderType } from 'borderless-agent'
 import { BrowserWindow } from 'electron'
-
-// borderless-agent is pure ESM; the Electron main bundle is CJS, so a
-// top-level `import` would compile to `require()` and crash with
-// ERR_REQUIRE_ESM. We externalize the package in vite.main.config.ts and
-// load it lazily via dynamic import — Node's ESM loader handles that fine
-// from a CJS caller. Cached because the dynamic import is only resolved
-// once per process.
-let agentModulePromise: Promise<typeof import('borderless-agent')> | null = null
-async function loadAgentModule(): Promise<typeof import('borderless-agent')> {
-  if (!agentModulePromise) {
-    agentModulePromise = import('borderless-agent')
-  }
-  return agentModulePromise
-}
 import { getActiveProvider, loadSettings } from './settingsStore'
 import { callTool as callMcpTool, discoverAll as discoverAllMcpTools } from './mcpService'
 
@@ -183,7 +173,6 @@ async function buildAgent(
   const settings = loadSettings()
   const mcpEnabled = settings.mcp.enabled && attachTools
 
-  const { AgentBuilder } = await loadAgentModule()
   const builder = new AgentBuilder()
     .setLLM(llmConfig)
     .setIncludeBuiltinTools(false)
@@ -428,10 +417,12 @@ export async function sendOneShot(request: {
 export async function testConnection(
   provider: string,
   apiKey: string,
-  baseUrl?: string
+  baseUrl?: string,
+  userModel?: string,
 ): Promise<boolean> {
   try {
-    const model = provider === 'ollama' ? 'llama3' : provider === 'anthropic' ? 'claude-haiku-4-20250414' : provider === 'google' ? 'gemini-1.5-flash' : 'gpt-4o-mini'
+    const fallback = provider === 'ollama' ? 'llama3' : provider === 'anthropic' ? 'claude-haiku-4-20250414' : provider === 'google' ? 'gemini-1.5-flash' : 'gpt-4o-mini'
+    const model = userModel || fallback
 
     // Connection test — skip MCP tool attach so a broken server can't
     // block the test handshake.
