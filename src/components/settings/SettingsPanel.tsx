@@ -214,8 +214,10 @@ function ThemeSettings() {
   const { t } = useTranslation()
   const themeId = useSettingsStore((s) => s.themeId)
   const themeMode = useSettingsStore((s) => s.themeMode)
+  const wordWrap = useSettingsStore((s) => s.wordWrap)
   const setThemeId = useSettingsStore((s) => s.setThemeId)
   const setThemeMode = useSettingsStore((s) => s.setThemeMode)
+  const setWordWrap = useSettingsStore((s) => s.setWordWrap)
 
   return (
     <div>
@@ -252,6 +254,17 @@ function ThemeSettings() {
           </button>
         ))}
       </div>
+
+      <h3 className="text-sm font-semibold mt-6 mb-2" style={{ color: 'var(--text-primary)' }}>{t('settings.theme.editor')}</h3>
+      <label className="flex items-center gap-3 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={wordWrap}
+          onChange={(e) => setWordWrap(e.target.checked)}
+          className="accent-[var(--accent-color)]"
+        />
+        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('settings.theme.wordWrap')}</span>
+      </label>
     </div>
   )
 }

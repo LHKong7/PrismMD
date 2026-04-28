@@ -126,6 +126,13 @@
     "next": "下一个匹配（Enter）",
     "close": "关闭（Esc）"
   },
+  "editorAI": {
+    "rewrite": "AI 改写",
+    "rewriting": "改写中...",
+    "error": "改写失败",
+    "accept": "接受",
+    "reject": "放弃"
+  },
   "commandPalette": {
     "placeholder": "搜索文件或命令...",
     "noResults": "没有找到结果。",
@@ -166,7 +173,9 @@
       "light": "浅色",
       "dark": "深色",
       "system": "跟随系统",
-      "followSystem": "跟随系统外观设置"
+      "followSystem": "跟随系统外观设置",
+      "editor": "编辑器",
+      "wordWrap": "编辑器自动换行"
     },
     "ai": {
       "title": "AI 服务商",

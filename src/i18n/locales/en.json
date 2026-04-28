@@ -126,6 +126,13 @@
     "next": "Next match (Enter)",
     "close": "Close (Esc)"
   },
+  "editorAI": {
+    "rewrite": "AI Rewrite",
+    "rewriting": "Rewriting...",
+    "error": "Rewrite failed",
+    "accept": "Accept",
+    "reject": "Discard"
+  },
   "commandPalette": {
     "placeholder": "Search files or commands...",
     "noResults": "No results found.",
@@ -166,7 +173,9 @@
       "light": "Light",
       "dark": "Dark",
       "system": "System",
-      "followSystem": "Follow system appearance"
+      "followSystem": "Follow system appearance",
+      "editor": "Editor",
+      "wordWrap": "Word wrap in editor"
     },
     "ai": {
       "title": "AI Providers",

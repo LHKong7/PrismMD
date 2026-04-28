@@ -74,6 +74,7 @@ interface SettingsStore {
   themeId: string
   themeMode: 'manual' | 'system'
   vibrancy: boolean
+  wordWrap: boolean
 
   // Privacy
   privacyMode: boolean // When true, block all external API calls - local LLM only
@@ -96,6 +97,7 @@ interface SettingsStore {
   setThemeId: (id: string) => void
   setThemeMode: (mode: 'manual' | 'system') => void
   setVibrancy: (enabled: boolean) => void
+  setWordWrap: (enabled: boolean) => void
   setPrivacyMode: (enabled: boolean) => void
   setProviderConfig: (provider: AIProvider, config: Partial<AIProviderConfig>) => void
   setActiveProvider: (provider: AIProvider | null) => void
@@ -114,6 +116,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   themeId: 'light',
   themeMode: 'system',
   vibrancy: false,
+  wordWrap: true,
   privacyMode: false,
   focusMode: false,
   insightGraph: DEFAULT_INSIGHT_GRAPH_CONFIG,
@@ -145,6 +148,11 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
   setVibrancy: (vibrancy) => {
     set({ vibrancy })
+    get().saveSettings()
+  },
+
+  setWordWrap: (wordWrap) => {
+    set({ wordWrap })
     get().saveSettings()
   },
 
@@ -224,6 +232,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
           themeId: (s.themeId as string) ?? 'light',
           themeMode: (s.themeMode as 'manual' | 'system') ?? 'system',
           vibrancy: (s.vibrancy as boolean) ?? false,
+          wordWrap: (s.wordWrap as boolean) ?? true,
           privacyMode: (s.privacyMode as boolean) ?? false,
           providers: { ...get().providers, ...(s.providers as Record<AIProvider, AIProviderConfig>) },
           activeProvider: (s.activeProvider as AIProvider | null) ?? null,
@@ -250,10 +259,10 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   },
 
   saveSettings: async () => {
-    const { language, themeId, themeMode, vibrancy, privacyMode, providers, activeProvider, insightGraph, mcp } = get()
+    const { language, themeId, themeMode, vibrancy, wordWrap, privacyMode, providers, activeProvider, insightGraph, mcp } = get()
     try {
       await window.electronAPI.saveSettings({
-        language, themeId, themeMode, vibrancy, privacyMode, providers, activeProvider, insightGraph, mcp,
+        language, themeId, themeMode, vibrancy, wordWrap, privacyMode, providers, activeProvider, insightGraph, mcp,
       })
     } catch {
       // Silently fail

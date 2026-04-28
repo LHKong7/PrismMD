@@ -1,14 +1,20 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightSpecialChars } from '@codemirror/view'
-import { EditorState, type Extension } from '@codemirror/state'
+import { Compartment, EditorState, type Extension } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { bracketMatching, indentOnInput, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
+import { useSettingsStore } from '../../store/settingsStore'
+import { editorAIExtension, type EditorSelectionInfo } from './editorAIPlugin'
+import { EditorAIBubble } from './EditorAIBubble'
 
 interface Props {
   content: string
   onChange: (value: string) => void
   language?: Extension
 }
+
+/** Compartment for dynamic word-wrap toggle without recreating the editor. */
+const wrapCompartment = new Compartment()
 
 /** Theme that reads CSS variables from the host app so the editor matches the active theme. */
 const appTheme = EditorView.theme({
@@ -53,9 +59,16 @@ const appTheme = EditorView.theme({
 export function CodeMirrorEditor({ content, onChange, language }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
-  // Keep onChange ref stable so we don't recreate the editor on every render.
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
+
+  const wordWrap = useSettingsStore((s) => s.wordWrap)
+  const activeProvider = useSettingsStore((s) => s.activeProvider)
+  const [editorSelection, setEditorSelection] = useState<EditorSelectionInfo | null>(null)
+
+  // Stable callback ref for the AI extension
+  const selectionCbRef = useRef(setEditorSelection)
+  selectionCbRef.current = setEditorSelection
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -70,6 +83,8 @@ export function CodeMirrorEditor({ content, onChange, language }: Props) {
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
       appTheme,
+      wrapCompartment.of(wordWrap ? EditorView.lineWrapping : []),
+      editorAIExtension((info) => selectionCbRef.current(info)),
       EditorView.updateListener.of((update) => {
         if (update.docChanged) {
           onChangeRef.current(update.state.doc.toString())
@@ -97,12 +112,20 @@ export function CodeMirrorEditor({ content, onChange, language }: Props) {
       view.destroy()
       viewRef.current = null
     }
-    // Only create the editor once on mount. Content syncs via the store.
+    // Only create the editor once on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Sync external content changes (e.g. discardChanges) into the editor
-  // without recreating it.
+  // Dynamic word wrap toggle
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    view.dispatch({
+      effects: wrapCompartment.reconfigure(wordWrap ? EditorView.lineWrapping : []),
+    })
+  }, [wordWrap])
+
+  // Sync external content changes into the editor without recreating it.
   useEffect(() => {
     const view = viewRef.current
     if (!view) return
@@ -115,10 +138,19 @@ export function CodeMirrorEditor({ content, onChange, language }: Props) {
   }, [content])
 
   return (
-    <div
-      ref={containerRef}
-      className="h-full overflow-hidden"
-      style={{ backgroundColor: 'var(--bg-primary)' }}
-    />
+    <>
+      <div
+        ref={containerRef}
+        className="h-full overflow-hidden"
+        style={{ backgroundColor: 'var(--bg-primary)' }}
+      />
+      {editorSelection && activeProvider && (
+        <EditorAIBubble
+          selection={editorSelection}
+          viewRef={viewRef}
+          onDismiss={() => setEditorSelection(null)}
+        />
+      )}
+    </>
   )
 }

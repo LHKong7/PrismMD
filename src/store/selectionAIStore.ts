@@ -12,7 +12,7 @@ import { create } from 'zustand'
  * MarkdownReader.
  */
 
-export type SelectionAIAction = 'explain' | 'translate' | 'simplify' | 'find-similar'
+export type SelectionAIAction = 'explain' | 'translate' | 'simplify' | 'find-similar' | 'rewrite'
 
 export interface SelectionAIAnchor {
   /** Screen-space coordinates (same space as HighlightPopover). */
