@@ -186,7 +186,7 @@ export function FileTreeNodeItem({ node, depth, hasChildren: _hasChildren, expan
         onKeyDown={handleKeyDown}
         aria-expanded={node.type === 'directory' ? expanded : undefined}
         className={clsx(
-          'w-full flex items-center gap-1.5 py-1 px-1 text-left text-sm transition-colors overflow-hidden',
+          'group w-full flex items-center gap-1.5 py-1 px-1 text-left text-sm transition-colors overflow-hidden',
           'hover:bg-black/5 dark:hover:bg-white/5',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-color)]',
           isActive && 'bg-black/10 dark:bg-white/10'
@@ -237,6 +237,26 @@ export function FileTreeNodeItem({ node, depth, hasChildren: _hasChildren, expan
           />
         ) : (
           <span className="truncate">{node.name}</span>
+        )}
+        {node.type === 'directory' && !isRenaming && (
+          <span
+            role="group"
+            className="ml-auto flex items-center gap-0.5 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span
+              role="button"
+              tabIndex={-1}
+              className="p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+              title={t('filetree.newFile')}
+              onClick={(e) => {
+                e.stopPropagation()
+                void createNewFile(node.path)
+              }}
+            >
+              <FilePlus size={12} style={{ color: 'var(--text-muted)' }} />
+            </span>
+          </span>
         )}
       </button>
 

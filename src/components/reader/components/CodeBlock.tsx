@@ -1,6 +1,9 @@
-import { useState, type ReactNode } from 'react'
-import { Copy, Check } from 'lucide-react'
+import { useState, useRef, useCallback, type ReactNode } from 'react'
+import { Copy, Check, Play } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { lookupMarkdownRenderer } from '../../../lib/markdown/rendererRegistry'
+import { isSandboxable } from '../../../lib/sandbox/sandboxLanguages'
+import { SandboxedCodeBlock } from './SandboxedCodeBlock'
 
 interface CodeBlockProps {
   children?: ReactNode
@@ -9,7 +12,11 @@ interface CodeBlockProps {
 }
 
 export function CodeBlock({ children, ...props }: CodeBlockProps) {
+  const { t } = useTranslation()
   const [copied, setCopied] = useState(false)
+  const [sandboxActive, setSandboxActive] = useState(false)
+  const [hovered, setHovered] = useState(false)
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Extract language and text from children
   let language = ''
@@ -47,16 +54,41 @@ export function CodeBlock({ children, ...props }: CodeBlockProps) {
     }
   }
 
+  const canSandbox = isSandboxable(language)
+
   const handleCopy = async () => {
     await navigator.clipboard.writeText(textContent)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const handleMouseEnter = useCallback(() => {
+    if (!canSandbox) return
+    hoverTimer.current = setTimeout(() => setHovered(true), 200)
+  }, [canSandbox])
+
+  const handleMouseLeave = useCallback(() => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current)
+    setHovered(false)
+  }, [])
+
+  // When sandbox is active, render the sandboxed view
+  if (sandboxActive) {
+    return (
+      <SandboxedCodeBlock
+        code={textContent}
+        language={language}
+        onClose={() => setSandboxActive(false)}
+      />
+    )
+  }
+
   return (
     <div
-      className="rounded-lg overflow-hidden my-6"
+      className="rounded-lg overflow-hidden my-6 relative"
       style={{ backgroundColor: 'var(--code-bg)' }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       {/* macOS-style header */}
       <div
@@ -76,17 +108,31 @@ export function CodeBlock({ children, ...props }: CodeBlockProps) {
             </span>
           )}
         </div>
-        <button
-          onClick={handleCopy}
-          className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-          title="Copy code"
-        >
-          {copied ? (
-            <Check size={14} style={{ color: 'var(--accent-color)' }} />
-          ) : (
-            <Copy size={14} style={{ color: 'var(--text-muted)' }} />
+        <div className="flex items-center gap-1">
+          {/* Sandbox play button — shown on hover for sandboxable languages */}
+          {hovered && canSandbox && (
+            <button
+              onClick={() => setSandboxActive(true)}
+              className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-colors hover:opacity-80"
+              style={{ color: 'var(--color-success)' }}
+              title={t('sandbox.run')}
+            >
+              <Play size={12} />
+              {t('sandbox.run')}
+            </button>
           )}
-        </button>
+          <button
+            onClick={handleCopy}
+            className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+            title="Copy code"
+          >
+            {copied ? (
+              <Check size={14} style={{ color: 'var(--accent-color)' }} />
+            ) : (
+              <Copy size={14} style={{ color: 'var(--text-muted)' }} />
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Code content */}

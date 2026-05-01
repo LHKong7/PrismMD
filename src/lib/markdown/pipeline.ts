@@ -12,6 +12,7 @@ import { jsx, jsxs } from 'react/jsx-runtime'
 import type { ReactElement } from 'react'
 import { remarkToc, type TocEntry } from './remarkToc'
 import { remarkCjkSpacing } from './remarkCjkSpacing'
+import { remarkCodeAnalysis, type CodeBlockMarker } from './remarkCodeAnalysis'
 import { CodeBlock } from '../../components/reader/components/CodeBlock'
 import { MermaidBlock } from '../../components/reader/components/MermaidBlock'
 import { TableBlock } from '../../components/reader/components/TableBlock'
@@ -19,10 +20,12 @@ import { TableBlock } from '../../components/reader/components/TableBlock'
 export interface MarkdownResult {
   content: ReactElement
   toc: TocEntry[]
+  codeMarkers: CodeBlockMarker[]
 }
 
 export async function processMarkdown(source: string): Promise<MarkdownResult> {
   const toc: TocEntry[] = []
+  const codeMarkers: CodeBlockMarker[] = []
 
   const result = await unified()
     .use(remarkParse)
@@ -31,6 +34,7 @@ export async function processMarkdown(source: string): Promise<MarkdownResult> {
     .use(remarkMath)
     .use(remarkCjkSpacing)
     .use(remarkToc, { onExtract: (entries: TocEntry[]) => { toc.push(...entries) } })
+    .use(remarkCodeAnalysis, { onExtract: (markers: CodeBlockMarker[]) => { codeMarkers.push(...markers) } })
     .use(remarkRehype, { allowDangerousHtml: false })
     .use(rehypeSlug)
     .use(rehypeKatex)
@@ -49,5 +53,6 @@ export async function processMarkdown(source: string): Promise<MarkdownResult> {
   return {
     content: result.result as ReactElement,
     toc,
+    codeMarkers,
   }
 }

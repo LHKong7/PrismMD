@@ -127,11 +127,34 @@
     "close": "Close (Esc)"
   },
   "editorAI": {
-    "rewrite": "AI Rewrite",
-    "rewriting": "Rewriting...",
-    "error": "Rewrite failed",
+    "rewrite": "Rewrite",
+    "shorten": "Shorten",
+    "expand": "Expand",
+    "fixGrammar": "Fix",
+    "changeTone": "Tone",
+    "toneFormal": "Formal",
+    "toneCasual": "Casual",
+    "toneAcademic": "Academic",
+    "toneCreative": "Creative",
+    "customPlaceholder": "Tell AI what to do...",
+    "processing": "Processing...",
+    "error": "Action failed",
     "accept": "Accept",
-    "reject": "Discard"
+    "reject": "Discard",
+    "retry": "Retry"
+  },
+  "minimap": {
+    "brokenBlock": "Broken code block",
+    "emptyBlock": "Empty code block",
+    "codeBlock": "Code block ({{language}})"
+  },
+  "sandbox": {
+    "run": "Run in Sandbox",
+    "rerun": "Re-run",
+    "close": "Close preview",
+    "console": "Console",
+    "consoleClear": "Clear",
+    "consoleOverflow": "{{count}} more entries hidden"
   },
   "commandPalette": {
     "placeholder": "Search files or commands...",
@@ -175,7 +198,8 @@
       "system": "System",
       "followSystem": "Follow system appearance",
       "editor": "Editor",
-      "wordWrap": "Word wrap in editor"
+      "wordWrap": "Word wrap in editor",
+      "fontSize": "Font size"
     },
     "ai": {
       "title": "AI Providers",

@@ -4,7 +4,9 @@ import { Compartment, EditorState, type Extension } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { bracketMatching, indentOnInput, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
 import { useSettingsStore } from '../../store/settingsStore'
+import { useEditorStore } from '../../store/editorStore'
 import { editorAIExtension, type EditorSelectionInfo } from './editorAIPlugin'
+import { aiHighlightExtension } from './editorAIHighlight'
 import { EditorAIBubble } from './EditorAIBubble'
 
 interface Props {
@@ -15,12 +17,20 @@ interface Props {
 
 /** Compartment for dynamic word-wrap toggle without recreating the editor. */
 const wrapCompartment = new Compartment()
+/** Compartment for dynamic font-size changes. */
+const fontSizeCompartment = new Compartment()
+
+function fontSizeTheme(size: number) {
+  return EditorView.theme({
+    '&': { fontSize: `${size}px` },
+    '.cm-gutters': { fontSize: `${size}px` },
+  })
+}
 
 /** Theme that reads CSS variables from the host app so the editor matches the active theme. */
 const appTheme = EditorView.theme({
   '&': {
     height: '100%',
-    fontSize: '14px',
     backgroundColor: 'var(--bg-primary)',
     color: 'var(--text-primary)',
   },
@@ -63,12 +73,16 @@ export function CodeMirrorEditor({ content, onChange, language }: Props) {
   onChangeRef.current = onChange
 
   const wordWrap = useSettingsStore((s) => s.wordWrap)
+  const editorFontSize = useSettingsStore((s) => s.editorFontSize)
+  const setEditorFontSize = useSettingsStore((s) => s.setEditorFontSize)
   const activeProvider = useSettingsStore((s) => s.activeProvider)
   const [editorSelection, setEditorSelection] = useState<EditorSelectionInfo | null>(null)
+  const [focusCustomInput, setFocusCustomInput] = useState(false)
 
-  // Stable callback ref for the AI extension
+  // Stable refs for callbacks used inside extensions (avoids editor rebuild)
   const selectionCbRef = useRef(setEditorSelection)
   selectionCbRef.current = setEditorSelection
+  const fontSizeRef = useRef({ get: () => useSettingsStore.getState().editorFontSize, set: setEditorFontSize })
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -81,9 +95,50 @@ export function CodeMirrorEditor({ content, onChange, language }: Props) {
       bracketMatching(),
       indentOnInput(),
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-      keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+      keymap.of([
+        ...defaultKeymap,
+        ...historyKeymap,
+        indentWithTab,
+        {
+          key: 'Mod-=',
+          run: () => {
+            fontSizeRef.current.set(fontSizeRef.current.get() + 1)
+            return true
+          },
+        },
+        {
+          key: 'Mod--',
+          run: () => {
+            fontSizeRef.current.set(fontSizeRef.current.get() - 1)
+            return true
+          },
+        },
+        {
+          key: 'Mod-0',
+          run: () => {
+            fontSizeRef.current.set(14)
+            return true
+          },
+        },
+        {
+          key: 'Mod-k',
+          run: (view) => {
+            const { from, to } = view.state.selection.main
+            if (from === to) return false
+            const text = view.state.sliceDoc(from, to)
+            if (text.trim().length < 2) return false
+            const coords = view.coordsAtPos(from)
+            if (!coords) return false
+            selectionCbRef.current({ text, from, to, anchor: { x: coords.left, y: coords.top } })
+            setFocusCustomInput(true)
+            return true
+          },
+        },
+      ]),
       appTheme,
+      fontSizeCompartment.of(fontSizeTheme(editorFontSize)),
       wrapCompartment.of(wordWrap ? EditorView.lineWrapping : []),
+      aiHighlightExtension,
       editorAIExtension((info) => selectionCbRef.current(info)),
       EditorView.updateListener.of((update) => {
         if (update.docChanged) {
@@ -107,10 +162,12 @@ export function CodeMirrorEditor({ content, onChange, language }: Props) {
     })
 
     viewRef.current = view
+    useEditorStore.getState().setEditorViewRef(view)
 
     return () => {
       view.destroy()
       viewRef.current = null
+      useEditorStore.getState().setEditorViewRef(null)
     }
     // Only create the editor once on mount.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -124,6 +181,15 @@ export function CodeMirrorEditor({ content, onChange, language }: Props) {
       effects: wrapCompartment.reconfigure(wordWrap ? EditorView.lineWrapping : []),
     })
   }, [wordWrap])
+
+  // Dynamic font size
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    view.dispatch({
+      effects: fontSizeCompartment.reconfigure(fontSizeTheme(editorFontSize)),
+    })
+  }, [editorFontSize])
 
   // Sync external content changes into the editor without recreating it.
   useEffect(() => {
@@ -144,11 +210,15 @@ export function CodeMirrorEditor({ content, onChange, language }: Props) {
         className="h-full overflow-hidden"
         style={{ backgroundColor: 'var(--bg-primary)' }}
       />
-      {editorSelection && activeProvider && (
+      {editorSelection && (
         <EditorAIBubble
           selection={editorSelection}
           viewRef={viewRef}
-          onDismiss={() => setEditorSelection(null)}
+          focusCustomInput={focusCustomInput}
+          onDismiss={() => {
+            setEditorSelection(null)
+            setFocusCustomInput(false)
+          }}
         />
       )}
     </>

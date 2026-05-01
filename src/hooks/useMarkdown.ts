@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react'
 import type { ReactElement } from 'react'
 import { processMarkdown, type MarkdownResult } from '../lib/markdown/pipeline'
 import type { TocEntry } from '../lib/markdown/remarkToc'
+import type { CodeBlockMarker } from '../lib/markdown/remarkCodeAnalysis'
 import { useFileStore } from '../store/fileStore'
 
 interface UseMarkdownResult {
   content: ReactElement | null
   toc: TocEntry[]
+  codeMarkers: CodeBlockMarker[]
   isProcessing: boolean
   error: string | null
 }
@@ -51,6 +53,7 @@ export function useMarkdown(source: string | null): UseMarkdownResult {
   return {
     content: result?.content ?? null,
     toc: result?.toc ?? [],
+    codeMarkers: result?.codeMarkers ?? [],
     isProcessing,
     error,
   }

@@ -40,9 +40,11 @@ function AppContent() {
   const zenMode = useUIStore((s) => s.zenMode)
   const loadSettings = useSettingsStore((s) => s.loadSettings)
   const loadLayout = useUIStore((s) => s.loadLayout)
+  const restoreSession = useFileStore((s) => s.restoreSession)
 
   useEffect(() => { loadSettings() }, [loadSettings])
   useEffect(() => { loadLayout() }, [loadLayout])
+  useEffect(() => { restoreSession() }, [restoreSession])
 
   // Prevent accidental close with unsaved editor changes.
   useEffect(() => {

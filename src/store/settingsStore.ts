@@ -75,6 +75,7 @@ interface SettingsStore {
   themeMode: 'manual' | 'system'
   vibrancy: boolean
   wordWrap: boolean
+  editorFontSize: number
 
   // Privacy
   privacyMode: boolean // When true, block all external API calls - local LLM only
@@ -98,6 +99,7 @@ interface SettingsStore {
   setThemeMode: (mode: 'manual' | 'system') => void
   setVibrancy: (enabled: boolean) => void
   setWordWrap: (enabled: boolean) => void
+  setEditorFontSize: (size: number) => void
   setPrivacyMode: (enabled: boolean) => void
   setProviderConfig: (provider: AIProvider, config: Partial<AIProviderConfig>) => void
   setActiveProvider: (provider: AIProvider | null) => void
@@ -117,6 +119,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   themeMode: 'system',
   vibrancy: false,
   wordWrap: true,
+  editorFontSize: 14,
   privacyMode: false,
   focusMode: false,
   insightGraph: DEFAULT_INSIGHT_GRAPH_CONFIG,
@@ -153,6 +156,12 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
 
   setWordWrap: (wordWrap) => {
     set({ wordWrap })
+    get().saveSettings()
+  },
+
+  setEditorFontSize: (editorFontSize) => {
+    const clamped = Math.max(10, Math.min(28, editorFontSize))
+    set({ editorFontSize: clamped })
     get().saveSettings()
   },
 
@@ -233,6 +242,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
           themeMode: (s.themeMode as 'manual' | 'system') ?? 'system',
           vibrancy: (s.vibrancy as boolean) ?? false,
           wordWrap: (s.wordWrap as boolean) ?? true,
+          editorFontSize: (s.editorFontSize as number) ?? 14,
           privacyMode: (s.privacyMode as boolean) ?? false,
           providers: { ...get().providers, ...(s.providers as Record<AIProvider, AIProviderConfig>) },
           activeProvider: (s.activeProvider as AIProvider | null) ?? null,
@@ -259,10 +269,10 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   },
 
   saveSettings: async () => {
-    const { language, themeId, themeMode, vibrancy, wordWrap, privacyMode, providers, activeProvider, insightGraph, mcp } = get()
+    const { language, themeId, themeMode, vibrancy, wordWrap, editorFontSize, privacyMode, providers, activeProvider, insightGraph, mcp } = get()
     try {
       await window.electronAPI.saveSettings({
-        language, themeId, themeMode, vibrancy, wordWrap, privacyMode, providers, activeProvider, insightGraph, mcp,
+        language, themeId, themeMode, vibrancy, wordWrap, editorFontSize, privacyMode, providers, activeProvider, insightGraph, mcp,
       })
     } catch {
       // Silently fail

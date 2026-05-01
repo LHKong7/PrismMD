@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
 import type { TocEntry } from '../../lib/markdown/remarkToc'
+import { useEditorStore } from '../../store/editorStore'
+import type { EditorTocEntry } from '../../lib/markdown/extractHeadings'
 import { TocItem } from './TocItem'
 
 interface TableOfContentsProps {
@@ -8,8 +10,17 @@ interface TableOfContentsProps {
 
 export function TableOfContents({ entries }: TableOfContentsProps) {
   const [activeId, setActiveId] = useState<string>('')
+  const editing = useEditorStore((s) => s.editing)
+  const editorToc = useEditorStore((s) => s.editorToc)
+  const scrollToLine = useEditorStore((s) => s.scrollToLine)
 
+  // The entries to display: editor headings when editing, prop entries when reading
+  const displayEntries = editing ? editorToc : entries
+
+  // IntersectionObserver for reader mode only
   useEffect(() => {
+    if (editing) return
+
     const headings = entries
       .map((e) => document.getElementById(e.id))
       .filter(Boolean) as HTMLElement[]
@@ -18,7 +29,6 @@ export function TableOfContents({ entries }: TableOfContentsProps) {
 
     const observer = new IntersectionObserver(
       (observerEntries) => {
-        // Find the first visible heading
         for (const entry of observerEntries) {
           if (entry.isIntersecting) {
             setActiveId(entry.target.id)
@@ -34,19 +44,28 @@ export function TableOfContents({ entries }: TableOfContentsProps) {
 
     headings.forEach((h) => observer.observe(h))
     return () => observer.disconnect()
-  }, [entries])
+  }, [entries, editing])
 
   const handleClick = (id: string) => {
-    const el = document.getElementById(id)
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      setActiveId(id)
+    if (editing) {
+      // Find the EditorTocEntry with this id and scroll to its line
+      const entry = editorToc.find((e) => e.id === id)
+      if (entry) {
+        scrollToLine(entry.line)
+        setActiveId(id)
+      }
+    } else {
+      const el = document.getElementById(id)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        setActiveId(id)
+      }
     }
   }
 
   return (
     <nav className="px-2">
-      {entries.map((entry, i) => (
+      {displayEntries.map((entry, i) => (
         <TocItem
           key={`${entry.id}-${i}`}
           entry={entry}

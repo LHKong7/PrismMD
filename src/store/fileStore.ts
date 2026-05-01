@@ -104,6 +104,10 @@ interface FileStore {
   closeOtherTabs: (tabId: string) => void
   closeTabsToRight: (tabId: string) => void
   reopenClosedTab: () => Promise<void>
+
+  // --- Session persistence ---
+  saveSession: () => Promise<void>
+  restoreSession: () => Promise<void>
 }
 
 function folderName(folderPath: string): string {
@@ -693,4 +697,79 @@ export const useFileStore = create<FileStore>((set, get) => ({
     set({ recentlyClosedPaths: rest })
     await get().openFile(filePath)
   },
+
+  saveSession: async () => {
+    if (typeof window === 'undefined' || !window.electronAPI) return
+    try {
+      const { tabs, activeTabId, openFolders } = get()
+      const settings = await window.electronAPI.loadSettings() as Record<string, unknown>
+      await window.electronAPI.saveSettings({
+        ...settings,
+        session: {
+          tabs: tabs.map((t) => ({ filePath: t.filePath, scrollY: t.scrollY })),
+          activeTabId,
+          openFolderPaths: openFolders.map((f) => f.path),
+        },
+      })
+    } catch {
+      // Silently fail
+    }
+  },
+
+  restoreSession: async () => {
+    if (typeof window === 'undefined' || !window.electronAPI) return
+    try {
+      const settings = await window.electronAPI.loadSettings() as Record<string, unknown>
+      const session = settings.session as {
+        tabs?: { filePath: string; scrollY: number }[]
+        activeTabId?: string | null
+        openFolderPaths?: string[]
+      } | undefined
+      if (!session) return
+
+      // Restore folders first
+      if (session.openFolderPaths) {
+        for (const folderPath of session.openFolderPaths) {
+          const exists = await window.electronAPI.exists(folderPath)
+          if (exists) {
+            await get().openFolder(folderPath)
+          }
+        }
+      }
+
+      // Restore tabs
+      if (session.tabs && session.tabs.length > 0) {
+        for (const tabInfo of session.tabs) {
+          const exists = await window.electronAPI.exists(tabInfo.filePath)
+          if (exists) {
+            await get().openFile(tabInfo.filePath)
+          }
+        }
+
+        // Switch to the previously active tab
+        if (session.activeTabId) {
+          const { tabs } = get()
+          const match = tabs.find((t) => t.id === session.activeTabId)
+          if (match) {
+            get().switchTab(match.id)
+          }
+        }
+      }
+    } catch {
+      // Session restore failed — start fresh
+    }
+  },
 }))
+
+// Auto-save session when tabs or active tab change (debounced 1s).
+let sessionSaveTimer: ReturnType<typeof setTimeout> | null = null
+useFileStore.subscribe(
+  (state, prev) => {
+    if (state.tabs !== prev.tabs || state.activeTabId !== prev.activeTabId || state.openFolders !== prev.openFolders) {
+      if (sessionSaveTimer) clearTimeout(sessionSaveTimer)
+      sessionSaveTimer = setTimeout(() => {
+        void useFileStore.getState().saveSession()
+      }, 1000)
+    }
+  },
+)

@@ -9,6 +9,7 @@ import { DocSummary } from './DocSummary'
 import { ContradictionBanner } from '../graph/ContradictionBanner'
 import { ErrorBanner } from './components/ErrorBanner'
 import { InFileSearchBar } from './InFileSearchBar'
+import { MiniMap } from './MiniMap'
 import { useInFileSearch } from '../../hooks/useInFileSearch'
 import '../../styles/markdown.css'
 import '../../styles/cjk.css'
@@ -24,7 +25,7 @@ import '../../styles/cjk.css'
 export function MarkdownReader() {
   const { t } = useTranslation()
   const { content: currentContent } = usePaneFileData()
-  const { content, isProcessing, error } = useMarkdown(currentContent)
+  const { content, codeMarkers, toc, isProcessing, error } = useMarkdown(currentContent)
   const scrollRef = useRef<HTMLDivElement>(null)
   const markdownBodyRef = useRef<HTMLDivElement>(null)
 
@@ -102,6 +103,7 @@ export function MarkdownReader() {
       <div className="markdown-body" ref={markdownBodyRef}>
         {content}
       </div>
+      <MiniMap scrollRef={scrollRef} codeMarkers={codeMarkers} toc={toc} />
     </div>
   )
 }

@@ -1,10 +1,11 @@
-import { app, BrowserWindow } from 'electron'
+import { app, BrowserWindow, screen } from 'electron'
 import path from 'path'
 import { registerIpcHandlers } from './ipc'
 import { appConfig } from '../app.config'
 import { shutdown as shutdownInsightGraph } from './services/insightGraphService'
 import { startAll as startMcpServers, shutdownAll as shutdownMcpServers } from './services/mcpService'
 import { initAutoUpdater } from './services/updaterService'
+import { loadSettings, saveSettings } from './services/settingsStore'
 
 // Apply app identity from the central config
 app.setName(appConfig.name)
@@ -15,6 +16,36 @@ export function getMainWindow(): BrowserWindow | null {
   return mainWindow
 }
 
+function getSavedWindowBounds(): { x?: number; y?: number; width: number; height: number } {
+  try {
+    const settings = loadSettings() as Record<string, unknown>
+    const session = settings.session as { windowBounds?: { x: number; y: number; width: number; height: number } } | undefined
+    if (session?.windowBounds) {
+      const b = session.windowBounds
+      // Validate bounds are on a visible display
+      const display = screen.getDisplayMatching({ x: b.x, y: b.y, width: b.width, height: b.height })
+      if (display) {
+        const { x, y, width, height } = display.workArea
+        // Check if at least part of the window is on-screen
+        if (b.x + b.width > x && b.x < x + width && b.y + b.height > y && b.y < y + height) {
+          return b
+        }
+      }
+    }
+  } catch { /* use defaults */ }
+  return { width: 1200, height: 800 }
+}
+
+function saveWindowBounds() {
+  if (!mainWindow) return
+  try {
+    const bounds = mainWindow.getBounds()
+    const settings = loadSettings() as Record<string, unknown>
+    const session = (settings.session ?? {}) as Record<string, unknown>
+    saveSettings({ ...settings, session: { ...session, windowBounds: bounds } } as never)
+  } catch { /* ignore */ }
+}
+
 function createWindow() {
   const iconPath = appConfig.icon
     ? path.join(
@@ -23,11 +54,12 @@ function createWindow() {
       )
     : undefined
 
+  const bounds = getSavedWindowBounds()
+
   mainWindow = new BrowserWindow({
     title: appConfig.name,
     ...(iconPath ? { icon: iconPath } : {}),
-    width: 1200,
-    height: 800,
+    ...bounds,
     minWidth: 800,
     minHeight: 600,
     frame: false,
@@ -46,6 +78,10 @@ function createWindow() {
   } else {
     mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`))
   }
+
+  mainWindow.on('close', () => {
+    saveWindowBounds()
+  })
 
   mainWindow.on('closed', () => {
     mainWindow = null

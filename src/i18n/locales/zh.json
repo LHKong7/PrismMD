@@ -127,11 +127,34 @@
     "close": "关闭（Esc）"
   },
   "editorAI": {
-    "rewrite": "AI 改写",
-    "rewriting": "改写中...",
-    "error": "改写失败",
+    "rewrite": "改写",
+    "shorten": "精简",
+    "expand": "扩展",
+    "fixGrammar": "修正",
+    "changeTone": "语气",
+    "toneFormal": "正式",
+    "toneCasual": "随意",
+    "toneAcademic": "学术",
+    "toneCreative": "创意",
+    "customPlaceholder": "告诉 AI 要做什么...",
+    "processing": "处理中...",
+    "error": "操作失败",
     "accept": "接受",
-    "reject": "放弃"
+    "reject": "放弃",
+    "retry": "重试"
+  },
+  "minimap": {
+    "brokenBlock": "异常代码块",
+    "emptyBlock": "空代码块",
+    "codeBlock": "代码块（{{language}}）"
+  },
+  "sandbox": {
+    "run": "沙箱运行",
+    "rerun": "重新运行",
+    "close": "关闭预览",
+    "console": "控制台",
+    "consoleClear": "清除",
+    "consoleOverflow": "还有 {{count}} 条被隐藏"
   },
   "commandPalette": {
     "placeholder": "搜索文件或命令...",
@@ -175,7 +198,8 @@
       "system": "跟随系统",
       "followSystem": "跟随系统外观设置",
       "editor": "编辑器",
-      "wordWrap": "编辑器自动换行"
+      "wordWrap": "编辑器自动换行",
+      "fontSize": "字体大小"
     },
     "ai": {
       "title": "AI 服务商",

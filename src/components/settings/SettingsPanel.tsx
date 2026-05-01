@@ -215,9 +215,11 @@ function ThemeSettings() {
   const themeId = useSettingsStore((s) => s.themeId)
   const themeMode = useSettingsStore((s) => s.themeMode)
   const wordWrap = useSettingsStore((s) => s.wordWrap)
+  const editorFontSize = useSettingsStore((s) => s.editorFontSize)
   const setThemeId = useSettingsStore((s) => s.setThemeId)
   const setThemeMode = useSettingsStore((s) => s.setThemeMode)
   const setWordWrap = useSettingsStore((s) => s.setWordWrap)
+  const setEditorFontSize = useSettingsStore((s) => s.setEditorFontSize)
 
   return (
     <div>
@@ -265,6 +267,25 @@ function ThemeSettings() {
         />
         <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('settings.theme.wordWrap')}</span>
       </label>
+
+      <div className="flex items-center gap-3 mt-3">
+        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('settings.theme.fontSize')}</span>
+        <input
+          type="range"
+          min={10}
+          max={28}
+          step={1}
+          value={editorFontSize}
+          onChange={(e) => setEditorFontSize(Number(e.target.value))}
+          className="flex-1 accent-[var(--accent-color)]"
+        />
+        <span
+          className="text-xs tabular-nums min-w-[3ch] text-right"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          {editorFontSize}px
+        </span>
+      </div>
     </div>
   )
 }
