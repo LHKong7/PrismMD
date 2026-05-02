@@ -1,5 +1,6 @@
 import { visit } from 'unist-util-visit'
 import { toString } from 'mdast-util-to-string'
+import GithubSlugger from 'github-slugger'
 import type { Root } from 'mdast'
 import type { Plugin } from 'unified'
 
@@ -13,26 +14,23 @@ interface RemarkTocOptions {
   onExtract: (entries: TocEntry[]) => void
 }
 
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .trim()
-    .replace(/[\s]+/g, '-')
-    .replace(/[^\w\u4e00-\u9fff\u3400-\u4dbf-]/g, '')
-    .replace(/--+/g, '-')
-    .replace(/^-+|-+$/g, '')
-}
-
+/**
+ * Remark plugin that extracts a table-of-contents from headings.
+ *
+ * Uses `github-slugger` to generate IDs that match `rehype-slug` exactly,
+ * including deduplication of repeated heading text (e.g. "Foo", "Foo" → "foo", "foo-1").
+ */
 export const remarkToc: Plugin<[RemarkTocOptions], Root> = (options) => {
   return (tree) => {
     const entries: TocEntry[] = []
+    const slugger = new GithubSlugger()
 
     visit(tree, 'heading', (node) => {
       const text = toString(node)
       entries.push({
         depth: node.depth,
         text,
-        id: slugify(text),
+        id: slugger.slug(text),
       })
     })
 
