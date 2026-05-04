@@ -1,4 +1,4 @@
-import { ipcMain, nativeTheme } from 'electron'
+import { ipcMain, nativeTheme, shell } from 'electron'
 import { getMainWindow } from '../main'
 
 export function registerThemeHandlers() {
@@ -31,5 +31,12 @@ export function registerThemeHandlers() {
 
   ipcMain.handle('window:is-maximized', () => {
     return getMainWindow()?.isMaximized() ?? false
+  })
+
+  ipcMain.handle('shell:open-external', async (_event, url: string) => {
+    // Only allow http/https URLs
+    if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
+      await shell.openExternal(url)
+    }
   })
 }

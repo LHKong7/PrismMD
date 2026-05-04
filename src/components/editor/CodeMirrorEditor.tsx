@@ -96,6 +96,49 @@ export function CodeMirrorEditor({ content, onChange, language }: Props) {
       indentOnInput(),
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
       keymap.of([
+        {
+          key: 'Mod-a',
+          run: (view) => {
+            const doc = view.state.doc
+            const { from, to } = view.state.selection.main
+
+            // Find the paragraph block around the cursor.
+            // A paragraph is delimited by blank lines (or doc boundaries).
+            let paraStart = from
+            let paraEnd = to
+
+            // Walk backward to find paragraph start (blank line or doc start)
+            const startLine = doc.lineAt(from)
+            for (let ln = startLine.number; ln >= 1; ln--) {
+              const line = doc.line(ln)
+              if (line.text.trim() === '' && ln < startLine.number) {
+                paraStart = doc.line(ln + 1).from
+                break
+              }
+              if (ln === 1) paraStart = 0
+            }
+
+            // Walk forward to find paragraph end (blank line or doc end)
+            const endLine = doc.lineAt(to)
+            for (let ln = endLine.number; ln <= doc.lines; ln++) {
+              const line = doc.line(ln)
+              if (line.text.trim() === '' && ln > endLine.number) {
+                paraEnd = doc.line(ln - 1).to
+                break
+              }
+              if (ln === doc.lines) paraEnd = doc.length
+            }
+
+            // If already selecting the full paragraph (or more), select all
+            if (from <= paraStart && to >= paraEnd) {
+              view.dispatch({ selection: { anchor: 0, head: doc.length } })
+            } else {
+              // Select the current paragraph
+              view.dispatch({ selection: { anchor: paraStart, head: paraEnd } })
+            }
+            return true
+          },
+        },
         ...defaultKeymap,
         ...historyKeymap,
         indentWithTab,

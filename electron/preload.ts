@@ -92,6 +92,9 @@ const electronAPI = {
     return () => ipcRenderer.removeListener('window:maximize-change', handler)
   },
 
+  // Shell
+  openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:open-external', url),
+
   // Settings
   loadSettings: (): Promise<Record<string, unknown>> =>
     ipcRenderer.invoke('settings:load'),

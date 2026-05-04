@@ -57,6 +57,9 @@ export interface ElectronAPI {
   isMaximized: () => Promise<boolean>
   onMaximizeChange: (callback: (isMaximized: boolean) => void) => () => void
 
+  // Shell
+  openExternal: (url: string) => Promise<void>
+
   // Settings
   loadSettings: () => Promise<Record<string, unknown>>
   saveSettings: (settings: Record<string, unknown>) => Promise<void>

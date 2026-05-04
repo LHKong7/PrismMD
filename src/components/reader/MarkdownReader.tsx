@@ -46,6 +46,24 @@ export function MarkdownReader() {
     return () => window.removeEventListener('keydown', onKey)
   }, [search])
 
+  // Intercept link clicks in the rendered markdown and open external
+  // URLs in the OS default browser instead of navigating the Electron window.
+  useEffect(() => {
+    const el = markdownBodyRef.current
+    if (!el) return
+    const handleClick = (e: MouseEvent) => {
+      const anchor = (e.target as HTMLElement).closest('a')
+      if (!anchor) return
+      const href = anchor.getAttribute('href')
+      if (href && /^https?:\/\//i.test(href)) {
+        e.preventDefault()
+        void window.electronAPI.openExternal(href)
+      }
+    }
+    el.addEventListener('click', handleClick)
+    return () => el.removeEventListener('click', handleClick)
+  }, [content])
+
   // Publish the current markdown-body element so features outside this
   // subtree (e.g. chat citations) can resolve evidence back to ranges.
   const setMarkdownBody = useReaderDomStore((s) => s.setMarkdownBody)
