@@ -216,10 +216,12 @@ function ThemeSettings() {
   const themeMode = useSettingsStore((s) => s.themeMode)
   const wordWrap = useSettingsStore((s) => s.wordWrap)
   const editorFontSize = useSettingsStore((s) => s.editorFontSize)
+  const fontFamily = useSettingsStore((s) => s.fontFamily)
   const setThemeId = useSettingsStore((s) => s.setThemeId)
   const setThemeMode = useSettingsStore((s) => s.setThemeMode)
   const setWordWrap = useSettingsStore((s) => s.setWordWrap)
   const setEditorFontSize = useSettingsStore((s) => s.setEditorFontSize)
+  const setFontFamily = useSettingsStore((s) => s.setFontFamily)
 
   return (
     <div>
@@ -285,6 +287,33 @@ function ThemeSettings() {
         >
           {editorFontSize}px
         </span>
+      </div>
+
+      <div className="flex items-center gap-3 mt-3">
+        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('settings.theme.fontFamily')}</span>
+        <select
+          value={fontFamily}
+          onChange={(e) => setFontFamily(e.target.value)}
+          className="flex-1 text-xs px-2 py-1 rounded border outline-none"
+          style={{
+            backgroundColor: 'var(--bg-secondary)',
+            borderColor: 'var(--border-color)',
+            color: 'var(--text-primary)',
+            fontFamily: fontFamily || 'inherit',
+          }}
+        >
+          <option value="">{t('settings.theme.fontDefault')}</option>
+          <option value="'Inter', sans-serif" style={{ fontFamily: 'Inter' }}>Inter</option>
+          <option value="'IBM Plex Sans', sans-serif" style={{ fontFamily: 'IBM Plex Sans' }}>IBM Plex Sans</option>
+          <option value="'Source Sans 3', sans-serif" style={{ fontFamily: 'Source Sans 3' }}>Source Sans 3</option>
+          <option value="'Fira Sans', sans-serif" style={{ fontFamily: 'Fira Sans' }}>Fira Sans</option>
+          <option value="'Nunito', sans-serif" style={{ fontFamily: 'Nunito' }}>Nunito</option>
+          <option value="'Quicksand', sans-serif" style={{ fontFamily: 'Quicksand' }}>Quicksand</option>
+          <option value="'Lora', serif" style={{ fontFamily: 'Lora' }}>Lora</option>
+          <option value="'Merriweather', serif" style={{ fontFamily: 'Merriweather' }}>Merriweather</option>
+          <option value="'Libre Baskerville', serif" style={{ fontFamily: 'Libre Baskerville' }}>Libre Baskerville</option>
+          <option value="'Bitter', serif" style={{ fontFamily: 'Bitter' }}>Bitter</option>
+        </select>
       </div>
     </div>
   )

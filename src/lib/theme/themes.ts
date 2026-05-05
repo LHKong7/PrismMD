@@ -59,6 +59,7 @@ export const themes: ThemeDefinition[] = [
       // Search highlight — WCAG AA against --text-primary (#1a1a2e → ~8:1 on #fde68a)
       '--color-search-highlight': '#fde68a',
       '--color-search-highlight-active': '#fbbf24',
+      '--font-body': "'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif",
     },
   },
   {
@@ -97,6 +98,7 @@ export const themes: ThemeDefinition[] = [
       '--color-info-border': 'rgba(96, 165, 250, 0.4)',
       '--color-search-highlight': '#854d0e',
       '--color-search-highlight-active': '#a16207',
+      '--font-body': "'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif",
     },
   },
   {
@@ -136,6 +138,7 @@ export const themes: ThemeDefinition[] = [
       '--color-info-border': 'rgba(129, 161, 193, 0.45)',
       '--color-search-highlight': '#4d4228',
       '--color-search-highlight-active': '#6b5a3a',
+      '--font-body': "'IBM Plex Sans', 'Noto Sans SC', 'PingFang SC', sans-serif",
     },
   },
   {
@@ -175,6 +178,7 @@ export const themes: ThemeDefinition[] = [
       '--color-info-border': 'rgba(38, 139, 210, 0.4)',
       '--color-search-highlight': '#f5e6b8',
       '--color-search-highlight-active': '#ecd97a',
+      '--font-body': "'Source Sans 3', 'Source Sans Pro', 'Noto Sans SC', sans-serif",
     },
   },
   {
@@ -213,6 +217,7 @@ export const themes: ThemeDefinition[] = [
       '--color-info-border': 'rgba(38, 139, 210, 0.45)',
       '--color-search-highlight': '#3d3d1e',
       '--color-search-highlight-active': '#5c5b2a',
+      '--font-body': "'Source Sans 3', 'Source Sans Pro', 'Noto Sans SC', sans-serif",
     },
   },
   {
@@ -252,6 +257,7 @@ export const themes: ThemeDefinition[] = [
       '--color-info-border': 'rgba(139, 233, 253, 0.4)',
       '--color-search-highlight': '#57502a',
       '--color-search-highlight-active': '#7a6d35',
+      '--font-body': "'Fira Sans', 'Noto Sans SC', 'PingFang SC', sans-serif",
     },
   },
   {
@@ -290,6 +296,7 @@ export const themes: ThemeDefinition[] = [
       '--color-info-border': 'rgba(43, 108, 176, 0.35)',
       '--color-search-highlight': '#f5deb3',
       '--color-search-highlight-active': '#e8c87a',
+      '--font-body': "'Lora', 'Noto Serif SC', 'Songti SC', serif",
     },
   },
   {
@@ -328,6 +335,7 @@ export const themes: ThemeDefinition[] = [
       '--color-info-border': 'rgba(29, 78, 216, 0.35)',
       '--color-search-highlight': '#d4e8b0',
       '--color-search-highlight-active': '#b8d88c',
+      '--font-body': "'Nunito', 'Noto Sans SC', 'PingFang SC', sans-serif",
     },
   },
   {
@@ -366,6 +374,7 @@ export const themes: ThemeDefinition[] = [
       '--color-info-border': 'rgba(43, 108, 176, 0.35)',
       '--color-search-highlight': '#edd9a8',
       '--color-search-highlight-active': '#e0c880',
+      '--font-body': "'Merriweather', 'Noto Serif SC', 'Songti SC', serif",
     },
   },
   {
@@ -404,6 +413,7 @@ export const themes: ThemeDefinition[] = [
       '--color-info-border': 'rgba(43, 108, 176, 0.35)',
       '--color-search-highlight': '#f0dca0',
       '--color-search-highlight-active': '#e0c870',
+      '--font-body': "'Libre Baskerville', 'Noto Serif SC', 'Songti SC', serif",
     },
   },
   {
@@ -442,6 +452,7 @@ export const themes: ThemeDefinition[] = [
       '--color-info-border': 'rgba(43, 108, 176, 0.35)',
       '--color-search-highlight': '#f0d0d8',
       '--color-search-highlight-active': '#e8b8c4',
+      '--font-body': "'Quicksand', 'Noto Sans SC', 'PingFang SC', sans-serif",
     },
   },
   {
@@ -480,6 +491,7 @@ export const themes: ThemeDefinition[] = [
       '--color-info-border': 'rgba(104, 176, 216, 0.4)',
       '--color-search-highlight': '#4a3818',
       '--color-search-highlight-active': '#604820',
+      '--font-body': "'Bitter', 'Noto Serif SC', 'Songti SC', serif",
     },
   },
 ]

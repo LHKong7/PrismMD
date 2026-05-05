@@ -95,6 +95,16 @@ const electronAPI = {
   // Shell
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:open-external', url),
 
+  // Export
+  exportHtml: (html: string, title: string): Promise<{ cancelled: boolean; filePath?: string }> =>
+    ipcRenderer.invoke('export:html', html, title),
+  exportPdf: (html: string, title: string): Promise<{ cancelled: boolean; filePath?: string }> =>
+    ipcRenderer.invoke('export:pdf', html, title),
+  exportDocx: (buffer: ArrayBuffer, title: string): Promise<{ cancelled: boolean; filePath?: string }> =>
+    ipcRenderer.invoke('export:docx', buffer, title),
+  printDocument: (html: string): Promise<void> =>
+    ipcRenderer.invoke('export:print', html),
+
   // Settings
   loadSettings: (): Promise<Record<string, unknown>> =>
     ipcRenderer.invoke('settings:load'),

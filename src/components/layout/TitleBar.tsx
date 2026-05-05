@@ -1,5 +1,5 @@
-import { useState, useEffect, type CSSProperties } from 'react'
-import { Minus, Square, X, Palette, PanelLeft, PanelRight, Settings, Bot, Network, BookOpen, Pencil, Columns2, Rows2, XCircle } from 'lucide-react'
+import { useState, useEffect, useRef, type CSSProperties } from 'react'
+import { Minus, Square, X, Palette, PanelLeft, PanelRight, Settings, Bot, Network, BookOpen, Pencil, Columns2, Rows2, XCircle, Download, FileText, FileType, Printer } from 'lucide-react'
 import { Tooltip } from '../ui/Tooltip'
 import { useTranslation } from 'react-i18next'
 import { useUIStore } from '../../store/uiStore'
@@ -140,6 +140,7 @@ export function TitleBar({ onOpenSettings }: TitleBarProps) {
             </Button>
           </Tooltip>
         )}
+        {currentFilePath && <ExportDropdown />}
         <Tooltip label={`${t('split.horizontal')} (${isMac ? '⌘' : 'Ctrl'}+\\)`} side="bottom">
           <Button
             variant="ghost"
@@ -263,5 +264,101 @@ export function TitleBar({ onOpenSettings }: TitleBarProps) {
         )}
       </div>
     </div>
+  )
+}
+
+function ExportDropdown() {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    window.addEventListener('mousedown', handleClick)
+    window.addEventListener('keydown', handleKey)
+    return () => {
+      window.removeEventListener('mousedown', handleClick)
+      window.removeEventListener('keydown', handleKey)
+    }
+  }, [open])
+
+  const handleAction = async (action: () => Promise<void>) => {
+    setOpen(false)
+    await action()
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <Tooltip label={t('export.title', 'Export')} side="bottom">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setOpen(!open)}
+          className="p-1.5"
+          aria-label={t('export.title', 'Export')}
+        >
+          <Download size={16} style={{ color: 'var(--text-secondary)' }} />
+        </Button>
+      </Tooltip>
+      {open && (
+        <div
+          className="absolute right-0 top-full mt-1 z-50 rounded-lg shadow-lg border overflow-hidden"
+          style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)', minWidth: 180 }}
+        >
+          <ExportMenuItem
+            icon={<FileText size={13} />}
+            label={t('export.html')}
+            onClick={() => handleAction(async () => {
+              const { exportToHtml } = await import('../../lib/export/exportActions')
+              await exportToHtml()
+            })}
+          />
+          <ExportMenuItem
+            icon={<FileType size={13} />}
+            label={t('export.pdf')}
+            onClick={() => handleAction(async () => {
+              const { exportToPdf } = await import('../../lib/export/exportActions')
+              await exportToPdf()
+            })}
+          />
+          <ExportMenuItem
+            icon={<FileText size={13} />}
+            label={t('export.docx')}
+            onClick={() => handleAction(async () => {
+              const { exportToDocx } = await import('../../lib/export/exportActions')
+              await exportToDocx()
+            })}
+          />
+          <div className="border-t" style={{ borderColor: 'var(--border-color)' }} />
+          <ExportMenuItem
+            icon={<Printer size={13} />}
+            label={t('export.print')}
+            onClick={() => handleAction(async () => {
+              const { printDocument } = await import('../../lib/export/exportActions')
+              await printDocument()
+            })}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ExportMenuItem({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+      style={{ color: 'var(--text-secondary)' }}
+    >
+      {icon}
+      {label}
+    </button>
   )
 }

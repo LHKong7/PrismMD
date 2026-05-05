@@ -7,6 +7,7 @@ import { registerInsightGraphHandlers } from './insightGraphHandlers'
 import { registerPluginHandlers } from './pluginHandlers'
 import { registerMcpHandlers } from './mcpHandlers'
 import { registerUpdaterHandlers } from './updaterHandlers'
+import { registerExportHandlers } from './exportHandlers'
 import { getMainWindow } from '../main'
 
 /**
@@ -27,4 +28,5 @@ export function registerIpcHandlers() {
   registerPluginHandlers()
   registerMcpHandlers()
   registerUpdaterHandlers()
+  registerExportHandlers()
 }

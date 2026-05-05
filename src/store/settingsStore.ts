@@ -76,6 +76,7 @@ interface SettingsStore {
   vibrancy: boolean
   wordWrap: boolean
   editorFontSize: number
+  fontFamily: string
 
   // Privacy
   privacyMode: boolean // When true, block all external API calls - local LLM only
@@ -100,6 +101,7 @@ interface SettingsStore {
   setVibrancy: (enabled: boolean) => void
   setWordWrap: (enabled: boolean) => void
   setEditorFontSize: (size: number) => void
+  setFontFamily: (family: string) => void
   setPrivacyMode: (enabled: boolean) => void
   setProviderConfig: (provider: AIProvider, config: Partial<AIProviderConfig>) => void
   setActiveProvider: (provider: AIProvider | null) => void
@@ -120,6 +122,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   vibrancy: false,
   wordWrap: true,
   editorFontSize: 14,
+  fontFamily: '',
   privacyMode: false,
   focusMode: false,
   insightGraph: DEFAULT_INSIGHT_GRAPH_CONFIG,
@@ -162,6 +165,18 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   setEditorFontSize: (editorFontSize) => {
     const clamped = Math.max(10, Math.min(28, editorFontSize))
     set({ editorFontSize: clamped })
+    get().saveSettings()
+  },
+
+  setFontFamily: (fontFamily) => {
+    set({ fontFamily })
+    // Apply immediately as CSS variable override
+    if (fontFamily) {
+      document.documentElement.style.setProperty('--font-body', fontFamily)
+    } else {
+      // Empty = use theme default; remove override so theme's value takes effect
+      document.documentElement.style.removeProperty('--font-body')
+    }
     get().saveSettings()
   },
 
@@ -243,6 +258,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
           vibrancy: (s.vibrancy as boolean) ?? false,
           wordWrap: (s.wordWrap as boolean) ?? true,
           editorFontSize: (s.editorFontSize as number) ?? 14,
+          fontFamily: (s.fontFamily as string) ?? '',
           privacyMode: (s.privacyMode as boolean) ?? false,
           providers: { ...get().providers, ...(s.providers as Record<AIProvider, AIProviderConfig>) },
           activeProvider: (s.activeProvider as AIProvider | null) ?? null,
@@ -262,6 +278,11 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
             },
           },
         })
+        // Apply font override if user has a custom selection
+        const ff = get().fontFamily
+        if (ff) {
+          document.documentElement.style.setProperty('--font-body', ff)
+        }
       }
     } catch {
       // Use defaults
@@ -269,10 +290,10 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   },
 
   saveSettings: async () => {
-    const { language, themeId, themeMode, vibrancy, wordWrap, editorFontSize, privacyMode, providers, activeProvider, insightGraph, mcp } = get()
+    const { language, themeId, themeMode, vibrancy, wordWrap, editorFontSize, fontFamily, privacyMode, providers, activeProvider, insightGraph, mcp } = get()
     try {
       await window.electronAPI.saveSettings({
-        language, themeId, themeMode, vibrancy, wordWrap, editorFontSize, privacyMode, providers, activeProvider, insightGraph, mcp,
+        language, themeId, themeMode, vibrancy, wordWrap, editorFontSize, fontFamily, privacyMode, providers, activeProvider, insightGraph, mcp,
       })
     } catch {
       // Silently fail

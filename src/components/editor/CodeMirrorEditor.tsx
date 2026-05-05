@@ -35,7 +35,7 @@ const appTheme = EditorView.theme({
     color: 'var(--text-primary)',
   },
   '.cm-content': {
-    fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace',
+    fontFamily: 'var(--font-body, ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace)',
     padding: '16px 0',
     caretColor: 'var(--accent-color)',
   },

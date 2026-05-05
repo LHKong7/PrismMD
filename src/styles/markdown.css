@@ -2,6 +2,7 @@
   max-width: 48rem;
   margin: 0 auto;
   padding: 2rem 1.5rem 4rem;
+  font-family: var(--font-body, inherit);
   font-size: 1rem;
   line-height: 1.8;
   color: var(--text-primary);

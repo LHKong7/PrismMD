@@ -156,6 +156,21 @@
     "consoleClear": "Clear",
     "consoleOverflow": "{{count}} more entries hidden"
   },
+  "memo": {
+    "title": "Memo",
+    "placeholder": "Jot down an idea...",
+    "add": "Add memo",
+    "delete": "Delete",
+    "empty": "No memos yet. Capture your inspirations here!",
+    "hint": "⌘+Enter to add"
+  },
+  "export": {
+    "title": "Export",
+    "html": "Export as HTML",
+    "pdf": "Export as PDF",
+    "docx": "Export as Word",
+    "print": "Print"
+  },
   "commandPalette": {
     "placeholder": "Search files or commands...",
     "noResults": "No results found.",
@@ -199,7 +214,9 @@
       "followSystem": "Follow system appearance",
       "editor": "Editor",
       "wordWrap": "Word wrap in editor",
-      "fontSize": "Font size"
+      "fontSize": "Font size",
+      "fontFamily": "Font",
+      "fontDefault": "Theme default"
     },
     "ai": {
       "title": "AI Providers",

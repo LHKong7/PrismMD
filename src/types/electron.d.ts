@@ -60,6 +60,12 @@ export interface ElectronAPI {
   // Shell
   openExternal: (url: string) => Promise<void>
 
+  // Export
+  exportHtml: (html: string, title: string) => Promise<{ cancelled: boolean; filePath?: string }>
+  exportPdf: (html: string, title: string) => Promise<{ cancelled: boolean; filePath?: string }>
+  exportDocx: (buffer: ArrayBuffer, title: string) => Promise<{ cancelled: boolean; filePath?: string }>
+  printDocument: (html: string) => Promise<void>
+
   // Settings
   loadSettings: () => Promise<Record<string, unknown>>
   saveSettings: (settings: Record<string, unknown>) => Promise<void>

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { ThemeProvider } from './lib/theme/ThemeProvider'
 import { TitleBar } from './components/layout/TitleBar'
 import { AppShell } from './components/layout/AppShell'
@@ -12,6 +12,7 @@ import { FocusOverlay } from './components/focusmode/FocusOverlay'
 import { ZenMode } from './components/zenmode/ZenMode'
 import { PluginNotificationHost } from './components/plugins/PluginNotificationHost'
 import { ToastHost } from './components/ui/Toast'
+import { MemoPanel } from './components/memo/MemoPanel'
 import { useFileWatcher } from './hooks/useFileWatcher'
 import { useAutoHide } from './hooks/useAutoHide'
 import { useAnnotations } from './hooks/useAnnotations'
@@ -38,6 +39,7 @@ function AppContent() {
   const toasts = useToastStore((s) => s.toasts)
   const dismissToast = useToastStore((s) => s.dismiss)
   const zenMode = useUIStore((s) => s.zenMode)
+  const [memoOpen, setMemoOpen] = useState(false)
   const loadSettings = useSettingsStore((s) => s.loadSettings)
   const loadLayout = useUIStore((s) => s.loadLayout)
   const restoreSession = useFileStore((s) => s.restoreSession)
@@ -146,6 +148,12 @@ function AppContent() {
         return
       }
 
+      if (e.key === 'm' && !e.shiftKey) {
+        e.preventDefault()
+        setMemoOpen((v) => !v)
+        return
+      }
+
       if (e.key === 'n') {
         e.preventDefault()
         void useFileStore.getState().createNewFile()
@@ -220,6 +228,7 @@ function AppContent() {
       />
       <GhostText />
       <SettingsPanel open={settingsOpen} onClose={closeSettings} />
+      <MemoPanel open={memoOpen} onClose={() => setMemoOpen(false)} />
       <PluginNotificationHost />
       <ToastHost items={toasts} onDismiss={dismissToast} />
     </div>
