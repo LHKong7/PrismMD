@@ -702,12 +702,14 @@ export const useFileStore = create<FileStore>((set, get) => ({
     if (typeof window === 'undefined' || !window.electronAPI) return
     try {
       const { tabs, activeTabId, openFolders } = get()
+      // Resolve activeTabId to filePath (IDs are random UUIDs, not stable across restarts)
+      const activeTab = tabs.find((t) => t.id === activeTabId)
       const settings = await window.electronAPI.loadSettings() as Record<string, unknown>
       await window.electronAPI.saveSettings({
         ...settings,
         session: {
           tabs: tabs.map((t) => ({ filePath: t.filePath, scrollY: t.scrollY })),
-          activeTabId,
+          activeFilePath: activeTab?.filePath ?? null,
           openFolderPaths: openFolders.map((f) => f.path),
         },
       })
@@ -722,7 +724,8 @@ export const useFileStore = create<FileStore>((set, get) => ({
       const settings = await window.electronAPI.loadSettings() as Record<string, unknown>
       const session = settings.session as {
         tabs?: { filePath: string; scrollY: number }[]
-        activeTabId?: string | null
+        activeFilePath?: string | null
+        activeTabId?: string | null  // legacy fallback
         openFolderPaths?: string[]
       } | undefined
       if (!session) return
@@ -739,17 +742,30 @@ export const useFileStore = create<FileStore>((set, get) => ({
 
       // Restore tabs
       if (session.tabs && session.tabs.length > 0) {
+        const scrollMap = new Map<string, number>()
         for (const tabInfo of session.tabs) {
           const exists = await window.electronAPI.exists(tabInfo.filePath)
           if (exists) {
             await get().openFile(tabInfo.filePath)
+            if (tabInfo.scrollY) scrollMap.set(tabInfo.filePath, tabInfo.scrollY)
           }
         }
 
-        // Switch to the previously active tab
-        if (session.activeTabId) {
+        // Apply saved scrollY to restored tabs
+        if (scrollMap.size > 0) {
+          set((state) => ({
+            tabs: state.tabs.map((t) => {
+              const saved = scrollMap.get(t.filePath)
+              return saved != null ? { ...t, scrollY: saved } : t
+            }),
+          }))
+        }
+
+        // Switch to the previously active tab (by filePath, not ID)
+        const activeFile = session.activeFilePath
+        if (activeFile) {
           const { tabs } = get()
-          const match = tabs.find((t) => t.id === session.activeTabId)
+          const match = tabs.find((t) => t.filePath === activeFile)
           if (match) {
             get().switchTab(match.id)
           }

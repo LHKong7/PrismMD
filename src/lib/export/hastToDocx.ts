@@ -67,7 +67,7 @@ function inlineChildren(node: Element, opts: InlineOptions = {}): TextRun[] {
         const text = getTextContent(child)
         // ExternalHyperlink cannot be mixed into TextRun array directly,
         // so we render the link text as underlined blue text.
-        runs.push(new TextRun({ text, color: '2563EB', underline: {}, ...opts }))
+        runs.push(new TextRun({ text, color: '2563EB', underline: { type: 'single' }, ...opts }))
         if (href) {
           runs.push(new TextRun({ text: ` (${href})`, color: '868E96', size: 18, ...opts }))
         }
@@ -310,5 +310,5 @@ export async function hastToDocxBuffer(hast: Root, title: string): Promise<Array
   })
 
   const buffer = await Packer.toBuffer(doc)
-  return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
+  return new Uint8Array(buffer).buffer
 }

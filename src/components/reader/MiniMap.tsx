@@ -64,6 +64,7 @@ export function MiniMap({ scrollRef, codeMarkers, toc }: Props) {
 
     // Heading markers from TOC (use rehype-slug ids)
     toc.forEach((entry, i) => {
+      if (!entry.id) return
       const el = container.querySelector(`#${CSS.escape(entry.id)}`)
       if (!el) return
       const offsetTop = (el as HTMLElement).offsetTop

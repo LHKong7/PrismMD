@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { TocEntry } from '../../lib/markdown/remarkToc'
 import { useEditorStore } from '../../store/editorStore'
-import type { EditorTocEntry } from '../../lib/markdown/extractHeadings'
 import { TocItem } from './TocItem'
 
 interface TableOfContentsProps {

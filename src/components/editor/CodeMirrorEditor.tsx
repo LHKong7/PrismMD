@@ -109,24 +109,22 @@ export function CodeMirrorEditor({ content, onChange, language }: Props) {
 
             // Walk backward to find paragraph start (blank line or doc start)
             const startLine = doc.lineAt(from)
-            for (let ln = startLine.number; ln >= 1; ln--) {
-              const line = doc.line(ln)
-              if (line.text.trim() === '' && ln < startLine.number) {
+            paraStart = doc.line(1).from  // default to doc start
+            for (let ln = startLine.number - 1; ln >= 1; ln--) {
+              if (doc.line(ln).text.trim() === '') {
                 paraStart = doc.line(ln + 1).from
                 break
               }
-              if (ln === 1) paraStart = 0
             }
 
             // Walk forward to find paragraph end (blank line or doc end)
             const endLine = doc.lineAt(to)
-            for (let ln = endLine.number; ln <= doc.lines; ln++) {
-              const line = doc.line(ln)
-              if (line.text.trim() === '' && ln > endLine.number) {
+            paraEnd = doc.length  // default to doc end
+            for (let ln = endLine.number + 1; ln <= doc.lines; ln++) {
+              if (doc.line(ln).text.trim() === '') {
                 paraEnd = doc.line(ln - 1).to
                 break
               }
-              if (ln === doc.lines) paraEnd = doc.length
             }
 
             // If already selecting the full paragraph (or more), select all
