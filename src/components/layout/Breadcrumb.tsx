@@ -47,7 +47,7 @@ export function Breadcrumb() {
 
   return (
     <div
-      className="flex items-center gap-0.5 px-3 text-xs shrink-0 overflow-hidden"
+      className="group flex items-center gap-0.5 px-3 text-xs shrink-0 overflow-hidden"
       style={{
         height: 24,
         color: 'var(--text-muted)',
@@ -79,7 +79,7 @@ export function Breadcrumb() {
           navigator.clipboard.writeText(currentFilePath)
           useToastStore.getState().show('success', 'Path copied')
         }}
-        className="ml-auto shrink-0 p-0.5 rounded opacity-0 hover:opacity-100 group-hover:opacity-50 transition-opacity"
+        className="ml-auto shrink-0 p-0.5 rounded opacity-30 hover:opacity-100 group-hover:opacity-60 transition-opacity"
         style={{ color: 'var(--text-muted)' }}
         title="Copy path"
         aria-label="Copy file path"

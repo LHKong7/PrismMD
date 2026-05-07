@@ -141,6 +141,7 @@ export function TitleBar({ onOpenSettings }: TitleBarProps) {
           </Tooltip>
         )}
         {currentFilePath && <ExportDropdown />}
+        <div className="w-px h-4 mx-0.5 flex-shrink-0" style={{ backgroundColor: 'var(--border-color)' }} />
         <Tooltip label={`${t('split.horizontal')} (${isMac ? '⌘' : 'Ctrl'}+\\)`} side="bottom">
           <Button
             variant="ghost"
@@ -182,6 +183,7 @@ export function TitleBar({ onOpenSettings }: TitleBarProps) {
             </Button>
           </Tooltip>
         )}
+        <div className="w-px h-4 mx-0.5 flex-shrink-0" style={{ backgroundColor: 'var(--border-color)' }} />
         <Tooltip label={`${t('titlebar.toggleAgent')} (${isMac ? '⌘' : 'Ctrl'}+J)`} side="bottom">
           <Button
             variant="ghost"
@@ -204,6 +206,7 @@ export function TitleBar({ onOpenSettings }: TitleBarProps) {
             <PanelRight size={16} style={{ color: 'var(--text-secondary)' }} />
           </Button>
         </Tooltip>
+        <div className="w-px h-4 mx-0.5 flex-shrink-0" style={{ backgroundColor: 'var(--border-color)' }} />
         <Tooltip label={`${t('titlebar.theme')}: ${getThemeById(themeId)?.name ?? themeId} (${isMac ? '⌘' : 'Ctrl'}+T)`} side="bottom">
           <Button
             variant="ghost"

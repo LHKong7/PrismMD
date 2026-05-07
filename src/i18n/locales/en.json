@@ -5,8 +5,11 @@
       "title": "Welcome to PrismMD",
       "subtitle": "Open a document or folder to start reading. Markdown, PDF, CSV, JSON and XLSX are all supported — drag and drop works too.",
       "newFile": "New File",
+      "newFileHint": "Create a markdown file",
       "openFile": "Open File",
+      "openFileHint": "Browse for a document",
       "openFolder": "Open Folder",
+      "openFolderHint": "Open an entire folder",
       "tip": "Tip: Press {{shortcut}} to open the command palette",
       "configureAI": "Configure AI provider"
     }

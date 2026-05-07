@@ -208,7 +208,7 @@ export function EditorAIBubble({ selection, viewRef, onDismiss, focusCustomInput
           style={{
             backgroundColor: 'var(--bg-primary)',
             borderColor: 'var(--border-color)',
-            maxWidth: 380,
+            maxWidth: Math.min(380, window.innerWidth - 24),
           }}
         >
           {/* Action buttons row */}

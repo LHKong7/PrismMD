@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { X, FileText, FileSpreadsheet, FileJson, File as FileIcon } from 'lucide-react'
 import { clsx } from 'clsx'
@@ -33,6 +33,19 @@ export function TabBar() {
   const closeTabsToRight = useFileStore((s) => s.closeTabsToRight)
 
   const scrollRef = useRef<HTMLDivElement>(null)
+  const [hasOverflow, setHasOverflow] = useState(false)
+
+  // Detect tab overflow
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const check = () => setHasOverflow(el.scrollWidth > el.clientWidth + 2)
+    check()
+    const ro = new ResizeObserver(check)
+    ro.observe(el)
+    el.addEventListener('scroll', check, { passive: true })
+    return () => { ro.disconnect(); el.removeEventListener('scroll', check) }
+  }, [tabs.length])
 
   // Context menu state
   const [ctxMenu, setCtxMenu] = useState<{ open: boolean; x: number; y: number; tabId: string }>({
@@ -103,17 +116,18 @@ export function TabBar() {
 
   return (
     <>
-      <div
-        ref={scrollRef}
-        className="flex items-end overflow-x-auto shrink-0"
-        style={{
-          height: 32,
-          backgroundColor: 'var(--bg-secondary)',
-          borderBottom: '1px solid var(--border-color)',
-          scrollbarWidth: 'none',
-        }}
-        onWheel={handleWheel}
-      >
+      <div className="relative shrink-0">
+        <div
+          ref={scrollRef}
+          className="flex items-end overflow-x-auto"
+          style={{
+            height: 32,
+            backgroundColor: 'var(--bg-secondary)',
+            borderBottom: '1px solid var(--border-color)',
+            scrollbarWidth: 'none',
+          }}
+          onWheel={handleWheel}
+        >
         {tabs.map((tab, idx) => (
           <TabItem
             key={tab.id}
@@ -131,6 +145,13 @@ export function TabBar() {
             onDrop={(e) => handleDrop(e, idx)}
           />
         ))}
+        </div>
+        {hasOverflow && (
+          <div
+            className="absolute right-0 top-0 bottom-0 w-5 pointer-events-none"
+            style={{ background: 'linear-gradient(to right, transparent, var(--bg-secondary))' }}
+          />
+        )}
       </div>
 
       <ContextMenu

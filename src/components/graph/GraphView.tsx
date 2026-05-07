@@ -5,12 +5,9 @@ import { useInsightGraphStore } from '../../store/insightGraphStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useFileStore } from '../../store/fileStore'
 import { Network, AlertCircle, Globe, FileText, Target, BookOpen } from 'lucide-react'
-import ForceGraph2D from 'react-force-graph-2d'
 import { Spinner } from '../ui/Spinner'
 import { graphPalette } from '../../lib/theme/tokens'
-// NOTE: the force-graph library extends the node objects with simulation
-// fields (x, y, vx, …) at runtime — we keep our schema wide (any extra
-// props allowed) to play nice with that.
+import { D3ForceGraph } from './D3ForceGraph'
 
 export interface GraphNode {
   id: string
@@ -199,19 +196,11 @@ export function GraphView() {
   // No auto-scope-to-global — the user stays in Document scope after
   // ingest and must explicitly click Global to see the merged graph.
 
-  // Map the SDK's edge shape (source/target strings) to whatever
-  // react-force-graph expects on `graphData.links`. Filter out any
-  // links whose source/target doesn't exist in the node set — dangling
-  // refs crash the force simulation.
-  const graphData = useMemo(() => {
-    if (!data) return { nodes: [], links: [] }
+  // Filter out dangling edge references that would crash the simulation.
+  const safeEdges = useMemo(() => {
+    if (!data) return []
     const nodeIds = new Set(data.nodes.map((n) => n.id))
-    return {
-      nodes: data.nodes,
-      links: data.edges
-        .map((e) => ({ ...e }))
-        .filter((e) => nodeIds.has(String(e.source)) && nodeIds.has(String(e.target))),
-    }
+    return data.edges.filter((e) => nodeIds.has(String(e.source)) && nodeIds.has(String(e.target)))
   }, [data])
 
   const nodeTypeColor = useMemo(
@@ -313,33 +302,13 @@ export function GraphView() {
           />
         )}
         {status === 'idle' && data && data.nodes.length > 0 && size.width > 0 && size.height > 0 && (
-          <ForceGraph2D
+          <D3ForceGraph
+            nodes={data.nodes}
+            edges={safeEdges}
             width={size.width}
             height={size.height}
-            graphData={graphData}
-            backgroundColor="transparent"
-            nodeId="id"
-            nodeLabel={(n) => `${(n as GraphNode).name}${(n as GraphNode).type ? ` · ${(n as GraphNode).type}` : ''}`}
-            nodeRelSize={5}
-            nodeColor={(n) => nodeTypeColor((n as GraphNode).type)}
-            linkColor={() => 'rgba(128,128,128,0.35)'}
-            linkDirectionalArrowLength={4}
-            linkDirectionalArrowRelPos={1}
-            linkLabel={(l) => String((l as GraphEdge).type ?? '')}
+            nodeTypeColor={nodeTypeColor}
             onNodeClick={handleNodeClick}
-            cooldownTicks={80}
-            nodeCanvasObjectMode={() => 'after'}
-            nodeCanvasObject={(node, ctx, globalScale) => {
-              const n = node as GraphNode & { x?: number; y?: number }
-              if (n.x === undefined || n.y === undefined) return
-              const label = n.name
-              const fontSize = 12 / globalScale
-              ctx.font = `${fontSize}px sans-serif`
-              ctx.textAlign = 'center'
-              ctx.textBaseline = 'top'
-              ctx.fillStyle = 'rgba(128,128,128,0.95)'
-              ctx.fillText(label, n.x, n.y + 8)
-            }}
           />
         )}
       </div>

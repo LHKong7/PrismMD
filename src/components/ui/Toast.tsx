@@ -51,7 +51,7 @@ export function ToastHost({
         'fixed right-4 bottom-10 z-toast flex flex-col gap-2 pointer-events-none',
         className,
       )}
-      style={{ maxWidth: 320 }}
+      style={{ maxWidth: 'min(320px, calc(100vw - 2rem))' }}
       aria-live="polite"
       aria-atomic="false"
     >

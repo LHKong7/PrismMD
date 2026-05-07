@@ -153,6 +153,7 @@ html, body, #root {
 ::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
   border-radius: 3px;
+  transition: background-color 120ms ease-out;
 }
 
 ::-webkit-scrollbar-thumb:hover {

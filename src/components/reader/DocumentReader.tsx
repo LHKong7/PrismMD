@@ -112,33 +112,42 @@ export function DocumentReader() {
             {t('app.welcome.subtitle')}
           </p>
           <div className="flex gap-3 justify-center">
-            <Button
-              variant="primary"
-              size="md"
-              onClick={() => createNewFile()}
-              className="px-4 py-2 rounded-lg font-medium"
-            >
-              <FilePlus size={16} />
-              {t('app.welcome.newFile')}
-            </Button>
-            <Button
-              variant="outline"
-              size="md"
-              onClick={openFileDialog}
-              className="px-4 py-2 rounded-lg font-medium"
-            >
-              <FileText size={16} />
-              {t('app.welcome.openFile')}
-            </Button>
-            <Button
-              variant="outline"
-              size="md"
-              onClick={openFolderDialog}
-              className="px-4 py-2 rounded-lg font-medium"
-            >
-              <FolderOpen size={16} />
-              {t('app.welcome.openFolder')}
-            </Button>
+            <div className="flex flex-col items-center gap-1">
+              <Button
+                variant="primary"
+                size="md"
+                onClick={() => createNewFile()}
+                className="px-4 py-2 rounded-lg font-medium"
+              >
+                <FilePlus size={16} />
+                {t('app.welcome.newFile')}
+              </Button>
+              <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('app.welcome.newFileHint', 'Create a markdown file')}</span>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <Button
+                variant="outline"
+                size="md"
+                onClick={openFileDialog}
+                className="px-4 py-2 rounded-lg font-medium"
+              >
+                <FileText size={16} />
+                {t('app.welcome.openFile')}
+              </Button>
+              <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('app.welcome.openFileHint', 'Browse for a document')}</span>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <Button
+                variant="outline"
+                size="md"
+                onClick={openFolderDialog}
+                className="px-4 py-2 rounded-lg font-medium"
+              >
+                <FolderOpen size={16} />
+                {t('app.welcome.openFolder')}
+              </Button>
+              <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{t('app.welcome.openFolderHint', 'Open an entire folder')}</span>
+            </div>
           </div>
           <p className="text-xs mt-6" style={{ color: 'var(--text-muted)' }}>
             {t('app.welcome.tip', { shortcut: 'Ctrl+P' })}
