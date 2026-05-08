@@ -7,6 +7,7 @@ import { useSettingsStore } from '../../store/settingsStore'
 import { useEditorStore } from '../../store/editorStore'
 import { editorAIExtension, type EditorSelectionInfo } from './editorAIPlugin'
 import { aiHighlightExtension } from './editorAIHighlight'
+import { tablePasteExtension } from './editorTablePaste'
 import { EditorAIBubble } from './EditorAIBubble'
 
 interface Props {
@@ -180,6 +181,7 @@ export function CodeMirrorEditor({ content, onChange, language }: Props) {
       fontSizeCompartment.of(fontSizeTheme(editorFontSize)),
       wrapCompartment.of(wordWrap ? EditorView.lineWrapping : []),
       aiHighlightExtension,
+      tablePasteExtension,
       editorAIExtension((info) => selectionCbRef.current(info)),
       EditorView.updateListener.of((update) => {
         if (update.docChanged) {

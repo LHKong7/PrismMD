@@ -15,6 +15,8 @@ import {
 export function StatusBar() {
   const { t } = useTranslation()
   const zenMode = useUIStore((s) => s.zenMode)
+  const deepEditing = useUIStore((s) => s.deepEditing)
+  const toggleDeepEditing = useUIStore((s) => s.toggleDeepEditing)
   const currentContent = useFileStore((s) => s.currentContent)
   const editing = useEditorStore((s) => s.editing)
   const isDirty = useEditorStore((s) => s.isDirty)
@@ -64,6 +66,17 @@ export function StatusBar() {
       style={{ backgroundColor: 'var(--bg-sidebar)', borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
     >
       <div className="flex items-center gap-3">
+        {/* Deep editing indicator */}
+        {deepEditing && (
+          <button
+            onClick={toggleDeepEditing}
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors hover:opacity-80"
+            style={{ backgroundColor: 'var(--accent-color)', color: '#fff' }}
+            title={t('statusBar.deepEditing', 'Deep Editing — click to exit')}
+          >
+            <span className="text-[10px] font-medium">{t('statusBar.deepEditingLabel', 'Deep Editing')}</span>
+          </button>
+        )}
         {/* Save state indicator — always visible when editing */}
         {editing && (
           <div className="flex items-center gap-1">

@@ -446,6 +446,8 @@
     "readingTime": "约 {{count}} 分钟阅读",
     "saved": "已保存",
     "unsaved": "未保存",
+    "deepEditing": "深度编辑 — 点击退出",
+    "deepEditingLabel": "深度编辑",
     "noModel": "无 AI 模型",
     "ready": "就绪",
     "privacyOn": "隐私模式",

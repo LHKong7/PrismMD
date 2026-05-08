@@ -24,6 +24,7 @@ export function AppShell() {
   const rightSidebarPinned = useUIStore((s) => s.rightSidebarPinned)
   const setLeftSidebarOpen = useUIStore((s) => s.setLeftSidebarOpen)
   const setRightSidebarOpen = useUIStore((s) => s.setRightSidebarOpen)
+  const deepEditing = useUIStore((s) => s.deepEditing)
   const mainViewMode = useUIStore((s) => s.mainViewMode)
   const LEFT_WIDTH = useUIStore((s) => s.leftSidebarWidth)
   const RIGHT_WIDTH = useUIStore((s) => s.rightSidebarWidth)
@@ -105,7 +106,7 @@ export function AppShell() {
           on trackpads/touch because the user can't "rest" the cursor at
           the edge — the handle gives them a clickable target plus a
           visual hint that there's a panel hidden there. */}
-      {!leftSidebarOpen && (
+      {!leftSidebarOpen && !deepEditing && (
         <>
           <div
             className="absolute top-0 bottom-0 left-0 z-overlay"
@@ -186,7 +187,7 @@ export function AppShell() {
       {/* Right hover trigger + handle. Mirrors the left side. We anchor
           the handle to the agent sidebar's edge when it's open so it
           stays reachable without overlapping the chat. */}
-      {!rightSidebarOpen && (
+      {!rightSidebarOpen && !deepEditing && (
         <>
           <div
             className="absolute top-0 bottom-0 right-0 z-overlay"

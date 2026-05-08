@@ -72,6 +72,8 @@ interface UIStore {
 
   /** Zen mode — fullscreen immersive document view. */
   zenMode: boolean
+  /** Deep editing — suppresses sidebar hover triggers for distraction-free writing. */
+  deepEditing: boolean
 
   /** Split-pane layout. */
   splitLayout: SplitLayout
@@ -109,6 +111,8 @@ interface UIStore {
   setResolvedTheme: (theme: 'light' | 'dark') => void
   toggleZenMode: () => void
   setZenMode: (on: boolean) => void
+  toggleDeepEditing: () => void
+  setDeepEditing: (on: boolean) => void
 
   splitPane: (direction: SplitDirection) => void
   unsplit: () => void
@@ -165,6 +169,7 @@ export const useUIStore = create<UIStore>((set, get) => {
   agentSidebarWidth: DEFAULT_AGENT_WIDTH,
 
   zenMode: false,
+  deepEditing: false,
 
   splitLayout: { ...DEFAULT_SPLIT_LAYOUT },
 
@@ -251,6 +256,17 @@ export const useUIStore = create<UIStore>((set, get) => {
 
   toggleZenMode: () => set((state) => ({ zenMode: !state.zenMode })),
   setZenMode: (on: boolean) => set({ zenMode: on }),
+  toggleDeepEditing: () => {
+    const next = !get().deepEditing
+    // Close unpinned sidebars when entering deep editing
+    if (next) {
+      const s = get()
+      if (s.leftSidebarOpen && !s.leftSidebarPinned) set({ leftSidebarOpen: false })
+      if (s.rightSidebarOpen && !s.rightSidebarPinned) set({ rightSidebarOpen: false })
+    }
+    set({ deepEditing: next })
+  },
+  setDeepEditing: (on: boolean) => set({ deepEditing: on }),
 
   splitPane: (direction) => {
     // Use dynamic import to avoid circular dependency with fileStore.

@@ -94,6 +94,13 @@ function AppContent() {
 
       if (!(e.metaKey || e.ctrlKey)) return
 
+      // Cmd+Shift+D — toggle deep editing mode
+      if (e.key === 'd' && e.shiftKey) {
+        e.preventDefault()
+        useUIStore.getState().toggleDeepEditing()
+        return
+      }
+
       // Cmd+Shift+Z — toggle zen mode (must check before undo which is Cmd+Z)
       if (e.key === 'z' && e.shiftKey) {
         e.preventDefault()

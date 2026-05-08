@@ -446,6 +446,8 @@
     "readingTime": "{{count}} min read",
     "saved": "Saved",
     "unsaved": "Unsaved",
+    "deepEditing": "Deep Editing — click to exit",
+    "deepEditingLabel": "Deep Editing",
     "noModel": "No AI model",
     "ready": "Ready",
     "privacyOn": "Privacy Mode",
