@@ -77,6 +77,8 @@ interface SettingsStore {
   wordWrap: boolean
   editorFontSize: number
   fontFamily: string
+  /** Rich edit mode — styled markdown tokens in editor (headings large, bold bold, etc.) */
+  richEditMode: boolean
 
   // Privacy
   privacyMode: boolean // When true, block all external API calls - local LLM only
@@ -102,6 +104,7 @@ interface SettingsStore {
   setWordWrap: (enabled: boolean) => void
   setEditorFontSize: (size: number) => void
   setFontFamily: (family: string) => void
+  setRichEditMode: (enabled: boolean) => void
   setPrivacyMode: (enabled: boolean) => void
   setProviderConfig: (provider: AIProvider, config: Partial<AIProviderConfig>) => void
   setActiveProvider: (provider: AIProvider | null) => void
@@ -123,6 +126,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   wordWrap: true,
   editorFontSize: 14,
   fontFamily: '',
+  richEditMode: true,
   privacyMode: false,
   focusMode: false,
   insightGraph: DEFAULT_INSIGHT_GRAPH_CONFIG,
@@ -177,6 +181,11 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
       // Empty = use theme default; remove override so theme's value takes effect
       document.documentElement.style.removeProperty('--font-body')
     }
+    get().saveSettings()
+  },
+
+  setRichEditMode: (richEditMode) => {
+    set({ richEditMode })
     get().saveSettings()
   },
 
@@ -259,6 +268,7 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
           wordWrap: (s.wordWrap as boolean) ?? true,
           editorFontSize: (s.editorFontSize as number) ?? 14,
           fontFamily: (s.fontFamily as string) ?? '',
+          richEditMode: (s.richEditMode as boolean) ?? true,
           privacyMode: (s.privacyMode as boolean) ?? false,
           providers: { ...get().providers, ...(s.providers as Record<AIProvider, AIProviderConfig>) },
           activeProvider: (s.activeProvider as AIProvider | null) ?? null,
@@ -290,10 +300,10 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
   },
 
   saveSettings: async () => {
-    const { language, themeId, themeMode, vibrancy, wordWrap, editorFontSize, fontFamily, privacyMode, providers, activeProvider, insightGraph, mcp } = get()
+    const { language, themeId, themeMode, vibrancy, wordWrap, editorFontSize, fontFamily, richEditMode, privacyMode, providers, activeProvider, insightGraph, mcp } = get()
     try {
       await window.electronAPI.saveSettings({
-        language, themeId, themeMode, vibrancy, wordWrap, editorFontSize, fontFamily, privacyMode, providers, activeProvider, insightGraph, mcp,
+        language, themeId, themeMode, vibrancy, wordWrap, editorFontSize, fontFamily, richEditMode, privacyMode, providers, activeProvider, insightGraph, mcp,
       })
     } catch {
       // Silently fail

@@ -219,7 +219,8 @@
       "wordWrap": "Word wrap in editor",
       "fontSize": "Font size",
       "fontFamily": "Font",
-      "fontDefault": "Theme default"
+      "fontDefault": "Theme default",
+      "richEditMode": "Rich edit mode (styled headings, bold, etc.)"
     },
     "ai": {
       "title": "AI Providers",

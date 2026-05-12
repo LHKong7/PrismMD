@@ -219,7 +219,8 @@
       "wordWrap": "编辑器自动换行",
       "fontSize": "字体大小",
       "fontFamily": "字体",
-      "fontDefault": "跟随主题"
+      "fontDefault": "跟随主题",
+      "richEditMode": "富文本编辑（标题、加粗等样式可视化）"
     },
     "ai": {
       "title": "AI 服务商",

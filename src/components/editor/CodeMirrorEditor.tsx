@@ -2,11 +2,12 @@ import { useRef, useEffect, useState } from 'react'
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightSpecialChars } from '@codemirror/view'
 import { Compartment, EditorState, type Extension } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
-import { bracketMatching, indentOnInput, syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
+import { bracketMatching, indentOnInput } from '@codemirror/language'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useEditorStore } from '../../store/editorStore'
 import { editorAIExtension, type EditorSelectionInfo } from './editorAIPlugin'
 import { aiHighlightExtension } from './editorAIHighlight'
+import { editorMarkdownStyleExtension } from './editorMarkdownStyle'
 import { tablePasteExtension } from './editorTablePaste'
 import { EditorAIBubble } from './EditorAIBubble'
 
@@ -20,6 +21,8 @@ interface Props {
 const wrapCompartment = new Compartment()
 /** Compartment for dynamic font-size changes. */
 const fontSizeCompartment = new Compartment()
+/** Compartment for toggling rich markdown styling on/off. */
+const richStyleCompartment = new Compartment()
 
 function fontSizeTheme(size: number) {
   return EditorView.theme({
@@ -76,6 +79,7 @@ export function CodeMirrorEditor({ content, onChange, language }: Props) {
   const wordWrap = useSettingsStore((s) => s.wordWrap)
   const editorFontSize = useSettingsStore((s) => s.editorFontSize)
   const setEditorFontSize = useSettingsStore((s) => s.setEditorFontSize)
+  const richEditMode = useSettingsStore((s) => s.richEditMode)
   const activeProvider = useSettingsStore((s) => s.activeProvider)
   const [editorSelection, setEditorSelection] = useState<EditorSelectionInfo | null>(null)
   const [focusCustomInput, setFocusCustomInput] = useState(false)
@@ -95,7 +99,7 @@ export function CodeMirrorEditor({ content, onChange, language }: Props) {
       history(),
       bracketMatching(),
       indentOnInput(),
-      syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+      richStyleCompartment.of(richEditMode ? editorMarkdownStyleExtension : []),
       keymap.of([
         {
           key: 'Mod-a',
@@ -233,6 +237,15 @@ export function CodeMirrorEditor({ content, onChange, language }: Props) {
       effects: fontSizeCompartment.reconfigure(fontSizeTheme(editorFontSize)),
     })
   }, [editorFontSize])
+
+  // Dynamic rich edit mode toggle
+  useEffect(() => {
+    const view = viewRef.current
+    if (!view) return
+    view.dispatch({
+      effects: richStyleCompartment.reconfigure(richEditMode ? editorMarkdownStyleExtension : []),
+    })
+  }, [richEditMode])
 
   // Sync external content changes into the editor without recreating it.
   useEffect(() => {

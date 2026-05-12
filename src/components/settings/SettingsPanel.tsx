@@ -217,11 +217,13 @@ function ThemeSettings() {
   const wordWrap = useSettingsStore((s) => s.wordWrap)
   const editorFontSize = useSettingsStore((s) => s.editorFontSize)
   const fontFamily = useSettingsStore((s) => s.fontFamily)
+  const richEditMode = useSettingsStore((s) => s.richEditMode)
   const setThemeId = useSettingsStore((s) => s.setThemeId)
   const setThemeMode = useSettingsStore((s) => s.setThemeMode)
   const setWordWrap = useSettingsStore((s) => s.setWordWrap)
   const setEditorFontSize = useSettingsStore((s) => s.setEditorFontSize)
   const setFontFamily = useSettingsStore((s) => s.setFontFamily)
+  const setRichEditMode = useSettingsStore((s) => s.setRichEditMode)
 
   return (
     <div>
@@ -268,6 +270,15 @@ function ThemeSettings() {
           className="accent-[var(--accent-color)]"
         />
         <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('settings.theme.wordWrap')}</span>
+      </label>
+      <label className="flex items-center gap-3 mt-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={richEditMode}
+          onChange={(e) => setRichEditMode(e.target.checked)}
+          className="accent-[var(--accent-color)]"
+        />
+        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('settings.theme.richEditMode')}</span>
       </label>
 
       <div className="flex items-center gap-3 mt-3">

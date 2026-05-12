@@ -1,8 +1,9 @@
 import { markdown } from '@codemirror/lang-markdown'
+import { GFM } from '@lezer/markdown'
 import { useEditorStore } from '../../store/editorStore'
 import { CodeMirrorEditor } from './CodeMirrorEditor'
 
-const mdLang = markdown()
+const mdLang = markdown({ extensions: GFM })
 
 export function MarkdownEditor() {
   const editorContent = useEditorStore((s) => s.editorContent)
