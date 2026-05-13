@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { X, Check, Globe, Palette, Bot, Eye, EyeOff, Shield, Trash2, Network, AlertTriangle, RefreshCw, Puzzle, FolderOpen, CircleAlert, Info, Download, Keyboard } from 'lucide-react'
+import { X, Check, Globe, Palette, Bot, Eye, EyeOff, Shield, Trash2, Network, AlertTriangle, RefreshCw, Puzzle, FolderOpen, CircleAlert, Info, Download, Keyboard, Pencil } from 'lucide-react'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
 import { Button } from '../ui/Button'
 import { Spinner } from '../ui/Spinner'
@@ -19,7 +19,7 @@ interface SettingsPanelProps {
   onClose: () => void
 }
 
-type Tab = 'language' | 'theme' | 'ai' | 'privacy' | 'insightgraph' | 'plugins' | 'mcp' | 'shortcuts' | 'about'
+type Tab = 'language' | 'theme' | 'editor' | 'ai' | 'privacy' | 'insightgraph' | 'plugins' | 'mcp' | 'shortcuts' | 'about'
 
 export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const { t } = useTranslation()
@@ -84,6 +84,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             {([
               { id: 'language' as Tab, icon: Globe, label: t('settings.language.title') },
               { id: 'theme' as Tab, icon: Palette, label: t('settings.theme.title') },
+              { id: 'editor' as Tab, icon: Pencil, label: t('settings.editor.title') },
               { id: 'ai' as Tab, icon: Bot, label: t('settings.ai.title') },
               { id: 'insightgraph' as Tab, icon: Network, label: t('settings.insightgraph.title') },
               { id: 'plugins' as Tab, icon: Puzzle, label: t('settings.plugins.title') },
@@ -113,6 +114,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
           <ScrollPaneWithFade>
             {activeTab === 'language' && <LanguageSettings />}
             {activeTab === 'theme' && <ThemeSettings />}
+            {activeTab === 'editor' && <EditorSettings />}
             {activeTab === 'ai' && <AISettings />}
             {activeTab === 'insightgraph' && <InsightGraphSettings />}
             {activeTab === 'plugins' && <PluginsSettings />}
@@ -214,16 +216,8 @@ function ThemeSettings() {
   const { t } = useTranslation()
   const themeId = useSettingsStore((s) => s.themeId)
   const themeMode = useSettingsStore((s) => s.themeMode)
-  const wordWrap = useSettingsStore((s) => s.wordWrap)
-  const editorFontSize = useSettingsStore((s) => s.editorFontSize)
-  const fontFamily = useSettingsStore((s) => s.fontFamily)
-  const richEditMode = useSettingsStore((s) => s.richEditMode)
   const setThemeId = useSettingsStore((s) => s.setThemeId)
   const setThemeMode = useSettingsStore((s) => s.setThemeMode)
-  const setWordWrap = useSettingsStore((s) => s.setWordWrap)
-  const setEditorFontSize = useSettingsStore((s) => s.setEditorFontSize)
-  const setFontFamily = useSettingsStore((s) => s.setFontFamily)
-  const setRichEditMode = useSettingsStore((s) => s.setRichEditMode)
 
   return (
     <div>
@@ -260,71 +254,97 @@ function ThemeSettings() {
           </button>
         ))}
       </div>
+    </div>
+  )
+}
 
-      <h3 className="text-sm font-semibold mt-6 mb-2" style={{ color: 'var(--text-primary)' }}>{t('settings.theme.editor')}</h3>
-      <label className="flex items-center gap-3 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={wordWrap}
-          onChange={(e) => setWordWrap(e.target.checked)}
-          className="accent-[var(--accent-color)]"
-        />
-        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('settings.theme.wordWrap')}</span>
-      </label>
-      <label className="flex items-center gap-3 mt-2 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={richEditMode}
-          onChange={(e) => setRichEditMode(e.target.checked)}
-          className="accent-[var(--accent-color)]"
-        />
-        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('settings.theme.richEditMode')}</span>
-      </label>
+function EditorSettings() {
+  const { t } = useTranslation()
+  const wordWrap = useSettingsStore((s) => s.wordWrap)
+  const editorFontSize = useSettingsStore((s) => s.editorFontSize)
+  const fontFamily = useSettingsStore((s) => s.fontFamily)
+  const richEditMode = useSettingsStore((s) => s.richEditMode)
+  const setWordWrap = useSettingsStore((s) => s.setWordWrap)
+  const setEditorFontSize = useSettingsStore((s) => s.setEditorFontSize)
+  const setFontFamily = useSettingsStore((s) => s.setFontFamily)
+  const setRichEditMode = useSettingsStore((s) => s.setRichEditMode)
 
-      <div className="flex items-center gap-3 mt-3">
-        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('settings.theme.fontSize')}</span>
-        <input
-          type="range"
-          min={10}
-          max={28}
-          step={1}
-          value={editorFontSize}
-          onChange={(e) => setEditorFontSize(Number(e.target.value))}
-          className="flex-1 accent-[var(--accent-color)]"
-        />
-        <span
-          className="text-xs tabular-nums min-w-[3ch] text-right"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          {editorFontSize}px
-        </span>
+  return (
+    <div>
+      <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{t('settings.editor.title')}</h3>
+      <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>{t('settings.editor.description')}</p>
+
+      <div className="space-y-3">
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={richEditMode}
+            onChange={(e) => setRichEditMode(e.target.checked)}
+            className="accent-[var(--accent-color)]"
+          />
+          <div>
+            <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('settings.editor.richEditMode')}</span>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{t('settings.editor.richEditModeHint')}</p>
+          </div>
+        </label>
+
+        <label className="flex items-center gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={wordWrap}
+            onChange={(e) => setWordWrap(e.target.checked)}
+            className="accent-[var(--accent-color)]"
+          />
+          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('settings.editor.wordWrap')}</span>
+        </label>
       </div>
 
-      <div className="flex items-center gap-3 mt-3">
-        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('settings.theme.fontFamily')}</span>
-        <select
-          value={fontFamily}
-          onChange={(e) => setFontFamily(e.target.value)}
-          className="flex-1 text-xs px-2 py-1 rounded border outline-none"
-          style={{
-            backgroundColor: 'var(--bg-secondary)',
-            borderColor: 'var(--border-color)',
-            color: 'var(--text-primary)',
-            fontFamily: fontFamily || 'inherit',
-          }}
-        >
-          <option value="">{t('settings.theme.fontDefault')}</option>
-          <option value="'Inter', sans-serif" style={{ fontFamily: 'Inter' }}>Inter</option>
-          <option value="'IBM Plex Sans', sans-serif" style={{ fontFamily: 'IBM Plex Sans' }}>IBM Plex Sans</option>
-          <option value="'Source Sans 3', sans-serif" style={{ fontFamily: 'Source Sans 3' }}>Source Sans 3</option>
-          <option value="'Fira Sans', sans-serif" style={{ fontFamily: 'Fira Sans' }}>Fira Sans</option>
-          <option value="'Nunito', sans-serif" style={{ fontFamily: 'Nunito' }}>Nunito</option>
-          <option value="'Quicksand', sans-serif" style={{ fontFamily: 'Quicksand' }}>Quicksand</option>
-          <option value="'Lora', serif" style={{ fontFamily: 'Lora' }}>Lora</option>
-          <option value="'Merriweather', serif" style={{ fontFamily: 'Merriweather' }}>Merriweather</option>
-          <option value="'Libre Baskerville', serif" style={{ fontFamily: 'Libre Baskerville' }}>Libre Baskerville</option>
-          <option value="'Bitter', serif" style={{ fontFamily: 'Bitter' }}>Bitter</option>
-        </select>
+      <div className="mt-5 space-y-3">
+        <div className="flex items-center gap-3">
+          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('settings.editor.fontSize')}</span>
+          <input
+            type="range"
+            min={10}
+            max={28}
+            step={1}
+            value={editorFontSize}
+            onChange={(e) => setEditorFontSize(Number(e.target.value))}
+            className="flex-1 accent-[var(--accent-color)]"
+          />
+          <span
+            className="text-xs tabular-nums min-w-[3ch] text-right"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            {editorFontSize}px
+          </span>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('settings.editor.fontFamily')}</span>
+          <select
+            value={fontFamily}
+            onChange={(e) => setFontFamily(e.target.value)}
+            className="flex-1 text-xs px-2 py-1 rounded border outline-none"
+            style={{
+              backgroundColor: 'var(--bg-secondary)',
+              borderColor: 'var(--border-color)',
+              color: 'var(--text-primary)',
+              fontFamily: fontFamily || 'inherit',
+            }}
+          >
+            <option value="">{t('settings.editor.fontDefault')}</option>
+            <option value="'Inter', sans-serif" style={{ fontFamily: 'Inter' }}>Inter</option>
+            <option value="'IBM Plex Sans', sans-serif" style={{ fontFamily: 'IBM Plex Sans' }}>IBM Plex Sans</option>
+            <option value="'Source Sans 3', sans-serif" style={{ fontFamily: 'Source Sans 3' }}>Source Sans 3</option>
+            <option value="'Fira Sans', sans-serif" style={{ fontFamily: 'Fira Sans' }}>Fira Sans</option>
+            <option value="'Nunito', sans-serif" style={{ fontFamily: 'Nunito' }}>Nunito</option>
+            <option value="'Quicksand', sans-serif" style={{ fontFamily: 'Quicksand' }}>Quicksand</option>
+            <option value="'Lora', serif" style={{ fontFamily: 'Lora' }}>Lora</option>
+            <option value="'Merriweather', serif" style={{ fontFamily: 'Merriweather' }}>Merriweather</option>
+            <option value="'Libre Baskerville', serif" style={{ fontFamily: 'Libre Baskerville' }}>Libre Baskerville</option>
+            <option value="'Bitter', serif" style={{ fontFamily: 'Bitter' }}>Bitter</option>
+          </select>
+        </div>
       </div>
     </div>
   )

@@ -214,13 +214,17 @@
       "light": "Light",
       "dark": "Dark",
       "system": "System",
-      "followSystem": "Follow system appearance",
-      "editor": "Editor",
-      "wordWrap": "Word wrap in editor",
+      "followSystem": "Follow system appearance"
+    },
+    "editor": {
+      "title": "Editor",
+      "description": "Configure the editing experience",
+      "richEditMode": "Rich edit mode",
+      "richEditModeHint": "Display styled headings, bold, italic in the editor",
+      "wordWrap": "Word wrap",
       "fontSize": "Font size",
       "fontFamily": "Font",
-      "fontDefault": "Theme default",
-      "richEditMode": "Rich edit mode (styled headings, bold, etc.)"
+      "fontDefault": "Theme default"
     },
     "ai": {
       "title": "AI Providers",

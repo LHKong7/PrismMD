@@ -214,13 +214,17 @@
       "light": "浅色",
       "dark": "深色",
       "system": "跟随系统",
-      "followSystem": "跟随系统外观设置",
-      "editor": "编辑器",
-      "wordWrap": "编辑器自动换行",
+      "followSystem": "跟随系统外观设置"
+    },
+    "editor": {
+      "title": "编辑器",
+      "description": "配置编辑体验",
+      "richEditMode": "富文本编辑模式",
+      "richEditModeHint": "在编辑器中显示标题、加粗、斜体等样式",
+      "wordWrap": "自动换行",
       "fontSize": "字体大小",
       "fontFamily": "字体",
-      "fontDefault": "跟随主题",
-      "richEditMode": "富文本编辑（标题、加粗等样式可视化）"
+      "fontDefault": "跟随主题"
     },
     "ai": {
       "title": "AI 服务商",
