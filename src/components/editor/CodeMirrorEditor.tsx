@@ -9,6 +9,7 @@ import { editorAIExtension, type EditorSelectionInfo } from './editorAIPlugin'
 import { aiHighlightExtension } from './editorAIHighlight'
 import { editorMarkdownStyleExtension } from './editorMarkdownStyle'
 import { tablePasteExtension } from './editorTablePaste'
+import { slashCommandExtension } from './editorSlashCommands'
 import { EditorAIBubble } from './EditorAIBubble'
 
 interface Props {
@@ -186,6 +187,7 @@ export function CodeMirrorEditor({ content, onChange, language }: Props) {
       wrapCompartment.of(wordWrap ? EditorView.lineWrapping : []),
       aiHighlightExtension,
       tablePasteExtension,
+      slashCommandExtension,
       editorAIExtension((info) => selectionCbRef.current(info)),
       EditorView.updateListener.of((update) => {
         if (update.docChanged) {
