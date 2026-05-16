@@ -6,8 +6,9 @@ import type { Plugin } from './types'
 // in its own loader that speaks via IPC.
 import helloPlugin from '../../plugins/hello'
 import mermaidPlugin from '../../plugins/mermaid'
+import executablePlugin from '../../plugins/executable'
 
-const BUILTIN_PLUGINS: Plugin[] = [helloPlugin, mermaidPlugin]
+const BUILTIN_PLUGINS: Plugin[] = [helloPlugin, mermaidPlugin, executablePlugin]
 
 let bootstrapped = false
 
