@@ -1,3 +1,12 @@
+export interface KBEntry {
+  id: string
+  title: string
+  originalPath: string
+  tags: string[]
+  summary: string
+  addedAt: number
+}
+
 export interface FileTreeNode {
   name: string
   path: string
@@ -65,6 +74,13 @@ export interface ElectronAPI {
   exportPdf: (html: string, title: string) => Promise<{ cancelled: boolean; filePath?: string }>
   exportDocx: (buffer: ArrayBuffer, title: string) => Promise<{ cancelled: boolean; filePath?: string }>
   printDocument: (html: string) => Promise<void>
+
+  // Knowledge Base
+  kbAdd: (filePath: string, title?: string, tags?: string[]) => Promise<{ ok: boolean; entry?: KBEntry; error?: string }>
+  kbRemove: (id: string) => Promise<{ ok: boolean; error?: string }>
+  kbList: () => Promise<{ ok: boolean; entries?: KBEntry[]; error?: string }>
+  kbSearch: (query: string) => Promise<{ ok: boolean; entries?: KBEntry[]; error?: string }>
+  kbGetContext: (query: string, maxDocs?: number) => Promise<{ ok: boolean; context?: string; error?: string }>
 
   // Settings
   loadSettings: () => Promise<Record<string, unknown>>

@@ -79,6 +79,12 @@ const SLASH_COMMANDS: Completion[] = [
     detail: 'Insert a hyperlink',
     apply: '[text](url)',
   },
+  {
+    label: '/knowledge',
+    displayLabel: 'Knowledge Base',
+    detail: 'Reference knowledge base in Agent context',
+    apply: '> [!knowledge] Query your knowledge base via the Agent sidebar.',
+  },
 ]
 
 function slashCompletions(context: CompletionContext) {

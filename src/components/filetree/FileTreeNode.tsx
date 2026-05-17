@@ -3,6 +3,7 @@ import {
   ChevronRight,
   FileText,
   FileSpreadsheet,
+  BookMarked,
   FileJson,
   File as FileIcon,
   Folder,
@@ -20,6 +21,7 @@ import type { FileTreeNode } from '../../types/electron'
 import { useFileStore } from '../../store/fileStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
+import { useKnowledgeBaseStore } from '../../store/knowledgeBaseStore'
 import { useBatchIngestStore } from '../../store/batchIngestStore'
 import { detectFormat, isSupported, type FileFormat } from '../../lib/fileFormat'
 import { ContextMenu } from '../ui/ContextMenu'
@@ -86,6 +88,7 @@ export function FileTreeNodeItem({ node, depth, hasChildren: _hasChildren, expan
   const insightGraphEnabled = useSettingsStore((s) => s.insightGraph.enabled)
   const ingestFile = useInsightGraphStore((s) => s.ingestFile)
   const startBatchIngest = useBatchIngestStore((s) => s.startBatchIngest)
+  const addToKB = useKnowledgeBaseStore((s) => s.addDocument)
 
   const isRenaming = renamingPath === node.path
   const inputRef = useRef<HTMLInputElement>(null)
@@ -349,6 +352,14 @@ export function FileTreeNodeItem({ node, depth, hasChildren: _hasChildren, expan
               <span>{t('filetree.delete')}</span>
             </button>
             <div className="my-1 border-t" style={{ borderColor: 'var(--border-color)' }} />
+            <button
+              role="menuitem"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 focus-visible:bg-black/5 dark:focus-visible:bg-white/5 focus-visible:outline-none"
+              onClick={() => { closeMenu(); void addToKB(node.path) }}
+            >
+              <BookMarked size={12} />
+              <span>{t('filetree.addToKB')}</span>
+            </button>
             <button
               role="menuitem"
               className="w-full flex items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 focus-visible:bg-black/5 dark:focus-visible:bg-white/5 focus-visible:outline-none"

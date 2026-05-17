@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { X, Check, Globe, Palette, Bot, Eye, EyeOff, Shield, Trash2, Network, AlertTriangle, RefreshCw, Puzzle, FolderOpen, CircleAlert, Info, Download, Keyboard, Pencil } from 'lucide-react'
+import { X, Check, Globe, Palette, Bot, Eye, EyeOff, Shield, Trash2, Network, AlertTriangle, RefreshCw, Puzzle, FolderOpen, CircleAlert, Info, Download, Keyboard, Pencil, BookMarked } from 'lucide-react'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
 import { Button } from '../ui/Button'
 import { Spinner } from '../ui/Spinner'
@@ -10,6 +10,7 @@ import { useUIStore } from '../../store/uiStore'
 import { usePluginManager } from '../../lib/plugins/host'
 import { reloadExternalPlugins } from '../../lib/plugins/externalLoader'
 import { useUpdaterStore } from '../../store/updaterStore'
+import { useKnowledgeBaseStore } from '../../store/knowledgeBaseStore'
 import { themes } from '../../lib/theme/themes'
 import { LANGUAGES, changeLanguage, type SupportedLanguage } from '../../i18n'
 import { clsx } from 'clsx'
@@ -19,7 +20,7 @@ interface SettingsPanelProps {
   onClose: () => void
 }
 
-type Tab = 'language' | 'theme' | 'editor' | 'ai' | 'privacy' | 'insightgraph' | 'plugins' | 'mcp' | 'shortcuts' | 'about'
+type Tab = 'language' | 'theme' | 'editor' | 'ai' | 'knowledge' | 'privacy' | 'insightgraph' | 'plugins' | 'mcp' | 'shortcuts' | 'about'
 
 export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const { t } = useTranslation()
@@ -86,6 +87,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
               { id: 'theme' as Tab, icon: Palette, label: t('settings.theme.title') },
               { id: 'editor' as Tab, icon: Pencil, label: t('settings.editor.title') },
               { id: 'ai' as Tab, icon: Bot, label: t('settings.ai.title') },
+              { id: 'knowledge' as Tab, icon: BookMarked, label: t('settings.knowledge.title') },
               { id: 'insightgraph' as Tab, icon: Network, label: t('settings.insightgraph.title') },
               { id: 'plugins' as Tab, icon: Puzzle, label: t('settings.plugins.title') },
               { id: 'mcp' as Tab, icon: Bot, label: t('settings.mcp.title') },
@@ -116,6 +118,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             {activeTab === 'theme' && <ThemeSettings />}
             {activeTab === 'editor' && <EditorSettings />}
             {activeTab === 'ai' && <AISettings />}
+            {activeTab === 'knowledge' && <KnowledgeSettings />}
             {activeTab === 'insightgraph' && <InsightGraphSettings />}
             {activeTab === 'plugins' && <PluginsSettings />}
             {activeTab === 'mcp' && <McpSettingsSection />}
@@ -346,6 +349,96 @@ function EditorSettings() {
           </select>
         </div>
       </div>
+    </div>
+  )
+}
+
+function KnowledgeSettings() {
+  const { t } = useTranslation()
+  const entries = useKnowledgeBaseStore((s) => s.entries)
+  const loading = useKnowledgeBaseStore((s) => s.loading)
+  const refresh = useKnowledgeBaseStore((s) => s.refresh)
+  const removeDocument = useKnowledgeBaseStore((s) => s.removeDocument)
+
+  useEffect(() => { refresh() }, [refresh])
+
+  return (
+    <div>
+      <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+        {t('settings.knowledge.title')}
+      </h3>
+      <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+        {t('settings.knowledge.description')}
+      </p>
+
+      {loading && (
+        <p className="text-xs py-4 text-center" style={{ color: 'var(--text-muted)' }}>
+          {t('settings.knowledge.loading')}
+        </p>
+      )}
+
+      {!loading && entries.length === 0 && (
+        <div className="rounded-lg border p-6 text-center" style={{ borderColor: 'var(--border-color)' }}>
+          <BookMarked size={24} className="mx-auto mb-2" style={{ color: 'var(--text-muted)' }} />
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            {t('settings.knowledge.empty')}
+          </p>
+        </div>
+      )}
+
+      {!loading && entries.length > 0 && (
+        <div className="space-y-2">
+          {entries.map((entry) => (
+            <div
+              key={entry.id}
+              className="group flex items-start gap-3 rounded-lg border p-3"
+              style={{ borderColor: 'var(--border-color)' }}
+            >
+              <BookMarked size={14} className="mt-0.5 flex-shrink-0" style={{ color: 'var(--accent-color)' }} />
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                  {entry.title}
+                </div>
+                <div className="text-[11px] truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  {entry.originalPath}
+                </div>
+                {entry.tags.length > 0 && (
+                  <div className="flex gap-1 mt-1 flex-wrap">
+                    {entry.tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="text-[10px] px-1.5 py-0.5 rounded-full"
+                        style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {entry.summary && (
+                  <p className="text-[11px] mt-1 line-clamp-2" style={{ color: 'var(--text-secondary)' }}>
+                    {entry.summary}
+                  </p>
+                )}
+                <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                  {t('settings.knowledge.addedOn')} {new Date(entry.addedAt).toLocaleDateString()}
+                </p>
+              </div>
+              <button
+                onClick={() => removeDocument(entry.id)}
+                className="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/10 dark:hover:bg-white/10"
+                title={t('settings.knowledge.remove')}
+              >
+                <Trash2 size={13} style={{ color: 'var(--text-muted)' }} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <p className="text-[11px] mt-4" style={{ color: 'var(--text-muted)' }}>
+        {t('settings.knowledge.tip')}
+      </p>
     </div>
   )
 }

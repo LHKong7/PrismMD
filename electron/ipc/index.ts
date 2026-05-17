@@ -8,6 +8,7 @@ import { registerPluginHandlers } from './pluginHandlers'
 import { registerMcpHandlers } from './mcpHandlers'
 import { registerUpdaterHandlers } from './updaterHandlers'
 import { registerExportHandlers } from './exportHandlers'
+import { registerKnowledgeBaseHandlers } from './knowledgeBaseHandlers'
 import { getMainWindow } from '../main'
 
 /**
@@ -29,4 +30,5 @@ export function registerIpcHandlers() {
   registerMcpHandlers()
   registerUpdaterHandlers()
   registerExportHandlers()
+  registerKnowledgeBaseHandlers()
 }

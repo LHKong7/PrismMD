@@ -226,6 +226,15 @@
       "fontFamily": "字体",
       "fontDefault": "跟随主题"
     },
+    "knowledge": {
+      "title": "知识库",
+      "description": "添加到知识库的文档会在与 AI 助手对话时自动作为上下文参考。",
+      "loading": "加载中...",
+      "empty": "知识库中暂无文档。在文件树中右键点击文件，选择「添加到知识库」即可开始。",
+      "addedOn": "添加于",
+      "remove": "从知识库移除",
+      "tip": "提示：发送消息时，AI 助手会自动从知识库中搜索相关文档作为参考。"
+    },
     "ai": {
       "title": "AI 服务商",
       "description": "配置 AI 助手的 API 密钥，支持云端与本地模型。",
@@ -493,7 +502,8 @@
     "cancel": "取消",
     "saveToGraph": "存入知识图谱",
     "ingestFolder": "整个文件夹入图谱（{{count}} 个文件）",
-    "savingToGraph": "保存中…"
+    "savingToGraph": "保存中…",
+    "addToKB": "添加到知识库"
   },
   "batchIngest": {
     "running": "正在摄入 {{done}} / {{total}}",

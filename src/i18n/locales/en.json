@@ -226,6 +226,15 @@
       "fontFamily": "Font",
       "fontDefault": "Theme default"
     },
+    "knowledge": {
+      "title": "Knowledge Base",
+      "description": "Documents added to the Knowledge Base are automatically used as context when chatting with the AI Agent.",
+      "loading": "Loading...",
+      "empty": "No documents in the Knowledge Base yet. Right-click a file in the file tree and select \"Add to Knowledge Base\" to get started.",
+      "addedOn": "Added",
+      "remove": "Remove from Knowledge Base",
+      "tip": "Tip: The Agent automatically searches the Knowledge Base for relevant documents when you send a message."
+    },
     "ai": {
       "title": "AI Providers",
       "description": "Configure API keys for AI assistants. Cloud and local models supported.",
@@ -493,7 +502,8 @@
     "cancel": "Cancel",
     "saveToGraph": "Save to Knowledge Graph",
     "savingToGraph": "Saving…",
-    "ingestFolder": "Ingest whole folder into Graph ({{count}} files)"
+    "ingestFolder": "Ingest whole folder into Graph ({{count}} files)",
+    "addToKB": "Add to Knowledge Base"
   },
   "batchIngest": {
     "running": "Ingesting {{done}} / {{total}}",

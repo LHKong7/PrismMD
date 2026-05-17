@@ -105,6 +105,18 @@ const electronAPI = {
   printDocument: (html: string): Promise<void> =>
     ipcRenderer.invoke('export:print', html),
 
+  // Knowledge Base
+  kbAdd: (filePath: string, title?: string, tags?: string[]): Promise<{ ok: boolean; entry?: unknown; error?: string }> =>
+    ipcRenderer.invoke('kb:add', filePath, title, tags),
+  kbRemove: (id: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('kb:remove', id),
+  kbList: (): Promise<{ ok: boolean; entries?: unknown[]; error?: string }> =>
+    ipcRenderer.invoke('kb:list'),
+  kbSearch: (query: string): Promise<{ ok: boolean; entries?: unknown[]; error?: string }> =>
+    ipcRenderer.invoke('kb:search', query),
+  kbGetContext: (query: string, maxDocs?: number): Promise<{ ok: boolean; context?: string; error?: string }> =>
+    ipcRenderer.invoke('kb:get-context', query, maxDocs),
+
   // Settings
   loadSettings: (): Promise<Record<string, unknown>> =>
     ipcRenderer.invoke('settings:load'),

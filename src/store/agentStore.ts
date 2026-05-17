@@ -251,6 +251,17 @@ export const useAgentStore = create<AgentStore>((set, get) => {
         }
       }
 
+      // Gather Knowledge Base context (best-effort).
+      let kbContext: string | undefined
+      try {
+        const kbRes = await window.electronAPI.kbGetContext(content, 3)
+        if (kbRes.ok && kbRes.context) {
+          kbContext = kbRes.context
+        }
+      } catch {
+        // KB not available
+      }
+
       // Build message history — keep only the most recent messages to
       // avoid token-limit errors and growing latency in long sessions.
       // The full transcript remains in the store for UI scrollback.
@@ -268,9 +279,16 @@ export const useAgentStore = create<AgentStore>((set, get) => {
         appendStreamContent(chunk)
       })
 
+      // Combine document context with KB context
+      let fullDocContext = documentContext ?? undefined
+      if (kbContext) {
+        fullDocContext = (fullDocContext ? fullDocContext + '\n\n---\n\n' : '') +
+          'Knowledge Base references:\n\n' + kbContext
+      }
+
       const result = await window.electronAPI.sendAgentMessage({
         messages: history,
-        documentContext: documentContext ?? undefined,
+        documentContext: fullDocContext,
         memoryContext,
         graphContext,
       })
