@@ -167,6 +167,19 @@
     "empty": "暂无备忘，在这里记录你的创作灵感！",
     "hint": "⌘+Enter 添加"
   },
+  "flashcard": {
+    "noFile": "请先打开一个文档来使用闪卡。",
+    "empty": "暂无闪卡。从当前文档生成闪卡，开始学习吧！",
+    "generate": "生成闪卡",
+    "generating": "正在生成闪卡...",
+    "regenerate": "重新生成",
+    "retry": "重试",
+    "question": "问题",
+    "answer": "答案",
+    "clickToFlip": "点击查看答案",
+    "know": "记住了",
+    "dontKnow": "没记住"
+  },
   "export": {
     "title": "导出",
     "html": "导出为 HTML",

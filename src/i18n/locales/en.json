@@ -167,6 +167,19 @@
     "empty": "No memos yet. Capture your inspirations here!",
     "hint": "⌘+Enter to add"
   },
+  "flashcard": {
+    "noFile": "Open a document to use flashcards.",
+    "empty": "No flashcards yet. Generate cards from the current document to start studying.",
+    "generate": "Generate Flashcards",
+    "generating": "Generating flashcards...",
+    "regenerate": "Regenerate",
+    "retry": "Try again",
+    "question": "Question",
+    "answer": "Answer",
+    "clickToFlip": "Click to reveal answer",
+    "know": "Know",
+    "dontKnow": "Don't Know"
+  },
   "export": {
     "title": "Export",
     "html": "Export as HTML",
