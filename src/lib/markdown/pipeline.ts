@@ -13,9 +13,13 @@ import type { ReactElement } from 'react'
 import { remarkToc, type TocEntry } from './remarkToc'
 import { remarkCjkSpacing } from './remarkCjkSpacing'
 import { remarkCodeAnalysis, type CodeBlockMarker } from './remarkCodeAnalysis'
+import { remarkEnhanced } from './remarkEnhanced'
 import { CodeBlock } from '../../components/reader/components/CodeBlock'
 import { MermaidBlock } from '../../components/reader/components/MermaidBlock'
 import { TableBlock } from '../../components/reader/components/TableBlock'
+import { Callout } from '../../components/reader/components/Callout'
+import { TabsBlock } from '../../components/reader/components/TabsBlock'
+import { TimelineBlock } from '../../components/reader/components/TimelineBlock'
 
 export interface MarkdownResult {
   content: ReactElement
@@ -35,7 +39,8 @@ export async function processMarkdown(source: string): Promise<MarkdownResult> {
     .use(remarkCjkSpacing)
     .use(remarkToc, { onExtract: (entries: TocEntry[]) => { toc.push(...entries) } })
     .use(remarkCodeAnalysis, { onExtract: (markers: CodeBlockMarker[]) => { codeMarkers.push(...markers) } })
-    .use(remarkRehype, { allowDangerousHtml: false })
+    .use(remarkEnhanced)
+    .use(remarkRehype, { allowDangerousHtml: true })
     .use(rehypeSlug)
     .use(rehypeKatex)
     // @ts-expect-error rehype-react types are complex
@@ -46,6 +51,9 @@ export async function processMarkdown(source: string): Promise<MarkdownResult> {
       components: {
         pre: CodeBlock,
         table: TableBlock,
+        callout: Callout,
+        'tabs-container': TabsBlock,
+        'timeline-container': TimelineBlock,
       },
     })
     .process(source)

@@ -206,3 +206,21 @@
   color: var(--text-primary);
   outline: 2px solid color-mix(in srgb, var(--color-search-highlight-active) 60%, transparent);
 }
+
+/* ─── Badges (inline pills) ─── */
+.markdown-body .badge {
+  display: inline-block;
+  padding: 0.15em 0.55em;
+  border-radius: 10px;
+  font-size: 0.75em;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.markdown-body .badge-blue   { background: var(--color-info-bg); color: var(--color-info); border: 1px solid var(--color-info-border); }
+.markdown-body .badge-green  { background: var(--color-success-bg); color: var(--color-success); border: 1px solid var(--color-success-border); }
+.markdown-body .badge-amber  { background: var(--color-warning-bg); color: var(--color-warning); border: 1px solid var(--color-warning-border); }
+.markdown-body .badge-red    { background: var(--color-error-bg); color: var(--color-error); border: 1px solid var(--color-error-border); }
+.markdown-body .badge-purple { background: rgba(139, 92, 246, 0.1); color: #8b5cf6; border: 1px solid rgba(139, 92, 246, 0.3); }
+.markdown-body .badge-gray   { background: var(--bg-secondary); color: var(--text-muted); border: 1px solid var(--border-color); }
