@@ -239,6 +239,24 @@
       "fontFamily": "Font",
       "fontDefault": "Theme default"
     },
+    "templates": {
+      "title": "Templates",
+      "description_setting": "Create reusable markdown templates. Use them via the Command Palette (Cmd+P).",
+      "new": "New Template",
+      "newTitle": "New Template",
+      "editTitle": "Edit Template",
+      "name": "Name",
+      "namePlaceholder": "e.g. Meeting Notes",
+      "description": "Description",
+      "descPlaceholder": "Brief description of the template",
+      "content": "Content",
+      "contentPlaceholder": "# Template Title\n\nYour markdown content here...",
+      "save": "Save",
+      "cancel": "Cancel",
+      "edit": "Edit",
+      "delete": "Delete",
+      "empty": "No templates yet. Create one to get started!"
+    },
     "knowledge": {
       "title": "Knowledge Base",
       "description": "Documents added to the Knowledge Base are automatically used as context when chatting with the AI Agent.",

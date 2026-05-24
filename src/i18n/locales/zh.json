@@ -239,6 +239,24 @@
       "fontFamily": "字体",
       "fontDefault": "跟随主题"
     },
+    "templates": {
+      "title": "模版库",
+      "description_setting": "创建可复用的 Markdown 模版，通过命令面板（Cmd+P）快速使用。",
+      "new": "新建模版",
+      "newTitle": "新建模版",
+      "editTitle": "编辑模版",
+      "name": "名称",
+      "namePlaceholder": "例如：会议记录",
+      "description": "描述",
+      "descPlaceholder": "简要描述模版用途",
+      "content": "内容",
+      "contentPlaceholder": "# 模版标题\n\n在这里输入 Markdown 内容...",
+      "save": "保存",
+      "cancel": "取消",
+      "edit": "编辑",
+      "delete": "删除",
+      "empty": "暂无模版，创建一个开始吧！"
+    },
     "knowledge": {
       "title": "知识库",
       "description": "添加到知识库的文档会在与 AI 助手对话时自动作为上下文参考。",

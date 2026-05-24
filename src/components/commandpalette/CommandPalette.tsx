@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Command } from 'cmdk'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
-import { FileText, FilePlus, FolderPlus, Pencil, Trash2, Copy, ExternalLink, Sun, Moon, Monitor, Settings, Bot, Shield, Eye, Network, BookOpen, Puzzle, Search, Maximize2, Columns2, Rows2, X, Keyboard } from 'lucide-react'
+import { FileText, FilePlus, FolderPlus, Pencil, Trash2, Copy, ExternalLink, Sun, Moon, Monitor, Settings, Bot, Shield, Eye, Network, BookOpen, Puzzle, Search, Maximize2, Columns2, Rows2, X, Keyboard, FileStack } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useUIStore } from '../../store/uiStore'
 import { useFileStore } from '../../store/fileStore'
@@ -9,6 +9,7 @@ import { useSettingsStore } from '../../store/settingsStore'
 import { useAgentStore } from '../../store/agentStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
 import { useCommandRegistry } from '../../store/commandRegistry'
+import { useTemplateStore } from '../../store/templateStore'
 import { useSearchIndexStore } from '../../store/searchIndexStore'
 import { applyTheme, getThemeById } from '../../lib/theme/themes'
 import { flattenFiles, fileName } from '../../lib/fileTree'
@@ -282,6 +283,39 @@ export function CommandPalette({ onOpenSettings }: CommandPaletteProps) {
                   </span>
                 </Command.Item>
               )}
+            </Command.Group>
+
+            {/* Templates */}
+            <Command.Group heading={t('commandPalette.templates', 'Templates')} style={{ color: 'var(--text-muted)' }}>
+              {useTemplateStore.getState().templates.map((tpl) => (
+                <Command.Item
+                  key={`tpl-${tpl.id}`}
+                  value={`template ${tpl.name}`}
+                  onSelect={() => {
+                    setOpen(false)
+                    const content = tpl.content.replace(/\{\{date\}\}/g, new Date().toLocaleDateString())
+                    const editor = require('../../store/editorStore').useEditorStore.getState()
+                    if (editor.editing && editor.editorViewRef) {
+                      const view = editor.editorViewRef
+                      const pos = view.state.selection.main.head
+                      view.dispatch({ changes: { from: pos, insert: content } })
+                    } else {
+                      void useFileStore.getState().createNewFile()
+                      setTimeout(() => {
+                        const ed = require('../../store/editorStore').useEditorStore.getState()
+                        ed.setEditing(true)
+                        ed.setEditorContent(content)
+                      }, 500)
+                    }
+                  }}
+                  className={cls}
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  <FileStack size={14} />
+                  <span className="truncate">{tpl.name}</span>
+                  <span className="ml-auto text-[10px] opacity-50">{t('commandPalette.template', 'Template')}</span>
+                </Command.Item>
+              ))}
             </Command.Group>
 
             {/* Plugin-contributed commands. Grouped by the `group` the

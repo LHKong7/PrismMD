@@ -85,6 +85,12 @@ const SLASH_COMMANDS: Completion[] = [
     detail: 'Reference knowledge base in Agent context',
     apply: '> [!knowledge] Query your knowledge base via the Agent sidebar.',
   },
+  {
+    label: '/template',
+    displayLabel: 'Template',
+    detail: 'Insert a template (manage in Settings → Templates)',
+    apply: '<!-- Use Cmd+P to search and insert a template -->',
+  },
 ]
 
 function slashCompletions(context: CompletionContext) {
