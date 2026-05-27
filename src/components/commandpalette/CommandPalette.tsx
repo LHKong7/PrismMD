@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Command } from 'cmdk'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
-import { FileText, FilePlus, FolderPlus, Pencil, Trash2, Copy, ExternalLink, Sun, Moon, Monitor, Settings, Bot, Shield, Eye, Network, BookOpen, Puzzle, Search, Maximize2, Columns2, Rows2, X, Keyboard, FileStack } from 'lucide-react'
+import { FileText, FilePlus, FolderPlus, Pencil, Trash2, Copy, ExternalLink, Sun, Moon, Monitor, Settings, Bot, Shield, Eye, Network, BookOpen, Puzzle, Search, Maximize2, Columns2, Rows2, X, Keyboard, FileStack, Zap } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useUIStore } from '../../store/uiStore'
 import { useFileStore } from '../../store/fileStore'
@@ -16,9 +16,10 @@ import { flattenFiles, fileName } from '../../lib/fileTree'
 
 interface CommandPaletteProps {
   onOpenSettings: () => void
+  onOpenHorseMode?: () => void
 }
 
-export function CommandPalette({ onOpenSettings }: CommandPaletteProps) {
+export function CommandPalette({ onOpenSettings, onOpenHorseMode }: CommandPaletteProps) {
   const { t } = useTranslation()
   const open = useUIStore((s) => s.commandPaletteOpen)
   const setOpen = useUIStore((s) => s.setCommandPaletteOpen)
@@ -232,6 +233,11 @@ export function CommandPalette({ onOpenSettings }: CommandPaletteProps) {
               <Command.Item value="Open Settings" onSelect={() => { onOpenSettings(); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
                 <Settings size={14} /><span>{t('commandPalette.openSettings')}</span>
               </Command.Item>
+              {onOpenHorseMode && (
+                <Command.Item value="Horse Mode" onSelect={() => { onOpenHorseMode(); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
+                  <Zap size={14} /><span>{t('commandPalette.horseMode', 'Horse Mode')}</span>
+                </Command.Item>
+              )}
               <Command.Item value="Keyboard Shortcuts" onSelect={() => { useUIStore.getState().openSettings('shortcuts'); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
                 <Keyboard size={14} /><span>{t('commandPalette.keyboardShortcuts')}</span>
               </Command.Item>

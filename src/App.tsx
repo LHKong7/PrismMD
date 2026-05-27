@@ -13,6 +13,7 @@ import { ZenMode } from './components/zenmode/ZenMode'
 import { PluginNotificationHost } from './components/plugins/PluginNotificationHost'
 import { ToastHost } from './components/ui/Toast'
 import { MemoPanel } from './components/memo/MemoPanel'
+import { HorseModeDialog } from './components/horsemode/HorseModeDialog'
 import { useFileWatcher } from './hooks/useFileWatcher'
 import { useAutoHide } from './hooks/useAutoHide'
 import { useAnnotations } from './hooks/useAnnotations'
@@ -40,6 +41,7 @@ function AppContent() {
   const dismissToast = useToastStore((s) => s.dismiss)
   const zenMode = useUIStore((s) => s.zenMode)
   const [memoOpen, setMemoOpen] = useState(false)
+  const [horseModeOpen, setHorseModeOpen] = useState(false)
   const loadSettings = useSettingsStore((s) => s.loadSettings)
   const loadLayout = useUIStore((s) => s.loadLayout)
   const restoreSession = useFileStore((s) => s.restoreSession)
@@ -228,7 +230,7 @@ function AppContent() {
       {!zenMode && <AppShell />}
       {!zenMode && <StatusBar />}
       <ZenMode />
-      <CommandPalette onOpenSettings={() => openSettings()} />
+      <CommandPalette onOpenSettings={() => openSettings()} onOpenHorseMode={() => setHorseModeOpen(true)} />
       <HighlightPopover onHighlight={addAnnotation} />
       <SelectionAIBubble
         onSaveAsNote={(text, note) => addAnnotation(text, 'yellow', note)}
@@ -236,6 +238,7 @@ function AppContent() {
       <GhostText />
       <SettingsPanel open={settingsOpen} onClose={closeSettings} />
       <MemoPanel open={memoOpen} onClose={() => setMemoOpen(false)} />
+      <HorseModeDialog open={horseModeOpen} onClose={() => setHorseModeOpen(false)} />
       <PluginNotificationHost />
       <ToastHost items={toasts} onDismiss={dismissToast} />
     </div>

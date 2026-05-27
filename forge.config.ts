@@ -26,20 +26,7 @@ const profile = resolveProfile()
 // transitive dependency tree so they get copied into the package.
 // ---------------------------------------------------------------------------
 const externalSeeds = [
-  '@insightgraph/sdk-embedded',
-  '@insightgraph/core',
-  '@insightgraph/agent-runtime',
-  '@insightgraph/extractor',
-  '@insightgraph/graph',
-  '@insightgraph/parser',
-  '@insightgraph/resolver',
-  '@insightgraph/retriever',
   'neo4j-driver',
-  'unpdf',
-  'xlsx',
-  'csv-parse',
-  'yaml',
-  'dotenv',
   'chokidar',
   'fsevents',
 ]

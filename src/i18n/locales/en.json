@@ -180,6 +180,22 @@
     "know": "Know",
     "dontKnow": "Don't Know"
   },
+  "horseMode": {
+    "title": "Horse Mode",
+    "description": "Describe a writing task and let AI create a complete document for you.",
+    "taskLabel": "What would you like written?",
+    "taskPlaceholder": "e.g. Write a 2000-word article about React Server Components...",
+    "directoryLabel": "Save to",
+    "noDirectory": "Select a directory",
+    "browse": "Browse",
+    "fileNameLabel": "File name",
+    "start": "Start Writing",
+    "cancel": "Cancel",
+    "hint": "Cmd+Enter to start",
+    "statusLabel": "Horse Mode",
+    "complete": "Horse Mode complete!",
+    "failed": "Horse Mode failed"
+  },
   "export": {
     "title": "Export",
     "html": "Export as HTML",

@@ -7,9 +7,10 @@ import { useInsightGraphStore } from '../../store/insightGraphStore'
 import { useBatchIngestStore } from '../../store/batchIngestStore'
 import { useUpdaterStore } from '../../store/updaterStore'
 import { useUIStore } from '../../store/uiStore'
+import { useHorseModeStore } from '../../store/horseModeStore'
 import {
   Bot, Globe, Shield, Network, Loader2, AlertCircle,
-  CheckCircle2, X, Download, MoreHorizontal, Circle,
+  CheckCircle2, X, Download, MoreHorizontal, Circle, Zap,
 } from 'lucide-react'
 
 export function StatusBar() {
@@ -17,6 +18,8 @@ export function StatusBar() {
   const zenMode = useUIStore((s) => s.zenMode)
   const deepEditing = useUIStore((s) => s.deepEditing)
   const toggleDeepEditing = useUIStore((s) => s.toggleDeepEditing)
+  const horseModeActive = useHorseModeStore((s) => s.active)
+  const horseModeStage = useHorseModeStore((s) => s.stage)
   const currentContent = useFileStore((s) => s.currentContent)
   const editing = useEditorStore((s) => s.editing)
   const isDirty = useEditorStore((s) => s.isDirty)
@@ -76,6 +79,22 @@ export function StatusBar() {
           >
             <span className="text-[10px] font-medium">{t('statusBar.deepEditingLabel', 'Deep Editing')}</span>
           </button>
+        )}
+        {/* Horse Mode indicator */}
+        {horseModeActive && (
+          <div
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded"
+            style={{ backgroundColor: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}
+          >
+            {horseModeStage === 'generating' ? (
+              <Loader2 size={10} className="animate-spin" />
+            ) : (
+              <Zap size={10} />
+            )}
+            <span className="text-[10px] font-medium">
+              {t('horseMode.statusLabel', 'Horse Mode')}
+            </span>
+          </div>
         )}
         {/* Save state indicator — always visible when editing */}
         {editing && (

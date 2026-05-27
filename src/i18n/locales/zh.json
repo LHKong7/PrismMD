@@ -180,6 +180,22 @@
     "know": "记住了",
     "dontKnow": "没记住"
   },
+  "horseMode": {
+    "title": "Horse Mode",
+    "description": "描述你的写作任务，让 AI 为你生成一篇完整的文档。",
+    "taskLabel": "你希望写什么？",
+    "taskPlaceholder": "例如：写一篇关于 React Server Components 的 2000 字技术文章...",
+    "directoryLabel": "保存到",
+    "noDirectory": "选择目录",
+    "browse": "浏览",
+    "fileNameLabel": "文件名",
+    "start": "开始写作",
+    "cancel": "取消",
+    "hint": "Cmd+Enter 开始",
+    "statusLabel": "Horse Mode",
+    "complete": "Horse Mode 完成！",
+    "failed": "Horse Mode 失败"
+  },
   "export": {
     "title": "导出",
     "html": "导出为 HTML",
