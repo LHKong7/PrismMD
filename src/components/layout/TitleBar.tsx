@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type CSSProperties } from 'react'
-import { Minus, Square, X, Palette, PanelLeft, PanelRight, Settings, Bot, Network, BookOpen, Pencil, Columns2, Rows2, XCircle, Download, FileText, FileType, Printer } from 'lucide-react'
+import { Minus, Square, X, Palette, PanelLeft, PanelRight, Settings, Bot, Network, BookOpen, Pencil, Columns2, Rows2, XCircle, Download, FileText, FileType, Printer, Zap } from 'lucide-react'
 import { Tooltip } from '../ui/Tooltip'
 import { useTranslation } from 'react-i18next'
 import { useUIStore } from '../../store/uiStore'
@@ -16,9 +16,10 @@ const noDragStyle = { WebkitAppRegion: 'no-drag' } as unknown as CSSProperties
 
 interface TitleBarProps {
   onOpenSettings: () => void
+  onOpenHorseMode?: () => void
 }
 
-export function TitleBar({ onOpenSettings }: TitleBarProps) {
+export function TitleBar({ onOpenSettings, onOpenHorseMode }: TitleBarProps) {
   const { t } = useTranslation()
   const [isMaximized, setIsMaximized] = useState(false)
   const toggleLeftSidebar = useUIStore((s) => s.toggleLeftSidebar)
@@ -141,6 +142,19 @@ export function TitleBar({ onOpenSettings }: TitleBarProps) {
           </Tooltip>
         )}
         {currentFilePath && <ExportDropdown />}
+        {onOpenHorseMode && (
+          <Tooltip label={t('horseMode.title', 'Horse Mode')} side="bottom">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onOpenHorseMode}
+              className="p-1.5"
+              aria-label={t('horseMode.title', 'Horse Mode')}
+            >
+              <Zap size={16} style={{ color: 'var(--color-warning)' }} />
+            </Button>
+          </Tooltip>
+        )}
         <div className="w-px h-4 mx-0.5 flex-shrink-0" style={{ backgroundColor: 'var(--border-color)' }} />
         <Tooltip label={`${t('split.horizontal')} (${isMac ? '⌘' : 'Ctrl'}+\\)`} side="bottom">
           <Button

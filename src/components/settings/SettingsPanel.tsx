@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { X, Check, Globe, Palette, Bot, Eye, EyeOff, Shield, Trash2, Network, AlertTriangle, RefreshCw, Puzzle, FolderOpen, CircleAlert, Info, Download, Keyboard, Pencil, BookMarked, FileStack } from 'lucide-react'
+import { X, Check, Globe, Palette, Bot, Eye, EyeOff, Shield, Trash2, Network, AlertTriangle, RefreshCw, Puzzle, FolderOpen, CircleAlert, Info, Download, Keyboard, Pencil, BookMarked, FileStack, MessageSquare } from 'lucide-react'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
 import { Button } from '../ui/Button'
 import { Spinner } from '../ui/Spinner'
@@ -12,6 +12,7 @@ import { reloadExternalPlugins } from '../../lib/plugins/externalLoader'
 import { useUpdaterStore } from '../../store/updaterStore'
 import { useKnowledgeBaseStore } from '../../store/knowledgeBaseStore'
 import { TemplateSettings } from './TemplateSettings'
+import { PromptSettings } from './PromptSettings'
 import { themes } from '../../lib/theme/themes'
 import { LANGUAGES, changeLanguage, type SupportedLanguage } from '../../i18n'
 import { clsx } from 'clsx'
@@ -21,7 +22,7 @@ interface SettingsPanelProps {
   onClose: () => void
 }
 
-type Tab = 'language' | 'theme' | 'editor' | 'templates' | 'ai' | 'knowledge' | 'privacy' | 'insightgraph' | 'plugins' | 'mcp' | 'shortcuts' | 'about'
+type Tab = 'language' | 'theme' | 'editor' | 'templates' | 'ai' | 'prompts' | 'knowledge' | 'privacy' | 'insightgraph' | 'plugins' | 'mcp' | 'shortcuts' | 'about'
 
 export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const { t } = useTranslation()
@@ -89,6 +90,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
               { id: 'editor' as Tab, icon: Pencil, label: t('settings.editor.title') },
               { id: 'templates' as Tab, icon: FileStack, label: t('settings.templates.title') },
               { id: 'ai' as Tab, icon: Bot, label: t('settings.ai.title') },
+              { id: 'prompts' as Tab, icon: MessageSquare, label: t('settings.prompts.title', 'Prompts') },
               { id: 'knowledge' as Tab, icon: BookMarked, label: t('settings.knowledge.title') },
               { id: 'insightgraph' as Tab, icon: Network, label: t('settings.insightgraph.title') },
               { id: 'plugins' as Tab, icon: Puzzle, label: t('settings.plugins.title') },
@@ -121,6 +123,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             {activeTab === 'editor' && <EditorSettings />}
             {activeTab === 'templates' && <TemplateSettings />}
             {activeTab === 'ai' && <AISettings />}
+            {activeTab === 'prompts' && <PromptSettings />}
             {activeTab === 'knowledge' && <KnowledgeSettings />}
             {activeTab === 'insightgraph' && <InsightGraphSettings />}
             {activeTab === 'plugins' && <PluginsSettings />}

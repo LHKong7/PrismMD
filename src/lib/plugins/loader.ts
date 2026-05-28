@@ -8,8 +8,9 @@ import helloPlugin from '../../plugins/hello'
 import mermaidPlugin from '../../plugins/mermaid'
 import executablePlugin from '../../plugins/executable'
 import flashcardPlugin from '../../plugins/flashcard'
+import workspacePlugin from '../../plugins/workspace'
 
-const BUILTIN_PLUGINS: Plugin[] = [helloPlugin, mermaidPlugin, executablePlugin, flashcardPlugin]
+const BUILTIN_PLUGINS: Plugin[] = [helloPlugin, mermaidPlugin, executablePlugin, flashcardPlugin, workspacePlugin]
 
 let bootstrapped = false
 

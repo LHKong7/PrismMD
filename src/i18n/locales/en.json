@@ -185,6 +185,8 @@
     "description": "Describe a writing task and let AI create a complete document for you.",
     "taskLabel": "What would you like written?",
     "taskPlaceholder": "e.g. Write a 2000-word article about React Server Components...",
+    "taskPlaceholderWithDoc": "e.g. Expand this outline into a full article, rewrite in formal tone...",
+    "useDocContext": "Use current document as reference",
     "directoryLabel": "Save to",
     "noDirectory": "Select a directory",
     "browse": "Browse",
@@ -194,7 +196,27 @@
     "hint": "Cmd+Enter to start",
     "statusLabel": "Horse Mode",
     "complete": "Horse Mode complete!",
-    "failed": "Horse Mode failed"
+    "failed": "Horse Mode failed",
+    "iterationsLabel": "Refinement iterations",
+    "iterationsHintSingle": "Single pass — no refinement.",
+    "iterationsHint": "Each iteration refines the previous output with fresh context."
+  },
+  "workspace": {
+    "dashboard": {
+      "morning": "Good morning",
+      "afternoon": "Good afternoon",
+      "evening": "Good evening",
+      "todayDiary": "Today's Diary",
+      "diaryHint": "Click to open or create today's journal entry.",
+      "tasks": "Tasks",
+      "recentFiles": "Recent Files",
+      "quickActions": "Quick Actions",
+      "diary": "Diary"
+    },
+    "tasks": {
+      "addPlaceholder": "Add a task...",
+      "empty": "No tasks yet. Add one above!"
+    }
   },
   "export": {
     "title": "Export",
@@ -272,6 +294,13 @@
       "edit": "Edit",
       "delete": "Delete",
       "empty": "No templates yet. Create one to get started!"
+    },
+    "prompts": {
+      "title": "Prompts",
+      "description": "Customize the system prompts for each AI mode. Leave empty to use the default.",
+      "customized": "Customized",
+      "resetDefault": "Reset to default",
+      "save": "Save"
     },
     "knowledge": {
       "title": "Knowledge Base",

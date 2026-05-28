@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Zap, FolderOpen, X } from 'lucide-react'
+import { Zap, FolderOpen, X, FileText } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useFileStore } from '../../store/fileStore'
+import { useEditorStore } from '../../store/editorStore'
 import { useHorseModeStore } from '../../store/horseModeStore'
 
 interface Props {
@@ -23,13 +24,24 @@ function slugify(text: string): string {
 export function HorseModeDialog({ open, onClose }: Props) {
   const { t } = useTranslation()
   const openFolders = useFileStore((s) => s.openFolders)
+  const currentFilePath = useFileStore((s) => s.currentFilePath)
+  const currentContent = useFileStore((s) => s.currentContent)
+  const editorContent = useEditorStore((s) => s.editorContent)
+  const editing = useEditorStore((s) => s.editing)
   const start = useHorseModeStore((s) => s.start)
 
   const [task, setTask] = useState('')
   const [targetDir, setTargetDir] = useState('')
   const [fileName, setFileName] = useState('')
   const [fileNameManual, setFileNameManual] = useState(false)
+  const [useDocContext, setUseDocContext] = useState(false)
+  const [iterations, setIterations] = useState(1)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const hasDocument = !!currentFilePath
+  const currentFileName = currentFilePath?.split(/[/\\]/).pop() ?? ''
+  // Use editor content if editing, otherwise reader content
+  const documentContent = editing ? editorContent : currentContent
 
   // Default target directory to first open folder
   useEffect(() => {
@@ -46,15 +58,17 @@ export function HorseModeDialog({ open, onClose }: Props) {
     }
   }, [task, fileNameManual])
 
-  // Focus textarea on open
+  // Reset state on open
   useEffect(() => {
     if (open) {
       setTimeout(() => textareaRef.current?.focus(), 50)
       setTask('')
       setFileName('')
       setFileNameManual(false)
+      setUseDocContext(hasDocument)
+      setIterations(1)
     }
-  }, [open])
+  }, [open, hasDocument])
 
   // Dismiss on Escape
   useEffect(() => {
@@ -78,7 +92,8 @@ export function HorseModeDialog({ open, onClose }: Props) {
   const handleStart = () => {
     if (!task.trim() || !targetDir || !fileName) return
     onClose()
-    void start(task.trim(), targetDir, fileName)
+    const docCtx = useDocContext && documentContent ? documentContent : undefined
+    void start(task.trim(), targetDir, fileName, iterations, docCtx)
   }
 
   if (!open) return null
@@ -97,7 +112,7 @@ export function HorseModeDialog({ open, onClose }: Props) {
           style={{ borderColor: 'var(--border-color)' }}
         >
           <div className="flex items-center gap-2">
-            <Zap size={18} style={{ color: 'var(--accent-color)' }} />
+            <Zap size={18} style={{ color: 'var(--color-warning)' }} />
             <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
               {t('horseMode.title')}
             </h2>
@@ -116,6 +131,35 @@ export function HorseModeDialog({ open, onClose }: Props) {
             {t('horseMode.description')}
           </p>
 
+          {/* Document context toggle */}
+          {hasDocument && (
+            <label
+              className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
+              style={{
+                borderColor: useDocContext ? 'var(--accent-color)' : 'var(--border-color)',
+                backgroundColor: useDocContext ? 'var(--color-info-bg)' : 'transparent',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={useDocContext}
+                onChange={(e) => setUseDocContext(e.target.checked)}
+                className="mt-0.5 accent-[var(--accent-color)]"
+              />
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+                  {t('horseMode.useDocContext')}
+                </div>
+                <div className="flex items-center gap-1 mt-1">
+                  <FileText size={11} style={{ color: 'var(--text-muted)' }} />
+                  <span className="text-[11px] truncate" style={{ color: 'var(--text-muted)' }}>
+                    {currentFileName}
+                  </span>
+                </div>
+              </div>
+            </label>
+          )}
+
           {/* Task */}
           <div>
             <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>
@@ -125,7 +169,11 @@ export function HorseModeDialog({ open, onClose }: Props) {
               ref={textareaRef}
               value={task}
               onChange={(e) => setTask(e.target.value)}
-              placeholder={t('horseMode.taskPlaceholder')}
+              placeholder={
+                useDocContext
+                  ? t('horseMode.taskPlaceholderWithDoc')
+                  : t('horseMode.taskPlaceholder')
+              }
               rows={4}
               className="w-full text-sm px-3 py-2 rounded-lg border outline-none resize-none"
               style={{
@@ -185,6 +233,35 @@ export function HorseModeDialog({ open, onClose }: Props) {
                 color: 'var(--text-primary)',
               }}
             />
+          </div>
+
+          {/* Iterations */}
+          <div>
+            <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>
+              {t('horseMode.iterationsLabel', 'Refinement iterations')}
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                min={1}
+                max={5}
+                step={1}
+                value={iterations}
+                onChange={(e) => setIterations(Number(e.target.value))}
+                className="flex-1 accent-[var(--accent-color)]"
+              />
+              <span
+                className="text-xs tabular-nums font-medium min-w-[2ch] text-center"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                {iterations}
+              </span>
+            </div>
+            <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
+              {iterations === 1
+                ? t('horseMode.iterationsHintSingle', 'Single pass — no refinement.')
+                : t('horseMode.iterationsHint', 'Each iteration refines the previous output with fresh context.')}
+            </p>
           </div>
         </div>
 

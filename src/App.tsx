@@ -96,6 +96,13 @@ function AppContent() {
 
       if (!(e.metaKey || e.ctrlKey)) return
 
+      // Cmd+Shift+J — open today's diary
+      if (e.key === 'j' && e.shiftKey) {
+        e.preventDefault()
+        import('./lib/workspace/diaryService').then(({ openTodayDiary }) => void openTodayDiary())
+        return
+      }
+
       // Cmd+Shift+D — toggle deep editing mode
       if (e.key === 'd' && e.shiftKey) {
         e.preventDefault()
@@ -225,7 +232,7 @@ function AppContent() {
 
   return (
     <div className="h-full flex flex-col" style={{ backgroundColor: 'var(--bg-primary)' }}>
-      {!zenMode && <TitleBar onOpenSettings={() => openSettings()} />}
+      {!zenMode && <TitleBar onOpenSettings={() => openSettings()} onOpenHorseMode={() => setHorseModeOpen(true)} />}
       <FocusOverlay />
       {!zenMode && <AppShell />}
       {!zenMode && <StatusBar />}

@@ -8,9 +8,10 @@ import { useBatchIngestStore } from '../../store/batchIngestStore'
 import { useUpdaterStore } from '../../store/updaterStore'
 import { useUIStore } from '../../store/uiStore'
 import { useHorseModeStore } from '../../store/horseModeStore'
+import { useAgentLogStore, type LogSource } from '../../store/agentLogStore'
 import {
   Bot, Globe, Shield, Network, Loader2, AlertCircle,
-  CheckCircle2, X, Download, MoreHorizontal, Circle, Zap,
+  CheckCircle2, X, Download, MoreHorizontal, Circle, Zap, ScrollText,
 } from 'lucide-react'
 
 export function StatusBar() {
@@ -20,6 +21,10 @@ export function StatusBar() {
   const toggleDeepEditing = useUIStore((s) => s.toggleDeepEditing)
   const horseModeActive = useHorseModeStore((s) => s.active)
   const horseModeStage = useHorseModeStore((s) => s.stage)
+  const agentLogEntries = useAgentLogStore((s) => s.entries)
+  const agentLogOpen = useAgentLogStore((s) => s.panelOpen)
+  const toggleAgentLog = useAgentLogStore((s) => s.togglePanel)
+  const clearAgentLog = useAgentLogStore((s) => s.clear)
   const currentContent = useFileStore((s) => s.currentContent)
   const editing = useEditorStore((s) => s.editing)
   const isDirty = useEditorStore((s) => s.isDirty)
@@ -82,8 +87,9 @@ export function StatusBar() {
         )}
         {/* Horse Mode indicator */}
         {horseModeActive && (
-          <div
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded"
+          <button
+            onClick={toggleAgentLog}
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors hover:opacity-80"
             style={{ backgroundColor: 'var(--color-warning-bg)', color: 'var(--color-warning)' }}
           >
             {horseModeStage === 'generating' ? (
@@ -94,7 +100,7 @@ export function StatusBar() {
             <span className="text-[10px] font-medium">
               {t('horseMode.statusLabel', 'Horse Mode')}
             </span>
-          </div>
+          </button>
         )}
         {/* Save state indicator — always visible when editing */}
         {editing && (
@@ -218,6 +224,24 @@ export function StatusBar() {
       </div>
 
       <div className="flex items-center gap-3">
+        {/* Unified Agent Log */}
+        {agentLogEntries.length > 0 && (
+          <div className="relative">
+            <button
+              onClick={toggleAgentLog}
+              className="flex items-center gap-1 px-1 py-0.5 rounded transition-colors hover:opacity-80"
+              style={{ color: 'var(--text-muted)' }}
+              title="Agent Activity Log"
+            >
+              <ScrollText size={11} />
+              <span className="text-[10px]">{agentLogEntries.length}</span>
+            </button>
+            {agentLogOpen && (
+              <AgentLogPanel entries={agentLogEntries} onClear={clearAgentLog} onClose={toggleAgentLog} />
+            )}
+          </div>
+        )}
+
         {updaterKind === 'downloaded' && (
           <button
             onClick={quitAndInstall}
@@ -239,6 +263,89 @@ export function StatusBar() {
         ) : (
           <span>{t('statusBar.ready')}</span>
         )}
+      </div>
+    </div>
+  )
+}
+
+const SOURCE_LABELS: Record<LogSource, { label: string; color: string }> = {
+  'horse-mode': { label: 'Horse', color: 'var(--color-warning)' },
+  'agent-chat': { label: 'Chat', color: 'var(--accent-color)' },
+  'graph-ingest': { label: 'Graph', color: 'var(--color-info)' },
+  'editor-ai': { label: 'Edit', color: 'var(--color-success)' },
+  'flashcard': { label: 'Flash', color: '#8b5cf6' },
+  'knowledge-base': { label: 'KB', color: '#06b6d4' },
+  'export': { label: 'Export', color: 'var(--text-muted)' },
+  'system': { label: 'Sys', color: 'var(--text-muted)' },
+}
+
+function AgentLogPanel({ entries, onClear, onClose }: {
+  entries: import('../../store/agentLogStore').AgentLogEntry[]
+  onClear: () => void
+  onClose: () => void
+}) {
+  return (
+    <div
+      className="absolute bottom-full right-0 mb-1 z-50 w-96 max-h-64 flex flex-col rounded-lg shadow-2xl border"
+      style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}
+    >
+      {/* Header */}
+      <div
+        className="flex items-center justify-between px-3 py-1.5 border-b flex-shrink-0"
+        style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)' }}
+      >
+        <div className="flex items-center gap-1.5">
+          <ScrollText size={12} style={{ color: 'var(--text-secondary)' }} />
+          <span className="text-[11px] font-semibold" style={{ color: 'var(--text-secondary)' }}>
+            Agent Activity
+          </span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-muted)' }}>
+            {entries.length}
+          </span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button onClick={onClear} className="text-[10px] px-1.5 py-0.5 rounded hover:opacity-80 transition-opacity" style={{ color: 'var(--text-muted)' }}>
+            Clear
+          </button>
+          <button onClick={onClose} className="p-0.5 rounded hover:opacity-80 transition-opacity">
+            <X size={12} style={{ color: 'var(--text-muted)' }} />
+          </button>
+        </div>
+      </div>
+
+      {/* Log entries */}
+      <div className="flex-1 overflow-y-auto">
+        {[...entries].reverse().map((entry) => {
+          const src = SOURCE_LABELS[entry.source] ?? SOURCE_LABELS.system
+          return (
+            <div
+              key={entry.id}
+              className="flex items-start gap-2 px-3 py-1 border-b last:border-b-0 text-[11px]"
+              style={{ borderColor: 'var(--border-color)' }}
+            >
+              <span className="text-[9px] tabular-nums flex-shrink-0 mt-px" style={{ color: 'var(--text-muted)' }}>
+                {new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </span>
+              <span
+                className="text-[9px] font-semibold px-1 py-0 rounded flex-shrink-0 mt-px"
+                style={{ color: src.color, backgroundColor: `color-mix(in srgb, ${src.color} 12%, transparent)` }}
+              >
+                {src.label}
+              </span>
+              <span
+                className="flex-1 break-words"
+                style={{
+                  color: entry.level === 'error' ? 'var(--color-error)'
+                    : entry.level === 'success' ? 'var(--color-success)'
+                    : entry.level === 'warning' ? 'var(--color-warning)'
+                    : 'var(--text-secondary)',
+                }}
+              >
+                {entry.message}
+              </span>
+            </div>
+          )
+        })}
       </div>
     </div>
   )

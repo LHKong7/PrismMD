@@ -17,6 +17,7 @@ import type { EditorView } from '@codemirror/view'
 import type { EditorSelectionInfo } from './editorAIPlugin'
 import { setAIHighlight } from './editorAIHighlight'
 import { useTranslation } from 'react-i18next'
+import { usePromptConfigStore, type PromptMode } from '../../store/promptConfigStore'
 
 interface Props {
   selection: EditorSelectionInfo
@@ -123,7 +124,18 @@ export function EditorAIBubble({ selection, viewRef, onDismiss, focusCustomInput
     setShowTone(false)
     highlightSelection()
     try {
-      const systemPrompt = SYSTEM_PROMPTS[actionKey] || SYSTEM_PROMPTS.custom
+      // Map action keys to configurable prompt modes
+      const promptModeMap: Record<string, PromptMode> = {
+        rewrite: 'editor-rewrite',
+        shorten: 'editor-shorten',
+        expand: 'editor-expand',
+        fixGrammar: 'editor-fix-grammar',
+        custom: 'editor-custom',
+      }
+      const configMode = promptModeMap[actionKey]
+      const systemPrompt = configMode
+        ? usePromptConfigStore.getState().getPrompt(configMode)
+        : SYSTEM_PROMPTS[actionKey] || SYSTEM_PROMPTS.custom
       const prompt = userPromptOverride
         ? `Instruction: ${userPromptOverride}\n\nText:\n"""\n${selection.text}\n"""`
         : `Text:\n"""\n${selection.text}\n"""`
