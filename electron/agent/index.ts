@@ -1,14 +1,13 @@
 /**
- * index.ts — Public barrel export for the borderless-agent library.
+ * index.ts — Public barrel export for the agent module.
  *
  * Usage:
  * ```ts
- * import { AgentBuilder } from 'borderless-agent';
+ * import { AgentBuilder } from '../agent';
  *
  * const agent = new AgentBuilder()
  *   .setProvider('openai', { apiKey: 'sk-...' })
  *   .setSystemPrompt('You are helpful.')
- *   .addTool({ name: 'hello', description: 'Say hi', execute: () => 'Hi!' })
  *   .build();
  *
  * const result = await agent.chat('Hello');
@@ -43,18 +42,6 @@ export type { LLMProvider, LLMResponse, ToolCall, ChatMessage } from './llmProto
 export type { ProviderName, RetryOptions } from './providers/base';
 export { getContextWindowForModel, withRetry } from './providers/base';
 
-// ---- Embeddings (optional) ----
-export { OpenAIEmbeddingProvider, cosineSimilarity } from './providers/embeddings';
-export type { EmbeddingProvider } from './providers/embeddings';
-export {
-    setEmbeddingProvider,
-    getEmbeddingProvider,
-    retrieve as retrieveMemories,
-    writeEvent as writeMemoryEvent,
-    writeInsight as writeMemoryInsight,
-} from './memoryCore';
-export type { RetrievalConfig } from './memoryCore';
-
 // ---- Pricing & Token Usage ----
 export {
     type TokenUsage,
@@ -71,11 +58,7 @@ export { createFileBackend as createFileStorage } from './storage/fileBackend';
 export { StorageBackend } from './storage/protocols';
 export type { SessionStore, MemoryStore, SkillStore, ContextStore } from './storage/protocols';
 
-// ---- MCP ----
-export { MCPManager } from './mcpClient';
-export type { MCPServerConfig } from './mcpClient';
-
-// ---- Session manager (for direct access) ----
+// ---- Session manager ----
 export { SessionManager, Session } from './sessionCore';
 
 // ---- Telemetry & metrics ----
@@ -90,11 +73,7 @@ export type {
     TelemetryConfig,
 } from './telemetry';
 export { MetricsCollector } from './metrics';
-export type {
-    TurnMetrics,
-    ToolMetrics,
-    AgentMetricsSnapshot,
-} from './metrics';
+export type { TurnMetrics, ToolMetrics, AgentMetricsSnapshot } from './metrics';
 
 // ---- Context assembly ----
 export { ContextBuilder, SourceRegistry } from './contextBuilder';
@@ -149,7 +128,7 @@ export {
     ConfigurationError,
 } from './errors';
 
-// ---- Context helpers (for advanced usage) ----
+// ---- Context helpers ----
 export {
     estimateTokens,
     getBudget,

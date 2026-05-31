@@ -372,8 +372,7 @@ async function modelSummarize(
     llm?: any,
 ): Promise<string> {
     if (!llm) {
-        const { defaultLlmProvider } = await import('./config');
-        llm = defaultLlmProvider;
+        return '';
     }
     const textParts: string[] = [];
     for (const m of rounds.slice(0, 30)) {

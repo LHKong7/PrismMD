@@ -12,11 +12,13 @@ import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as readline from 'readline';
-import { WORKDIR, defaultLlmProvider, logger } from './config';
+import { WORKDIR, logger } from './config';
 import { LLMProvider, LLMResponse, ToolCall, ChatMessage } from './llmProtocol';
-import { SKILLS } from './skillsCore';
-import { TODO } from './todoCore';
-import { AGENT_TYPES, EXECUTOR_MUTATING_TOOLS } from './agentsCore';
+// Stubs for modules removed during cleanup (PrismMD disables builtin tools).
+const SKILLS = { getDescriptions: () => '', getSkillContent: async (_n: string) => null as string | null, listSkills: async () => [] as string[] };
+const TODO = { update: (_items: any) => 'TODO tool not available.' };
+const AGENT_TYPES: Record<string, { prompt: string; description: string; tools: string | string[]; requiresApproval?: boolean }> = {};
+const EXECUTOR_MUTATING_TOOLS = new Set<string>();
 
 // Mid-term memory: optional callback when a file is read
 let _fileAccessCallback: ((path: string) => void) | null = null;
@@ -560,7 +562,7 @@ export async function runTask(
     agentType: string,
     llm?: LLMProvider,
 ): Promise<string> {
-    if (!llm) llm = defaultLlmProvider;
+    if (!llm) return 'Error: No LLM provider available for subagent.';
     if (!(agentType in AGENT_TYPES))
         return `Error: Unknown agent type '${agentType}'`;
 

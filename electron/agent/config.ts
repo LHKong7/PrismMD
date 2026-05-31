@@ -1,9 +1,8 @@
 /**
- * config.ts - Shared configuration for the agentic system.
+ * config.ts - Shared configuration for the agent module.
  */
 
 import * as path from 'path';
-import { OpenAIProvider } from './providers/openai';
 
 // Logging: AGENT_VERBOSE=1 or true => DEBUG, else INFO
 const _verbose = ['1', 'true', 'yes'].includes(
@@ -59,13 +58,5 @@ export function streamEnabled(): boolean {
     );
 }
 
-// OpenAI model
+// OpenAI model (used as fallback in standalone mode)
 export const MODEL: string = process.env.MODEL_ID ?? 'gpt-4o';
-
-// Default LLM provider
-export const defaultLlmProvider = new OpenAIProvider({
-    apiKey: process.env.OPENAI_API_KEY ?? 'sk-placeholder',
-    model: MODEL,
-    baseUrl: process.env.OPENAI_BASE_URL || undefined,
-    timeout: API_TIMEOUT,
-});
