@@ -152,6 +152,11 @@ const config: ForgeConfig = {
           target: 'main',
         },
         {
+          entry: 'electron/workers/agentWorker.ts',
+          config: 'vite.main.config.ts',
+          target: 'main',
+        },
+        {
           entry: 'electron/preload.ts',
           config: 'vite.preload.config.ts',
           target: 'preload',

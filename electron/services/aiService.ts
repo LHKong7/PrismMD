@@ -1,23 +1,21 @@
 /**
- * AI Service — powered by the borderless-agent library.
+ * AI Service — routes agent operations to the worker thread.
  *
- * Uses AgentBuilder / AgentInstance from the local agent module (electron/agent)
- * for unified multi-provider support, context management (token budgeting,
- * history selection), tool execution with observation folding, and retry
- * with exponential backoff.
+ * All LLM calls run in a separate worker_threads Worker for main-thread
+ * isolation. This file handles validation, trace events, MCP tool discovery,
+ * and IPC forwarding — the heavy computation runs off-thread.
  *
  * Exports the same four functions the IPC handlers expect:
  *   sendMessage()    — streaming chat
  *   sendOneShot()    — non-streaming single-turn
+ *   runTask()        — autonomous iteration loop
  *   testConnection() — quick connectivity test
  *   stopGeneration() — abort in-flight stream
  */
 import { app, BrowserWindow } from 'electron'
-import { AgentBuilder } from '../agent'
-import type { AgentInstance, ToolDefinition, StreamChunk } from '../agent'
-import type { ProviderName } from '../agent/providers/base'
 import { getActiveProvider, loadSettings } from './settingsStore'
-import { callTool as callMcpTool, discoverAll as discoverAllMcpTools } from './mcpService'
+import { discoverAll as discoverAllMcpTools } from './mcpService'
+import { agentWorker } from './agentWorkerManager'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -37,7 +35,6 @@ interface McpTool {
   name: string
   description: string
   inputSchema: Record<string, unknown>
-  execute: (args: Record<string, unknown>) => Promise<unknown>
 }
 
 // ─── Trace ─────────────────────────────────────────────────────────────────
@@ -65,120 +62,39 @@ function traceEvent(type: TraceType, label: string, data: unknown, durationMs?: 
 
 // ─── Abort ──────────────────────────────────────────────────────────────────
 
-let currentAbortController: AbortController | null = null
-
 export function stopGeneration() {
-  if (currentAbortController) {
-    currentAbortController.abort()
-    currentAbortController = null
-  }
+  agentWorker.abort()
 }
 
 // ─── MCP Tool Discovery ────────────────────────────────────────────────────
 
-async function discoverMcpTools(): Promise<{ tools: McpTool[]; warning?: string }> {
+async function discoverMcpToolDefs(): Promise<{
+  toolDefs: Array<{ name: string; description: string; parameters?: Record<string, any>; required?: string[] }>
+  warning?: string
+}> {
   const settings = loadSettings()
-  if (!settings.mcp.enabled) return { tools: [] }
+  if (!settings.mcp.enabled) return { toolDefs: [] }
 
-  let discovered: Awaited<ReturnType<typeof discoverAllMcpTools>> = []
   try {
-    discovered = await discoverAllMcpTools()
+    const discovered = await discoverAllMcpTools()
+    if (discovered.length === 0) return { toolDefs: [] }
+
+    const toolDefs = discovered.map(({ tool, qualifiedName, serverId }) => {
+      const schema = (tool.inputSchema ?? { type: 'object', properties: {} }) as Record<string, any>
+      return {
+        name: qualifiedName,
+        description: tool.description ?? `MCP tool from server "${serverId}"`,
+        parameters: schema.properties ?? {},
+        required: schema.required ?? [],
+      }
+    })
+    return { toolDefs }
   } catch (err) {
     return {
-      tools: [],
+      toolDefs: [],
       warning: `MCP tool discovery failed: ${err instanceof Error ? err.message : String(err)}`,
     }
   }
-  if (discovered.length === 0) return { tools: [] }
-
-  const tools: McpTool[] = discovered.map(({ serverId, tool, qualifiedName }) => ({
-    name: qualifiedName,
-    description: tool.description ?? `MCP tool from server "${serverId}"`,
-    inputSchema: (tool.inputSchema ?? { type: 'object', properties: {} }) as Record<string, unknown>,
-    execute: async (args: Record<string, unknown>) => callMcpTool(serverId, tool.name, args ?? {}),
-  }))
-
-  return { tools }
-}
-
-// ─── Provider Mapping ──────────────────────────────────────────────────────
-
-function mapProvider(active: {
-  provider: string
-  model: string
-  apiKey: string
-  baseUrl?: string
-}): { providerName: ProviderName; config: { apiKey: string; model: string; baseUrl?: string } } {
-  switch (active.provider) {
-    case 'anthropic':
-      return { providerName: 'anthropic', config: { apiKey: active.apiKey, model: active.model } }
-    case 'google':
-      return { providerName: 'google', config: { apiKey: active.apiKey, model: active.model } }
-    case 'ollama':
-      return {
-        providerName: 'openai',
-        config: {
-          apiKey: 'ollama',
-          model: active.model,
-          baseUrl: `${active.baseUrl ?? 'http://localhost:11434'}/v1`,
-        },
-      }
-    case 'custom':
-      return {
-        providerName: 'openai',
-        config: { apiKey: active.apiKey, model: active.model, baseUrl: active.baseUrl },
-      }
-    case 'openai':
-    default:
-      return {
-        providerName: 'openai',
-        config: { apiKey: active.apiKey, model: active.model, baseUrl: active.baseUrl },
-      }
-  }
-}
-
-// ─── MCP → ToolDefinition Conversion ───────────────────────────────────────
-
-function mcpToolsToToolDefs(mcpTools: McpTool[]): ToolDefinition[] {
-  return mcpTools.map((t) => {
-    const schema = t.inputSchema as { properties?: Record<string, any>; required?: string[] }
-    return {
-      name: t.name,
-      description: t.description,
-      parameters: schema.properties ?? {},
-      required: schema.required ?? [],
-      execute: async (args: Record<string, any>) => {
-        const result = await t.execute(args)
-        return typeof result === 'string' ? result : JSON.stringify(result)
-      },
-    }
-  })
-}
-
-// ─── Agent Builder ─────────────────────────────────────────────────────────
-
-function buildAgent(
-  active: { provider: string; model: string; apiKey: string; baseUrl?: string },
-  systemPrompt: string,
-  options?: {
-    mcpTools?: McpTool[]
-    maxToolRounds?: number
-  },
-): AgentInstance {
-  const { providerName, config } = mapProvider(active)
-  const builder = new AgentBuilder()
-    .setProvider(providerName, config)
-    .setSystemPrompt(systemPrompt)
-    .setIncludeBuiltinTools(false)
-    .enableContext(true)
-    .enableMemory(false)
-    .setMaxToolRounds(options?.maxToolRounds ?? 8)
-
-  if (options?.mcpTools?.length) {
-    builder.addTools(mcpToolsToToolDefs(options.mcpTools))
-  }
-
-  return builder.build()
 }
 
 // ─── Public API ─────────────────────────────────────────────────────────────
@@ -196,7 +112,7 @@ export async function sendMessage(
 
   const { provider, model } = active
 
-  // Build system prompt with structured context sections
+  // Build system prompt
   const systemParts: string[] = [
     'You are an intelligent reading assistant for PrismMD, a Markdown reader.',
     'You answer questions about the document the user is reading, using the context provided below.',
@@ -214,11 +130,10 @@ export async function sendMessage(
     )
   }
 
-  // MCP tool hint (streaming path does not pass tools to the agent, only hints)
-  const { tools: mcpTools, warning: mcpWarning } = await discoverMcpTools()
-  if (mcpTools.length > 0) {
+  const { toolDefs, warning: mcpWarning } = await discoverMcpToolDefs()
+  if (toolDefs.length > 0) {
     systemParts.push(
-      `\nYou have access to ${mcpTools.length} MCP tool(s). Call them when ` +
+      `\nYou have access to ${toolDefs.length} MCP tool(s). Call them when ` +
       "the user asks for information you don't already have in the provided context.",
     )
   }
@@ -227,35 +142,18 @@ export async function sendMessage(
   systemParts.push('\nAnswer the user\'s questions based on the context above. Be concise and precise.')
   const systemPrompt = systemParts.join('\n')
 
-  // ── Trace: request start ──
-  traceEvent('request', `Stream → ${provider}/${model}`, {
-    provider, model, baseUrl: active.baseUrl, type: 'stream',
-  })
+  // Trace
+  traceEvent('request', `Stream → ${provider}/${model}`, { provider, model, type: 'stream' })
   traceEvent('system-prompt', 'System prompt', { text: systemPrompt })
-
-  if (mcpTools.length > 0) {
-    traceEvent('tools', `${mcpTools.length} MCP tool(s) attached`, {
-      tools: mcpTools.map((t) => t.name),
-      count: mcpTools.length,
-    })
-  }
 
   const history = request.messages.slice(0, -1)
   const lastMessage = request.messages[request.messages.length - 1]
   if (!lastMessage) throw new Error('No messages provided.')
 
   traceEvent('messages', `${history.length + 1} message(s) sent`, {
-    messages: [...history, lastMessage].map((m) => ({
-      role: m.role,
-      content: m.content,
-    })),
+    messages: [...history, lastMessage].map((m) => ({ role: m.role, content: m.content })),
   })
 
-  // Build the agent — context management handles token budgeting and history trimming
-  const agent = buildAgent(active, systemPrompt)
-
-  currentAbortController = new AbortController()
-  const signal = currentAbortController.signal
   const startMs = Date.now()
 
   try {
@@ -265,34 +163,20 @@ export async function sendMessage(
       content: m.content,
     }))
 
-    // Agent's stream() uses its internal context management:
-    // - selectHistory() trims history based on token budget
-    // - Token budgeting ensures system prompt + history + output fit in window
-    const stream = agent.stream(lastMessage.content, agentHistory)
+    // Stream via worker thread — main thread stays responsive
+    await agentWorker.stream(
+      { provider: active, systemPrompt, message: lastMessage.content, history: agentHistory },
+      (delta) => {
+        fullReply += delta
+        mainWindow.webContents.send('agent:stream-chunk', delta)
+      },
+    )
 
-    for await (const chunk of stream) {
-      if (signal.aborted) break
-      if (chunk.delta) {
-        fullReply += chunk.delta
-        mainWindow.webContents.send('agent:stream-chunk', chunk.delta)
-      }
-    }
-
-    traceEvent('response', 'Stream complete', {
-      reply: fullReply,
-      length: fullReply.length,
-    }, Date.now() - startMs)
+    traceEvent('response', 'Stream complete', { reply: fullReply, length: fullReply.length }, Date.now() - startMs)
   } catch (err) {
-    if ((err as { name?: string })?.name === 'AbortError') {
-      traceEvent('response', 'Stream aborted by user', { aborted: true }, Date.now() - startMs)
-    } else {
-      const message = err instanceof Error ? err.message : String(err)
-      traceEvent('error', 'Stream error', { error: message }, Date.now() - startMs)
-      mainWindow.webContents.send('agent:stream-error', message)
-    }
-  } finally {
-    currentAbortController = null
-    await agent.close()
+    const message = err instanceof Error ? err.message : String(err)
+    traceEvent('error', 'Stream error', { error: message }, Date.now() - startMs)
+    mainWindow.webContents.send('agent:stream-error', message)
   }
 
   return { provider, model }
@@ -324,51 +208,30 @@ export async function sendOneShot(request: {
   }
   const systemPrompt = systemParts.length > 0 ? systemParts.join('\n\n') : 'You are a helpful assistant.'
 
-  // Discover MCP tools for one-shot calls
-  const { tools: mcpTools } = await discoverMcpTools()
+  // Discover MCP tools — their definitions (no functions) are passed to worker
+  const { toolDefs } = await discoverMcpToolDefs()
 
-  // ── Trace: one-shot request ──
-  traceEvent('request', `One-shot → ${provider}/${model}`, {
-    provider, model, baseUrl: active.baseUrl, type: 'one-shot',
-    hasJsonSchema: !!request.jsonSchema,
-  })
-  if (systemPrompt) {
-    traceEvent('system-prompt', 'System prompt (one-shot)', { text: systemPrompt })
-  }
-  traceEvent('messages', 'Prompt sent', {
-    messages: [{
-      role: 'user',
-      content: request.prompt,
-    }],
-  })
-  if (mcpTools.length > 0) {
-    traceEvent('tools', `${mcpTools.length} MCP tool(s) attached`, {
-      tools: mcpTools.map((t) => t.name),
-      count: mcpTools.length,
-    })
-  }
+  traceEvent('request', `One-shot → ${provider}/${model}`, { provider, model, type: 'one-shot', hasJsonSchema: !!request.jsonSchema })
+  traceEvent('messages', 'Prompt sent', { messages: [{ role: 'user', content: request.prompt }] })
 
   const startMs = Date.now()
 
-  // Build agent WITH tools — agent's internal loop handles multi-round tool calls,
-  // observation folding, and retry with exponential backoff
-  const agent = buildAgent(active, systemPrompt, { mcpTools, maxToolRounds: 8 })
-
   let reply: string
   try {
-    const result = await agent.chat(request.prompt)
+    const result = await agentWorker.chat({
+      provider: active,
+      systemPrompt,
+      message: request.prompt,
+      toolDefs: toolDefs.length > 0 ? toolDefs : undefined,
+      maxToolRounds: 8,
+    })
     reply = result.reply
 
-    traceEvent('response', 'One-shot complete', {
-      reply,
-      length: reply.length,
-    }, Date.now() - startMs)
+    traceEvent('response', 'One-shot complete', { reply, length: reply.length }, Date.now() - startMs)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     traceEvent('error', 'One-shot error', { error: message }, Date.now() - startMs)
     throw err
-  } finally {
-    await agent.close()
   }
 
   let json: unknown | undefined
@@ -378,9 +241,7 @@ export async function sendOneShot(request: {
       json = JSON.parse(stripped)
     } catch (err) {
       throw new Error(
-        `Expected JSON reply but failed to parse: ${
-          err instanceof Error ? err.message : String(err)
-        }. Raw reply: ${reply.slice(0, 200)}`,
+        `Expected JSON reply but failed to parse: ${err instanceof Error ? err.message : String(err)}. Raw reply: ${reply.slice(0, 200)}`,
       )
     }
   }
@@ -420,25 +281,23 @@ export async function runTask(
     maxIterations: request.maxIterations ?? 5,
   })
 
-  const agent = buildAgent(active, systemPrompt)
   const startMs = Date.now()
 
   try {
-    const taskResult = await agent.runTask({
-      task: request.task,
-      qualityThreshold: request.qualityThreshold ?? 7,
-      maxIterations: request.maxIterations ?? 5,
-      onProgress: (progress) => {
-        // Send progress events to renderer
+    const taskResult = await agentWorker.runTask(
+      {
+        provider: active,
+        systemPrompt,
+        task: request.task,
+        qualityThreshold: request.qualityThreshold ?? 7,
+        maxIterations: request.maxIterations ?? 5,
+      },
+      (progress) => {
         if (!mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('agent:task-progress', {
-            iteration: progress.iteration,
-            phase: progress.phase,
-            qualityScore: progress.qualityScore,
-          })
+          mainWindow.webContents.send('agent:task-progress', progress)
         }
       },
-    })
+    )
 
     traceEvent('response', 'RunTask complete', {
       resultLength: taskResult.result.length,
@@ -447,20 +306,11 @@ export async function runTask(
       thresholdMet: taskResult.thresholdMet,
     }, Date.now() - startMs)
 
-    return {
-      provider,
-      model,
-      result: taskResult.result,
-      iterations: taskResult.iterations,
-      qualityScore: taskResult.qualityScore,
-      thresholdMet: taskResult.thresholdMet,
-    }
+    return { provider, model, ...taskResult }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     traceEvent('error', 'RunTask error', { error: message }, Date.now() - startMs)
     throw err
-  } finally {
-    await agent.close()
   }
 }
 
@@ -476,17 +326,7 @@ export async function testConnection(
       : provider === 'google' ? 'gemini-1.5-flash'
       : 'gpt-4o-mini'
     const model = userModel || fallback
-
-    const agent = buildAgent(
-      { provider, model, apiKey, baseUrl },
-      'You are a test assistant.',
-    )
-    try {
-      const result = await agent.chat('hi')
-      return !!result.reply
-    } finally {
-      await agent.close()
-    }
+    return await agentWorker.test({ provider, model, apiKey, baseUrl })
   } catch {
     return false
   }

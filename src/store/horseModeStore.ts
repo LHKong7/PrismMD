@@ -127,6 +127,13 @@ export const useHorseModeStore = create<HorseModeStore>((set, get) => ({
       }
 
       const content = (consolidateRes.ok ? consolidateRes.result.reply : res.result.result).trim()
+      if (!content) {
+        set({ stage: 'failed', error: 'Agent produced empty output' })
+        hlog('Error: agent produced empty output', 'error')
+        const { useToastStore } = await import('./toastStore')
+        useToastStore.getState().show('error', 'Horse Mode failed: empty output')
+        return
+      }
       const wordCount = content.split(/\s+/).length
       hlog(`Final document: ${wordCount} words (${res.result.provider}/${res.result.model})`, 'success')
 

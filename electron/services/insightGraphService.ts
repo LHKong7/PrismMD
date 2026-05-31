@@ -13,8 +13,7 @@ import fs from 'fs/promises'
 import crypto from 'crypto'
 import neo4j, { type Driver, type Session } from 'neo4j-driver'
 import { getActiveProvider, getInsightGraphSettings, loadSettings, type InsightGraphSettings } from './settingsStore'
-import { AgentBuilder } from '../agent'
-import type { ProviderName } from '../agent/providers/base'
+import { agentWorker } from './agentWorkerManager'
 
 // ─── Error Types ────────────────────────────────────────────────────────────
 
@@ -107,19 +106,7 @@ export async function testNeo4jConnection(
   }
 }
 
-// ─── Agent Helper ──────────────────────────────────────────────────────────
-
-function mapProvider(active: { provider: string; model: string; apiKey: string; baseUrl?: string }): {
-  providerName: ProviderName; config: { apiKey: string; model: string; baseUrl?: string }
-} {
-  switch (active.provider) {
-    case 'anthropic': return { providerName: 'anthropic', config: { apiKey: active.apiKey, model: active.model } }
-    case 'google': return { providerName: 'google', config: { apiKey: active.apiKey, model: active.model } }
-    case 'ollama': return { providerName: 'openai', config: { apiKey: 'ollama', model: active.model, baseUrl: `${active.baseUrl ?? 'http://localhost:11434'}/v1` } }
-    case 'custom': return { providerName: 'openai', config: { apiKey: active.apiKey, model: active.model, baseUrl: active.baseUrl } }
-    default: return { providerName: 'openai', config: { apiKey: active.apiKey, model: active.model, baseUrl: active.baseUrl } }
-  }
-}
+// ─── Agent Helper (via worker thread) ──────────────────────────────────────
 
 async function agentChat(systemPrompt: string, prompt: string): Promise<string> {
   const active = getActiveProvider()
@@ -128,21 +115,12 @@ async function agentChat(systemPrompt: string, prompt: string): Promise<string> 
   if (settings.privacyMode && active.provider !== 'ollama') {
     throw new Error('Privacy Mode is enabled. Only local models (Ollama) are allowed.')
   }
-  const { providerName, config } = mapProvider(active)
-  const agent = new AgentBuilder()
-    .setProvider(providerName, config)
-    .setSystemPrompt(systemPrompt)
-    .setIncludeBuiltinTools(false)
-    .enableContext(false)
-    .enableMemory(false)
-    .setMaxToolRounds(1)
-    .build()
-  try {
-    const result = await agent.chat(prompt)
-    return result.reply
-  } finally {
-    await agent.close()
-  }
+  const result = await agentWorker.chat({
+    provider: active,
+    systemPrompt,
+    message: prompt,
+  })
+  return result.reply
 }
 
 async function agentChatJson<T>(systemPrompt: string, prompt: string, jsonSchema: Record<string, unknown>): Promise<T> {
@@ -156,7 +134,11 @@ async function agentChatJson<T>(systemPrompt: string, prompt: string, jsonSchema
 
   const reply = await agentChat(fullSystemPrompt, prompt)
   const stripped = reply.trim().replace(/^```(?:json)?\s*/i, '').replace(/```$/i, '').trim()
-  return JSON.parse(stripped) as T
+  try {
+    return JSON.parse(stripped) as T
+  } catch {
+    throw new Error(`AI returned invalid JSON. Reply: ${reply.slice(0, 200)}...`)
+  }
 }
 
 // ─── Public API: Ingest ─────────────────────────────────────────────────────

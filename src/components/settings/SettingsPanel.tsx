@@ -14,6 +14,7 @@ import { useKnowledgeBaseStore } from '../../store/knowledgeBaseStore'
 import { TemplateSettings } from './TemplateSettings'
 import { PromptSettings } from './PromptSettings'
 import { AgentSessionsPanel } from './AgentSessionsPanel'
+import { PromptLibrary } from './PromptLibrary'
 import { themes } from '../../lib/theme/themes'
 import { LANGUAGES, changeLanguage, type SupportedLanguage } from '../../i18n'
 import { clsx } from 'clsx'
@@ -237,6 +238,10 @@ function AgentCombinedSettings() {
 
       <CollapsibleSection title={t('settings.prompts.title', 'Prompts')} defaultOpen={false}>
         <PromptSettings />
+      </CollapsibleSection>
+
+      <CollapsibleSection title={t('settings.promptLibrary.title')} defaultOpen={false}>
+        <PromptLibrary />
       </CollapsibleSection>
 
       <CollapsibleSection title={t('settings.agentSessions.sessionsTitle', 'Sessions')} defaultOpen={false}>

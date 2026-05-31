@@ -3,6 +3,7 @@ import { MessageSquare, Plus, Trash2, Zap, ChevronDown, ChevronRight, FolderOpen
 import { useTranslation } from 'react-i18next'
 import { useSessionStore, type SessionSummary } from '../../store/sessionStore'
 import { useAgentStore } from '../../store/agentStore'
+import { MarkdownPreview } from '../ui/MarkdownPreview'
 import { clsx } from 'clsx'
 
 function formatRelativeTime(timestamp: number): string {
@@ -134,14 +135,16 @@ function SessionCard({
   const [loadingHistory, setLoadingHistory] = useState(false)
 
   useEffect(() => {
-    if (isExpanded && !messages) {
-      setLoadingHistory(true)
-      window.electronAPI.sessionGetHistory(session.id)
-        .then((history) => setMessages(history ?? []))
-        .catch(() => setMessages([]))
-        .finally(() => setLoadingHistory(false))
-    }
-  }, [isExpanded, session.id, messages])
+    if (!isExpanded) return
+    let cancelled = false
+    setLoadingHistory(true)
+    setMessages(null)
+    window.electronAPI.sessionGetHistory(session.id)
+      .then((history) => { if (!cancelled) setMessages(history ?? []) })
+      .catch(() => { if (!cancelled) setMessages([]) })
+      .finally(() => { if (!cancelled) setLoadingHistory(false) })
+    return () => { cancelled = true }
+  }, [isExpanded, session.id])
 
   const filePath = sessionDir ? `${sessionDir}/${session.id}.json` : session.id
 
@@ -315,12 +318,25 @@ function MessageBlock({ role, content }: { role: string; content: string }) {
       </div>
       <div
         className={clsx(
-          'text-xs whitespace-pre-wrap break-words',
-          !expanded && isLong && 'line-clamp-6',
+          !expanded && isLong && 'max-h-36 overflow-hidden relative',
         )}
-        style={{ color: 'var(--text-secondary)' }}
       >
-        {content}
+        {role === 'assistant' ? (
+          <MarkdownPreview content={content} />
+        ) : (
+          <div
+            className="text-xs whitespace-pre-wrap break-words"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            {content}
+          </div>
+        )}
+        {!expanded && isLong && (
+          <div
+            className="absolute bottom-0 left-0 right-0 h-10 pointer-events-none"
+            style={{ background: 'linear-gradient(to bottom, transparent, var(--bg-primary))' }}
+          />
+        )}
       </div>
       {!expanded && isLong && (
         <button

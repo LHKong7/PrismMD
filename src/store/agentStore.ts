@@ -302,14 +302,16 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       finalizeStream(result.provider as AIProvider, result.model)
 
       // Persist chat history to the current session (best-effort).
-      // Auto-create a session if none exists yet.
+      // Auto-create a session if none exists yet. Guard against race condition.
       try {
         const sessionStore = useSessionStore.getState()
-        if (!sessionStore.currentSessionId) {
+        if (!sessionStore.currentSessionId && !sessionStore.loading) {
           await sessionStore.createSession()
         }
-        const msgs = get().messages.map((m) => ({ role: m.role, content: m.content }))
-        await sessionStore.saveHistory(msgs)
+        if (useSessionStore.getState().currentSessionId) {
+          const msgs = get().messages.map((m) => ({ role: m.role, content: m.content }))
+          await sessionStore.saveHistory(msgs)
+        }
       } catch {
         // Session save best-effort
       }
@@ -337,7 +339,9 @@ export const useAgentStore = create<AgentStore>((set, get) => {
   stopGeneration: () => {
     window.electronAPI.stopAgentGeneration?.()
     const { finalizeStream } = get()
-    finalizeStream('openai', '')
+    // Use the actual active provider rather than hardcoded 'openai'
+    const activeProvider = (useSettingsStore.getState().activeProvider ?? 'openai') as AIProvider
+    finalizeStream(activeProvider, '')
   },
 
   retryMessage: async (messageId, documentContext, currentFilePath) => {

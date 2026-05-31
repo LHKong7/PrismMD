@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Send, Square, Trash2, Bot, ChevronDown, Brain, AlertTriangle, X, ArrowDown, Download } from 'lucide-react'
+import { Send, Square, Trash2, Bot, ChevronDown, Brain, AlertTriangle, X, ArrowDown, Download, BookOpen } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAgentStore, type ChatMessage as ChatMessageType } from '../../store/agentStore'
 import { useFileStore } from '../../store/fileStore'
 import { useSettingsStore, DEFAULT_MODELS, type AIProvider } from '../../store/settingsStore'
 import { useUIStore } from '../../store/uiStore'
+import { usePromptLibraryStore } from '../../store/promptLibraryStore'
 import { ChatMessage, renderWithCitations } from './ChatMessage'
 import { useReaderDomStore } from '../../store/readerDomStore'
 import { Button } from '../ui/Button'
@@ -311,6 +312,7 @@ export function AgentSidebar() {
             className="flex-1 text-sm bg-transparent outline-none resize-none max-h-24 disabled:opacity-50"
             style={{ color: 'var(--text-primary)' }}
           />
+          <PromptQuickPick onSelect={(content) => setInput(content)} />
           {isStreaming ? (
             <Button
               variant="primary"
@@ -389,4 +391,59 @@ function exportConversationAsMarkdown(
   a.remove()
   // Revoke async so the browser has time to start the download.
   window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+/**
+ * Quick-pick button for the prompt library. Shows a small dropdown
+ * of saved prompts; clicking one fills the chat input.
+ */
+function PromptQuickPick({ onSelect }: { onSelect: (content: string) => void }) {
+  const prompts = usePromptLibraryStore((s) => s.prompts)
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
+  if (prompts.length === 0) return null
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="p-1.5 rounded-md transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+        title="Prompt Library"
+        type="button"
+      >
+        <BookOpen size={14} style={{ color: 'var(--text-muted)' }} />
+      </button>
+      {open && (
+        <div
+          className="absolute bottom-full right-0 mb-1 w-56 max-h-48 overflow-y-auto rounded-lg border shadow-lg py-1"
+          style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}
+        >
+          {prompts.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => { onSelect(p.content); setOpen(false) }}
+              className="w-full text-left px-3 py-2 text-xs hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              <div className="font-medium truncate">{p.name}</div>
+              <div className="truncate mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                {p.content.slice(0, 60)}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }

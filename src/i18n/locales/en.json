@@ -486,6 +486,26 @@
       "clear": "Clear",
       "empty": "No trace entries yet. Send an AI message to start recording."
     },
+    "promptLibrary": {
+      "title": "Prompt Library",
+      "description": "Save and manage your custom prompts for quick reuse across chat and Horse Mode.",
+      "add": "New Prompt",
+      "save": "Save",
+      "cancel": "Cancel",
+      "edit": "Edit",
+      "copy": "Copy to clipboard",
+      "duplicate": "Duplicate",
+      "delete": "Delete",
+      "namePlaceholder": "Prompt name (e.g., \"Summarize article\")",
+      "contentPlaceholder": "Enter your prompt content here...",
+      "emptyTitle": "No saved prompts",
+      "emptyDescription": "Create custom prompts to reuse across your AI conversations.",
+      "catGeneral": "General",
+      "catWriting": "Writing",
+      "catAnalysis": "Analysis",
+      "catCoding": "Coding",
+      "catCustom": "Custom"
+    },
     "agentSessions": {
       "title": "Agent",
       "description": "Manage your AI conversation sessions and chat history.",

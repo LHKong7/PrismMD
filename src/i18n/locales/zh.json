@@ -486,6 +486,26 @@
       "clear": "清空",
       "empty": "暂无追踪记录。发送 AI 消息后开始记录。"
     },
+    "promptLibrary": {
+      "title": "提示词库",
+      "description": "保存和管理自定义提示词，可在对话和 Horse Mode 中快速复用。",
+      "add": "新建提示词",
+      "save": "保存",
+      "cancel": "取消",
+      "edit": "编辑",
+      "copy": "复制到剪贴板",
+      "duplicate": "复制",
+      "delete": "删除",
+      "namePlaceholder": "提示词名称（如「总结文章」）",
+      "contentPlaceholder": "输入提示词内容...",
+      "emptyTitle": "暂无保存的提示词",
+      "emptyDescription": "创建自定义提示词，在 AI 对话中快速复用。",
+      "catGeneral": "通用",
+      "catWriting": "写作",
+      "catAnalysis": "分析",
+      "catCoding": "编程",
+      "catCustom": "自定义"
+    },
     "agentSessions": {
       "title": "智能体",
       "description": "管理你的 AI 对话会话和聊天记录。",
