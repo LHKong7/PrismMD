@@ -1,9 +1,10 @@
 /**
- * Agent Worker Manager — manages the worker_threads Worker for agent operations.
+ * Agent Worker Pool — manages multiple worker_threads for concurrent agent operations.
  *
- * Provides async methods (stream, chat, runTask, test) that communicate
- * with the agentWorker via structured messages. MCP tool calls are proxied
- * back from the worker to the main thread for execution.
+ * Maintains a pool of up to N workers. When all workers are busy, incoming
+ * requests are queued and dispatched as workers become available (FIFO).
+ * This allows InsightGraph extraction, Horse Mode, and Agent Chat to run
+ * concurrently without blocking each other.
  */
 import { Worker } from 'worker_threads'
 import * as path from 'path'
@@ -63,80 +64,146 @@ export interface RunTaskResult {
   thresholdMet: boolean
 }
 
-// ─── Worker Manager ─────────────────────────────────────────────────────────
+// ─── Pool Types ─────────────────────────────────────────────────────────────
 
-class AgentWorkerManager {
-  private worker: Worker | null = null
-  private busy = false
-  private pendingResolve: ((value: any) => void) | null = null
-  private pendingReject: ((err: Error) => void) | null = null
-  private onChunk: ((delta: string) => void) | null = null
-  private onProgress: ((progress: { iteration: number; phase: string; qualityScore?: number }) => void) | null = null
+interface PooledWorker {
+  id: number
+  worker: Worker
+  busy: boolean
+  taskType: string | null
+  pendingResolve: ((value: any) => void) | null
+  pendingReject: ((err: Error) => void) | null
+  onChunk: ((delta: string) => void) | null
+  onProgress: ((progress: { iteration: number; phase: string; qualityScore?: number }) => void) | null
+}
+
+interface QueuedTask {
+  type: 'stream' | 'chat' | 'run-task' | 'test'
+  payload: any
+  resolve: (value: any) => void
+  reject: (err: Error) => void
+  onChunk?: (delta: string) => void
+  onProgress?: (progress: { iteration: number; phase: string; qualityScore?: number }) => void
+}
+
+// ─── Worker Pool ────────────────────────────────────────────────────────────
+
+const MAX_WORKERS = 3
+
+class AgentWorkerPool {
+  private pool: PooledWorker[] = []
+  private queue: QueuedTask[] = []
+  private nextId = 0
 
   private getWorkerPath(): string {
-    // In dev mode, the worker is compiled by Vite alongside main.js
-    // In production, it's in the same directory as the main bundle
-    if (app.isPackaged) {
-      return path.join(__dirname, 'agentWorker.js')
-    }
     return path.join(__dirname, 'agentWorker.js')
   }
 
-  private ensureWorker(): Worker {
-    if (this.worker) return this.worker
+  private spawnWorker(): PooledWorker {
+    const id = this.nextId++
+    const worker = new Worker(this.getWorkerPath())
 
-    this.worker = new Worker(this.getWorkerPath())
+    const pw: PooledWorker = {
+      id,
+      worker,
+      busy: false,
+      taskType: null,
+      pendingResolve: null,
+      pendingReject: null,
+      onChunk: null,
+      onProgress: null,
+    }
 
-    this.worker.on('message', (msg: { type: string; [key: string]: any }) => {
+    worker.on('message', (msg: { type: string; [key: string]: any }) => {
       switch (msg.type) {
         case 'chunk':
-          this.onChunk?.(msg.delta)
+          pw.onChunk?.(msg.delta)
           break
         case 'progress':
-          this.onProgress?.({ iteration: msg.iteration, phase: msg.phase, qualityScore: msg.qualityScore })
+          pw.onProgress?.({ iteration: msg.iteration, phase: msg.phase, qualityScore: msg.qualityScore })
           break
         case 'result':
-          this.busy = false
-          this.pendingResolve?.(msg)
-          this.pendingResolve = null
-          this.pendingReject = null
+          pw.pendingResolve?.(msg)
+          this.releaseWorker(pw)
           break
         case 'error':
-          this.busy = false
-          this.pendingReject?.(new Error(msg.message))
-          this.pendingResolve = null
-          this.pendingReject = null
+          pw.pendingReject?.(new Error(msg.message))
+          this.releaseWorker(pw)
           break
         case 'tool-call-request':
-          void this.handleToolCallRequest(msg.id, msg.name, msg.args)
+          void this.handleToolCallRequest(pw, msg.id, msg.name, msg.args)
           break
       }
     })
 
-    this.worker.on('error', (err) => {
-      this.busy = false
-      this.pendingReject?.(err)
-      this.pendingResolve = null
-      this.pendingReject = null
-      // Worker crashed — clear reference so next call spawns a new one
-      this.worker = null
+    worker.on('error', (err) => {
+      pw.pendingReject?.(err)
+      this.removeWorker(pw)
+      this.drainQueue()
     })
 
-    this.worker.on('exit', (code) => {
-      if (code !== 0) {
-        this.pendingReject?.(new Error(`Agent worker exited with code ${code}`))
-        this.pendingResolve = null
-        this.pendingReject = null
+    worker.on('exit', (code) => {
+      if (code !== 0 && pw.pendingReject) {
+        pw.pendingReject(new Error(`Agent worker exited with code ${code}`))
       }
-      this.busy = false
-      this.worker = null
+      this.removeWorker(pw)
+      this.drainQueue()
     })
 
-    return this.worker
+    this.pool.push(pw)
+    return pw
   }
 
-  private async handleToolCallRequest(id: string, toolName: string, args: Record<string, any>) {
-    // Parse serverId from qualified name (format: "serverId__toolName")
+  private releaseWorker(pw: PooledWorker) {
+    pw.busy = false
+    pw.taskType = null
+    pw.pendingResolve = null
+    pw.pendingReject = null
+    pw.onChunk = null
+    pw.onProgress = null
+    this.drainQueue()
+  }
+
+  private removeWorker(pw: PooledWorker) {
+    const idx = this.pool.indexOf(pw)
+    if (idx >= 0) this.pool.splice(idx, 1)
+    pw.busy = false
+    pw.pendingResolve = null
+    pw.pendingReject = null
+    pw.onChunk = null
+    pw.onProgress = null
+  }
+
+  private acquireWorker(): PooledWorker | null {
+    // Try to find a free worker
+    const free = this.pool.find((pw) => !pw.busy)
+    if (free) return free
+    // Spawn a new one if under limit
+    if (this.pool.length < MAX_WORKERS) return this.spawnWorker()
+    // All busy, no room to spawn
+    return null
+  }
+
+  private drainQueue() {
+    while (this.queue.length > 0) {
+      const pw = this.acquireWorker()
+      if (!pw) break
+      const task = this.queue.shift()!
+      this.dispatch(pw, task)
+    }
+  }
+
+  private dispatch(pw: PooledWorker, task: QueuedTask) {
+    pw.busy = true
+    pw.taskType = task.type
+    pw.pendingResolve = task.resolve
+    pw.pendingReject = task.reject
+    pw.onChunk = task.onChunk ?? null
+    pw.onProgress = task.onProgress ?? null
+    pw.worker.postMessage({ type: task.type, ...task.payload })
+  }
+
+  private async handleToolCallRequest(pw: PooledWorker, id: string, toolName: string, args: Record<string, any>) {
     const sep = toolName.indexOf('__')
     const serverId = sep > 0 ? toolName.slice(0, sep) : toolName
     const actualName = sep > 0 ? toolName.slice(sep + 2) : toolName
@@ -149,29 +216,33 @@ class AgentWorkerManager {
       result = `Error: ${err instanceof Error ? err.message : String(err)}`
     }
 
-    this.worker?.postMessage({ type: 'tool-result', id, result })
+    pw.worker.postMessage({ type: 'tool-result', id, result })
   }
 
   // ─── Public API ──────────────────────────────────────────────────────────
 
   /**
    * Stream a chat message. Calls onChunkCb for each text delta.
-   * Resolves when streaming is complete.
+   * If all workers are busy, the request is queued.
    */
   async stream(
     config: StreamConfig,
     onChunkCb: (delta: string) => void,
   ): Promise<void> {
-    if (this.busy) throw new Error('Agent worker is busy. Wait for current operation to complete.')
-    this.busy = true
-    this.onChunk = onChunkCb
-
-    const worker = this.ensureWorker()
-
     return new Promise<void>((resolve, reject) => {
-      this.pendingResolve = () => { this.onChunk = null; resolve() }
-      this.pendingReject = (err) => { this.onChunk = null; reject(err) }
-      worker.postMessage({ type: 'stream', ...config })
+      const task: QueuedTask = {
+        type: 'stream',
+        payload: config,
+        resolve: () => resolve(),
+        reject,
+        onChunk: onChunkCb,
+      }
+      const pw = this.acquireWorker()
+      if (pw) {
+        this.dispatch(pw, task)
+      } else {
+        this.queue.push(task)
+      }
     })
   }
 
@@ -179,15 +250,19 @@ class AgentWorkerManager {
    * Non-streaming chat call. Returns the full reply.
    */
   async chat(config: ChatConfig): Promise<ChatResult> {
-    if (this.busy) throw new Error('Agent worker is busy. Wait for current operation to complete.')
-    this.busy = true
-
-    const worker = this.ensureWorker()
-
     return new Promise<ChatResult>((resolve, reject) => {
-      this.pendingResolve = (msg) => resolve({ reply: msg.reply, hadToolCalls: msg.hadToolCalls, usage: msg.usage })
-      this.pendingReject = reject
-      worker.postMessage({ type: 'chat', ...config })
+      const task: QueuedTask = {
+        type: 'chat',
+        payload: config,
+        resolve: (msg) => resolve({ reply: msg.reply, hadToolCalls: msg.hadToolCalls, usage: msg.usage }),
+        reject,
+      }
+      const pw = this.acquireWorker()
+      if (pw) {
+        this.dispatch(pw, task)
+      } else {
+        this.queue.push(task)
+      }
     })
   }
 
@@ -199,19 +274,20 @@ class AgentWorkerManager {
     config: RunTaskConfig,
     onProgressCb?: (progress: { iteration: number; phase: string; qualityScore?: number }) => void,
   ): Promise<RunTaskResult> {
-    if (this.busy) throw new Error('Agent worker is busy. Wait for current operation to complete.')
-    this.busy = true
-    this.onProgress = onProgressCb ?? null
-
-    const worker = this.ensureWorker()
-
     return new Promise<RunTaskResult>((resolve, reject) => {
-      this.pendingResolve = (msg) => {
-        this.onProgress = null
-        resolve({ result: msg.result, iterations: msg.iterations, qualityScore: msg.qualityScore, thresholdMet: msg.thresholdMet })
+      const task: QueuedTask = {
+        type: 'run-task',
+        payload: config,
+        resolve: (msg) => resolve({ result: msg.result, iterations: msg.iterations, qualityScore: msg.qualityScore, thresholdMet: msg.thresholdMet }),
+        reject,
+        onProgress: onProgressCb,
       }
-      this.pendingReject = (err) => { this.onProgress = null; reject(err) }
-      worker.postMessage({ type: 'run-task', ...config })
+      const pw = this.acquireWorker()
+      if (pw) {
+        this.dispatch(pw, task)
+      } else {
+        this.queue.push(task)
+      }
     })
   }
 
@@ -219,34 +295,45 @@ class AgentWorkerManager {
    * Quick connectivity test. Returns true if the provider responds.
    */
   async test(provider: ProviderConfig): Promise<boolean> {
-    if (this.busy) throw new Error('Agent worker is busy. Wait for current operation to complete.')
-    this.busy = true
-
-    const worker = this.ensureWorker()
-
     return new Promise<boolean>((resolve) => {
-      this.pendingResolve = (msg) => resolve(!!msg.success)
-      this.pendingReject = () => resolve(false)
-      worker.postMessage({ type: 'test', provider })
+      const task: QueuedTask = {
+        type: 'test',
+        payload: { provider },
+        resolve: (msg) => resolve(!!msg.success),
+        reject: () => resolve(false),
+      }
+      const pw = this.acquireWorker()
+      if (pw) {
+        this.dispatch(pw, task)
+      } else {
+        this.queue.push(task)
+      }
     })
   }
 
   /**
-   * Abort the current operation.
+   * Abort the currently streaming operation (targets the worker running a stream task).
    */
   abort(): void {
-    this.worker?.postMessage({ type: 'abort' })
+    const streaming = this.pool.find((pw) => pw.busy && pw.taskType === 'stream')
+    if (streaming) {
+      streaming.worker.postMessage({ type: 'abort' })
+    }
   }
 
   /**
-   * Terminate the worker (call on app quit).
+   * Terminate all workers (call on app quit).
    */
   async shutdown(): Promise<void> {
-    if (this.worker) {
-      await this.worker.terminate()
-      this.worker = null
+    // Reject all queued tasks
+    for (const task of this.queue) {
+      task.reject(new Error('Worker pool shutting down'))
     }
+    this.queue = []
+    // Terminate all workers
+    await Promise.all(this.pool.map((pw) => pw.worker.terminate()))
+    this.pool = []
   }
 }
 
-export const agentWorker = new AgentWorkerManager()
+export const agentWorker = new AgentWorkerPool()
