@@ -471,6 +471,38 @@
       "delete": "Delete",
       "expandCollapse": "Expand / Collapse"
     },
+    "developer": {
+      "title": "Developer",
+      "description": "Inspect the full Agent call chain: system prompts, messages, responses, timing, and tool calls.",
+      "filterAll": "All",
+      "filterRequest": "Request",
+      "filterSystemPrompt": "System Prompt",
+      "filterMessages": "Messages",
+      "filterTools": "Tools",
+      "filterResponse": "Response",
+      "filterToolCall": "Tool Call",
+      "filterError": "Error",
+      "entryCount": "{{count}} entries",
+      "clear": "Clear",
+      "empty": "No trace entries yet. Send an AI message to start recording."
+    },
+    "agentSessions": {
+      "title": "Agent",
+      "description": "Manage your AI conversation sessions and chat history.",
+      "newSession": "New Session",
+      "current": "Current",
+      "switch": "Switch",
+      "delete": "Delete",
+      "emptyTitle": "No sessions yet",
+      "emptyDescription": "Start a conversation with the AI assistant to create your first session.",
+      "turns": "{{count}} messages",
+      "noPreview": "Empty session",
+      "sourceChat": "Chat",
+      "sourceHorseMode": "Horse Mode",
+      "sessionsTitle": "Sessions",
+      "filePath": "File",
+      "messages": "Messages"
+    },
     "close": "Close"
   },
   "highlightPopover": {

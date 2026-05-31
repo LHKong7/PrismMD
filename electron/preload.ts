@@ -146,6 +146,18 @@ const electronAPI = {
     ipcRenderer.on('agent:mcp-warning', handler)
     return () => ipcRenderer.removeListener('agent:mcp-warning', handler)
   },
+  onAgentTrace: (callback: (entry: {
+    id: string
+    timestamp: number
+    type: 'request' | 'system-prompt' | 'messages' | 'tools' | 'response' | 'tool-call' | 'error'
+    label: string
+    data: unknown
+    durationMs?: number
+  }) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, entry: Parameters<typeof callback>[0]) => callback(entry)
+    ipcRenderer.on('agent:trace', handler)
+    return () => ipcRenderer.removeListener('agent:trace', handler)
+  },
   stopAgentGeneration: (): void => { ipcRenderer.send('agent:stop') },
   testAgentConnection: (provider: string, apiKey: string, baseUrl?: string, model?: string): Promise<boolean> =>
     ipcRenderer.invoke('agent:test-connection', provider, apiKey, baseUrl, model),
@@ -163,6 +175,58 @@ const electronAPI = {
     | { ok: true; result: { provider: string; model: string; reply: string; json?: unknown } }
     | { ok: false; error: string }
   > => ipcRenderer.invoke('agent:one-shot', request),
+
+  /**
+   * Run an autonomous agent task (plan → execute → review → evaluate loop).
+   * Used by Horse Mode for iterative document generation with quality evaluation.
+   */
+  sendAgentTask: (request: {
+    task: string
+    systemPrompt?: string
+    qualityThreshold?: number
+    maxIterations?: number
+  }): Promise<
+    | { ok: true; result: { provider: string; model: string; result: string; iterations: number; qualityScore: number; thresholdMet: boolean } }
+    | { ok: false; error: string }
+  > => ipcRenderer.invoke('agent:run-task', request),
+  onAgentTaskProgress: (callback: (progress: {
+    iteration: number
+    phase: 'plan' | 'execute' | 'review' | 'evaluate'
+    qualityScore?: number
+  }) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, progress: Parameters<typeof callback>[0]) => callback(progress)
+    ipcRenderer.on('agent:task-progress', handler)
+    return () => ipcRenderer.removeListener('agent:task-progress', handler)
+  },
+
+  // Sessions
+  sessionGetDir: (): Promise<string> =>
+    ipcRenderer.invoke('session:get-dir'),
+  sessionCreate: (): Promise<string> =>
+    ipcRenderer.invoke('session:create'),
+  sessionRestore: (sessionId: string): Promise<{
+    id: string
+    messages: Array<{ role: string; content: string }>
+  } | null> => ipcRenderer.invoke('session:restore', sessionId),
+  sessionList: (limit?: number): Promise<Array<{
+    id: string
+    updatedAt: number
+    turns: number
+    state: string
+    preview: string
+    source: 'chat' | 'horse-mode'
+  }>> => ipcRenderer.invoke('session:list', limit),
+  sessionDelete: (sessionId: string): Promise<boolean> =>
+    ipcRenderer.invoke('session:delete', sessionId),
+  sessionSaveHistory: (
+    sessionId: string,
+    messages: Array<{ role: string; content: string }>,
+    metadata?: { source?: 'chat' | 'horse-mode' },
+  ): Promise<void> => ipcRenderer.invoke('session:save-history', sessionId, messages, metadata),
+  sessionGetHistory: (sessionId: string): Promise<Array<{
+    role: string
+    content: string
+  }> | null> => ipcRenderer.invoke('session:get-history', sessionId),
 
   // Memory
   memorySave: (filePath: string, summary: string, topics: string[]): Promise<void> =>

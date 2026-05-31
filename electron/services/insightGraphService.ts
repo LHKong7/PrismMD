@@ -13,7 +13,8 @@ import fs from 'fs/promises'
 import crypto from 'crypto'
 import neo4j, { type Driver, type Session } from 'neo4j-driver'
 import { getActiveProvider, getInsightGraphSettings, loadSettings, type InsightGraphSettings } from './settingsStore'
-import { sendOneShot } from './aiService'
+import { AgentBuilder } from '../agent'
+import type { ProviderName } from '../agent/providers/base'
 
 // ─── Error Types ────────────────────────────────────────────────────────────
 
@@ -106,6 +107,58 @@ export async function testNeo4jConnection(
   }
 }
 
+// ─── Agent Helper ──────────────────────────────────────────────────────────
+
+function mapProvider(active: { provider: string; model: string; apiKey: string; baseUrl?: string }): {
+  providerName: ProviderName; config: { apiKey: string; model: string; baseUrl?: string }
+} {
+  switch (active.provider) {
+    case 'anthropic': return { providerName: 'anthropic', config: { apiKey: active.apiKey, model: active.model } }
+    case 'google': return { providerName: 'google', config: { apiKey: active.apiKey, model: active.model } }
+    case 'ollama': return { providerName: 'openai', config: { apiKey: 'ollama', model: active.model, baseUrl: `${active.baseUrl ?? 'http://localhost:11434'}/v1` } }
+    case 'custom': return { providerName: 'openai', config: { apiKey: active.apiKey, model: active.model, baseUrl: active.baseUrl } }
+    default: return { providerName: 'openai', config: { apiKey: active.apiKey, model: active.model, baseUrl: active.baseUrl } }
+  }
+}
+
+async function agentChat(systemPrompt: string, prompt: string): Promise<string> {
+  const active = getActiveProvider()
+  if (!active) throw new Error('No AI provider configured.')
+  const settings = loadSettings()
+  if (settings.privacyMode && active.provider !== 'ollama') {
+    throw new Error('Privacy Mode is enabled. Only local models (Ollama) are allowed.')
+  }
+  const { providerName, config } = mapProvider(active)
+  const agent = new AgentBuilder()
+    .setProvider(providerName, config)
+    .setSystemPrompt(systemPrompt)
+    .setIncludeBuiltinTools(false)
+    .enableContext(false)
+    .enableMemory(false)
+    .setMaxToolRounds(1)
+    .build()
+  try {
+    const result = await agent.chat(prompt)
+    return result.reply
+  } finally {
+    await agent.close()
+  }
+}
+
+async function agentChatJson<T>(systemPrompt: string, prompt: string, jsonSchema: Record<string, unknown>): Promise<T> {
+  const fullSystemPrompt = [
+    systemPrompt,
+    'You MUST respond with a single valid JSON value and nothing else.',
+    'Do not wrap the JSON in Markdown code fences. Do not add commentary.',
+    'The response must conform to this shape:',
+    JSON.stringify(jsonSchema, null, 2),
+  ].join('\n\n')
+
+  const reply = await agentChat(fullSystemPrompt, prompt)
+  const stripped = reply.trim().replace(/^```(?:json)?\s*/i, '').replace(/```$/i, '').trim()
+  return JSON.parse(stripped) as T
+}
+
 // ─── Public API: Ingest ─────────────────────────────────────────────────────
 
 const EXTRACT_SYSTEM_PROMPT = `You are an expert knowledge graph extractor. Given a document, extract entities, relationships, claims, and events.
@@ -171,12 +224,11 @@ export async function ingestDocument(
   const truncated = content.slice(0, 12000) // cap to fit in context
   let extracted: ExtractedGraph
   try {
-    const res = await sendOneShot({
-      systemPrompt: EXTRACT_SYSTEM_PROMPT,
-      prompt: `Extract a knowledge graph from this document:\n\n${truncated}`,
-      jsonSchema: EXTRACT_JSON_SCHEMA,
-    })
-    extracted = (res.json ?? JSON.parse(res.reply)) as ExtractedGraph
+    extracted = await agentChatJson<ExtractedGraph>(
+      EXTRACT_SYSTEM_PROMPT,
+      `Extract a knowledge graph from this document:\n\n${truncated}`,
+      EXTRACT_JSON_SCHEMA,
+    )
   } catch (err) {
     emit('failed', { error: err instanceof Error ? err.message : String(err) })
     throw err
@@ -285,13 +337,13 @@ export async function graphQuery(
   ).join('\n')
 
   // Ask AI
-  const res = await sendOneShot({
-    systemPrompt: 'You are a knowledge graph assistant. Answer the question using ONLY the provided graph context. Cite evidence with bracketed numbers [N].',
-    prompt: `Graph context:\n${contextStr}\n\nQuestion: ${question}`,
-  })
+  const answer = await agentChat(
+    'You are a knowledge graph assistant. Answer the question using ONLY the provided graph context. Cite evidence with bracketed numbers [N].',
+    `Graph context:\n${contextStr}\n\nQuestion: ${question}`,
+  )
 
   const evidence = context.map((e, i) => ({ index: i + 1, text: `${e.name}: ${e.description ?? ''}`, source: e.name }))
-  return { answer: res.reply, evidence, keyFindings: [], confidence: context.length > 3 ? 0.8 : 0.5 }
+  return { answer, evidence, keyFindings: [], confidence: context.length > 3 ? 0.8 : 0.5 }
 }
 
 // ─── Public API: Read Operations ────────────────────────────────────────────

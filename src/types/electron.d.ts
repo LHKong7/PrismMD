@@ -95,8 +95,67 @@ export interface ElectronAPI {
   onAgentStream: (callback: (chunk: string) => void) => () => void
   onAgentStreamError: (callback: (error: string) => void) => () => void
   onAgentMcpWarning: (callback: (message: string) => void) => () => void
+  onAgentTrace: (callback: (entry: {
+    id: string
+    timestamp: number
+    type: 'request' | 'system-prompt' | 'messages' | 'tools' | 'response' | 'tool-call' | 'error'
+    label: string
+    data: unknown
+    durationMs?: number
+  }) => void) => () => void
   stopAgentGeneration: () => void
   testAgentConnection: (provider: string, apiKey: string, baseUrl?: string, model?: string) => Promise<boolean>
+
+  sendAgentOneShot: (request: {
+    prompt: string
+    systemPrompt?: string
+    jsonSchema?: Record<string, unknown>
+  }) => Promise<
+    | { ok: true; result: { provider: string; model: string; reply: string; json?: unknown } }
+    | { ok: false; error: string }
+  >
+
+  // Autonomous task (Horse Mode)
+  sendAgentTask: (request: {
+    task: string
+    systemPrompt?: string
+    qualityThreshold?: number
+    maxIterations?: number
+  }) => Promise<
+    | { ok: true; result: { provider: string; model: string; result: string; iterations: number; qualityScore: number; thresholdMet: boolean } }
+    | { ok: false; error: string }
+  >
+  onAgentTaskProgress: (callback: (progress: {
+    iteration: number
+    phase: 'plan' | 'execute' | 'review' | 'evaluate'
+    qualityScore?: number
+  }) => void) => () => void
+
+  // Sessions
+  sessionGetDir: () => Promise<string>
+  sessionCreate: () => Promise<string>
+  sessionRestore: (sessionId: string) => Promise<{
+    id: string
+    messages: Array<{ role: string; content: string }>
+  } | null>
+  sessionList: (limit?: number) => Promise<Array<{
+    id: string
+    updatedAt: number
+    turns: number
+    state: string
+    preview: string
+    source: 'chat' | 'horse-mode'
+  }>>
+  sessionDelete: (sessionId: string) => Promise<boolean>
+  sessionSaveHistory: (
+    sessionId: string,
+    messages: Array<{ role: string; content: string }>,
+    metadata?: { source?: 'chat' | 'horse-mode' },
+  ) => Promise<void>
+  sessionGetHistory: (sessionId: string) => Promise<Array<{
+    role: string
+    content: string
+  }> | null>
 
   // Memory
   memorySave: (filePath: string, summary: string, topics: string[]) => Promise<void>

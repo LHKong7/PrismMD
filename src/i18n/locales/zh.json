@@ -471,6 +471,38 @@
       "delete": "删除",
       "expandCollapse": "展开 / 折叠"
     },
+    "developer": {
+      "title": "开发者",
+      "description": "查看完整的 Agent 调用链：系统提示词、消息、响应、耗时和工具调用。",
+      "filterAll": "全部",
+      "filterRequest": "请求",
+      "filterSystemPrompt": "系统提示词",
+      "filterMessages": "消息",
+      "filterTools": "工具",
+      "filterResponse": "响应",
+      "filterToolCall": "工具调用",
+      "filterError": "错误",
+      "entryCount": "{{count}} 条记录",
+      "clear": "清空",
+      "empty": "暂无追踪记录。发送 AI 消息后开始记录。"
+    },
+    "agentSessions": {
+      "title": "智能体",
+      "description": "管理你的 AI 对话会话和聊天记录。",
+      "newSession": "新建会话",
+      "current": "当前",
+      "switch": "切换",
+      "delete": "删除",
+      "emptyTitle": "暂无会话",
+      "emptyDescription": "与 AI 助手开始对话后将自动创建会话。",
+      "turns": "{{count}} 条消息",
+      "noPreview": "空会话",
+      "sourceChat": "对话",
+      "sourceHorseMode": "Horse Mode",
+      "sessionsTitle": "会话记录",
+      "filePath": "文件",
+      "messages": "消息记录"
+    },
     "close": "关闭"
   },
   "highlightPopover": {

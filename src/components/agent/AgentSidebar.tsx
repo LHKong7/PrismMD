@@ -259,7 +259,7 @@ export function AgentSidebar() {
               <Button
                 variant="primary"
                 size="md"
-                onClick={() => openSettings('ai')}
+                onClick={() => openSettings('agent')}
                 className="font-medium"
               >
                 <Bot size={12} />

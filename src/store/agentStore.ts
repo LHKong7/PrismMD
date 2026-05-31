@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import type { AIProvider } from './settingsStore'
 import { useSettingsStore } from './settingsStore'
 import { useInsightGraphStore } from './insightGraphStore'
+import { useSessionStore } from './sessionStore'
 
 /**
  * A numbered citation attached to an assistant reply. The number matches
@@ -82,6 +83,9 @@ interface AgentStore {
   stopGeneration: () => void
   /** Re-send a previously failed user prompt (powers the Retry button). */
   retryMessage: (messageId: string, documentContext?: string, currentFilePath?: string) => Promise<void>
+
+  /** Load messages from a persisted session into the store. */
+  loadSession: (sessionId: string) => Promise<void>
 
   // Memory
   saveConversationMemory: (filePath: string) => Promise<void>
@@ -262,10 +266,11 @@ export const useAgentStore = create<AgentStore>((set, get) => {
         // KB not available
       }
 
-      // Build message history — keep only the most recent messages to
-      // avoid token-limit errors and growing latency in long sessions.
+      // Build message history — send a generous window and let the
+      // agent module's selectHistory() do intelligent token-budget-
+      // aware trimming based on the model's actual context window size.
       // The full transcript remains in the store for UI scrollback.
-      const MAX_CONTEXT_MESSAGES = 40
+      const MAX_CONTEXT_MESSAGES = 100
       const allMsgs = get().messages
       const trimmed = allMsgs.length > MAX_CONTEXT_MESSAGES
         ? allMsgs.slice(-MAX_CONTEXT_MESSAGES)
@@ -295,6 +300,19 @@ export const useAgentStore = create<AgentStore>((set, get) => {
 
       cleanup()
       finalizeStream(result.provider as AIProvider, result.model)
+
+      // Persist chat history to the current session (best-effort).
+      // Auto-create a session if none exists yet.
+      try {
+        const sessionStore = useSessionStore.getState()
+        if (!sessionStore.currentSessionId) {
+          await sessionStore.createSession()
+        }
+        const msgs = get().messages.map((m) => ({ role: m.role, content: m.content }))
+        await sessionStore.saveHistory(msgs)
+      } catch {
+        // Session save best-effort
+      }
 
       // Save to memory after successful conversation
       if (currentFilePath) {
@@ -342,6 +360,18 @@ export const useAgentStore = create<AgentStore>((set, get) => {
       return { messages: next }
     })
     await sendMessage(prompt, documentContext, currentFilePath)
+  },
+
+  loadSession: async (sessionId: string) => {
+    const messages = await useSessionStore.getState().switchSession(sessionId)
+    if (!messages) return
+    const hydrated: ChatMessage[] = messages.map((m) => ({
+      id: crypto.randomUUID(),
+      role: m.role as 'user' | 'assistant' | 'system',
+      content: m.content,
+      timestamp: Date.now(),
+    }))
+    set({ messages: hydrated, streamingContent: '', pendingEvidence: [] })
   },
 
   saveConversationMemory: async (filePath: string) => {

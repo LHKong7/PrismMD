@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { useAgentLogStore } from './agentLogStore'
 import { usePromptConfigStore } from './promptConfigStore'
+import { useSessionStore } from './sessionStore'
 
 export type HorseModeStage = 'idle' | 'generating' | 'writing' | 'completed' | 'failed'
 
@@ -13,6 +14,8 @@ interface HorseModeStore {
   error: string | null
   iterations: number
   currentIteration: number
+  currentPhase: string
+  qualityScore: number | null
   cancelled: boolean
 
   start: (task: string, targetDir: string, fileName: string, iterations?: number, documentContent?: string) => Promise<void>
@@ -23,15 +26,6 @@ function hlog(message: string, level: 'info' | 'success' | 'error' = 'info') {
   useAgentLogStore.getState().log('horse-mode', message, level)
 }
 
-const REFINE_SYSTEM_PROMPT = `You are a talented editor and rewriter. You are given a draft document and the original task that produced it. Your job is to improve the draft — make it sharper, more engaging, better structured, and more polished.
-
-Rules:
-- Fix any weak openings, vague statements, or repetitive patterns.
-- Improve flow, transitions, and rhythm.
-- Strengthen the conclusion.
-- Keep the same language, format (markdown), and overall structure unless improvement requires changes.
-- Output ONLY the improved document — no meta-commentary, no "Here is the improved version", no diff markers.`
-
 export const useHorseModeStore = create<HorseModeStore>((set, get) => ({
   active: false,
   task: '',
@@ -41,37 +35,58 @@ export const useHorseModeStore = create<HorseModeStore>((set, get) => ({
   error: null,
   iterations: 1,
   currentIteration: 0,
+  currentPhase: '',
+  qualityScore: null,
   cancelled: false,
 
   start: async (task, targetDir, fileName, iterations = 1, documentContent) => {
     const hasDocContext = !!documentContent?.trim()
     set({
       active: true, task, targetDir, fileName, stage: 'generating',
-      error: null, iterations, currentIteration: 1, cancelled: false,
+      error: null, iterations, currentIteration: 1, currentPhase: 'plan',
+      qualityScore: null, cancelled: false,
     })
 
     useAgentLogStore.getState().panelOpen || useAgentLogStore.setState({ panelOpen: true })
 
     hlog(`Task: ${task.slice(0, 120)}${task.length > 120 ? '...' : ''}`)
     hlog(`Target: ${targetDir}/${fileName}`)
-    hlog(`Iterations: ${iterations}`)
+    hlog(`Max iterations: ${iterations}`)
     if (hasDocContext) hlog('Using current document as reference')
 
     const filePath = `${targetDir}/${fileName}`
 
     try {
-      // ── Iteration 1: Initial generation ──
-      hlog(`Iteration 1/${iterations}: Generating initial draft...`)
-      set({ currentIteration: 1 })
-
+      // Build the system prompt from prompt config
       const systemPrompt = hasDocContext
         ? usePromptConfigStore.getState().getPrompt('horse-mode-with-context')
         : usePromptConfigStore.getState().getPrompt('horse-mode')
-      const prompt = hasDocContext
+
+      // Build the full task description for the autonomous loop
+      const fullTask = hasDocContext
         ? `## Reference Document\n\n${documentContent!.slice(0, 12000)}\n\n---\n\n## Task\n\n${task}`
         : task
 
-      const res = await window.electronAPI.sendAgentOneShot({ systemPrompt, prompt })
+      // Subscribe to progress events
+      const cleanup = window.electronAPI.onAgentTaskProgress((progress) => {
+        if (get().cancelled) return
+        set({
+          currentIteration: progress.iteration,
+          currentPhase: progress.phase,
+          qualityScore: progress.qualityScore ?? get().qualityScore,
+        })
+        hlog(`Iteration ${progress.iteration}: ${progress.phase}${progress.qualityScore != null ? ` (score: ${progress.qualityScore})` : ''}`)
+      })
+
+      // Run the autonomous agent task (plan → execute → review → evaluate loop)
+      const res = await window.electronAPI.sendAgentTask({
+        task: fullTask,
+        systemPrompt,
+        qualityThreshold: 7,
+        maxIterations: iterations,
+      })
+
+      cleanup()
 
       if (!res.ok) {
         set({ stage: 'failed', error: res.error })
@@ -81,53 +96,81 @@ export const useHorseModeStore = create<HorseModeStore>((set, get) => ({
         return
       }
 
-      let content = res.result.reply.trim()
-      let wordCount = content.split(/\s+/).length
-      hlog(`Iteration 1/${iterations}: ${wordCount} words (${res.result.provider}/${res.result.model})`, 'success')
+      hlog(
+        `Autonomous loop done: ${res.result.iterations} iteration(s), ` +
+        `score ${res.result.qualityScore}${res.result.thresholdMet ? ' (threshold met)' : ''}`,
+        'success',
+      )
 
-      // Write initial draft
-      set({ stage: 'writing' })
-      await window.electronAPI.writeFile(filePath, content)
-      hlog(`Draft saved to ${filePath}`)
+      // The autonomous loop output contains process narration (plan, steps,
+      // review). Extract the final clean document via a consolidation call.
+      hlog('Consolidating final document...')
+      const consolidateRes = await window.electronAPI.sendAgentOneShot({
+        systemPrompt,
+        prompt: [
+          '## Original Task',
+          task,
+          '',
+          '## Raw Output (from iterative refinement)',
+          res.result.result,
+          '',
+          '## Instructions',
+          'Extract and output ONLY the final polished document from the raw output above.',
+          'Remove all process notes, step numbers, planning text, review comments, and meta-commentary.',
+          'Output the clean document in markdown format. Nothing else.',
+        ].join('\n'),
+      })
 
-      // ── Iterations 2..N: Refinement loop ──
-      for (let i = 2; i <= iterations; i++) {
-        if (get().cancelled) {
-          hlog(`Cancelled at iteration ${i}`, 'error')
-          break
-        }
-
-        set({ stage: 'generating', currentIteration: i })
-        hlog(`Iteration ${i}/${iterations}: Refining draft...`)
-
-        // Read the previous output (fresh context)
-        const previousDraft = await window.electronAPI.readFile(filePath)
-
-        const refineRes = await window.electronAPI.sendAgentOneShot({
-          systemPrompt: REFINE_SYSTEM_PROMPT,
-          prompt: `## Original Task\n\n${task}\n\n---\n\n## Current Draft (Iteration ${i - 1} of ${iterations})\n\n${previousDraft.slice(0, 12000)}\n\n---\n\nThis is refinement iteration ${i} of ${iterations}. Improve the draft above.`,
-        })
-
-        if (!refineRes.ok) {
-          hlog(`Iteration ${i} failed: ${refineRes.error} — keeping previous version`, 'warning' as 'error')
-          break
-        }
-
-        content = refineRes.result.reply.trim()
-        wordCount = content.split(/\s+/).length
-        hlog(`Iteration ${i}/${iterations}: ${wordCount} words`, 'success')
-
-        set({ stage: 'writing' })
-        await window.electronAPI.writeFile(filePath, content)
-        hlog(`Updated draft saved`)
+      if (!consolidateRes.ok) {
+        // Fallback: use raw output if consolidation fails
+        hlog('Consolidation failed, using raw output', 'error')
       }
 
-      // ── Done ──
+      const content = (consolidateRes.ok ? consolidateRes.result.reply : res.result.result).trim()
+      const wordCount = content.split(/\s+/).length
+      hlog(`Final document: ${wordCount} words (${res.result.provider}/${res.result.model})`, 'success')
+
+      // Write final output to file
+      set({ stage: 'writing' })
+      await window.electronAPI.writeFile(filePath, content)
+      hlog(`Saved to ${filePath}`)
+
+      // Save as a session so it appears in the Agent panel
+      try {
+        const sessionId = await window.electronAPI.sessionCreate()
+        await window.electronAPI.sessionSaveHistory(
+          sessionId,
+          [
+            { role: 'user', content: task },
+            {
+              role: 'assistant',
+              content: [
+                `**File:** \`${filePath}\``,
+                `**Iterations:** ${res.result.iterations} | **Score:** ${res.result.qualityScore}/10${res.result.thresholdMet ? ' (threshold met)' : ''}`,
+                `**Words:** ${wordCount}`,
+                '',
+                '---',
+                '',
+                content,
+              ].join('\n'),
+            },
+          ],
+          { source: 'horse-mode' },
+        )
+        await useSessionStore.getState().refreshSessions()
+        hlog('Session saved to Agent panel')
+      } catch {
+        // Session save best-effort
+      }
+
+      // Open in PrismMD
       set({ stage: 'completed' })
       hlog('Opening in PrismMD...')
       const { useFileStore } = await import('./fileStore')
+      const finalContent = await window.electronAPI.readFile(filePath)
       await useFileStore.getState().openFile(filePath)
-      hlog(`Done! (${iterations} iteration${iterations > 1 ? 's' : ''})`, 'success')
+      useFileStore.getState().setContent(finalContent)
+      hlog(`Done! (${res.result.iterations} iteration${res.result.iterations > 1 ? 's' : ''}, score: ${res.result.qualityScore})`, 'success')
 
       const { useToastStore } = await import('./toastStore')
       useToastStore.getState().show('success', `Horse Mode complete! Saved to ${fileName}`, 5000)
@@ -146,8 +189,7 @@ export const useHorseModeStore = create<HorseModeStore>((set, get) => ({
 
   cancel: () => {
     set({ cancelled: true })
-    hlog('Cancelling after current iteration...', 'error')
-    // Don't immediately reset — let the loop check `cancelled` and exit gracefully
+    hlog('Cancelling after current phase...', 'error')
     setTimeout(() => {
       if (get().cancelled) {
         set({ active: false, stage: 'idle', cancelled: false })

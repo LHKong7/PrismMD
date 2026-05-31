@@ -83,8 +83,8 @@ export function HorseModeDialog({ open, onClose }: Props) {
   const handleSelectDir = async () => {
     try {
       const result = await window.electronAPI.openFolderDialog()
-      if (result && !result.cancelled && result.folderPath) {
-        setTargetDir(result.folderPath)
+      if (typeof result === 'string' && result) {
+        setTargetDir(result)
       }
     } catch { /* cancelled */ }
   }
@@ -196,24 +196,30 @@ export function HorseModeDialog({ open, onClose }: Props) {
               {t('horseMode.directoryLabel')}
             </label>
             <div className="flex gap-2">
-              <div
-                className="flex-1 text-xs px-3 py-1.5 rounded-lg border truncate flex items-center"
+              <select
+                value={targetDir}
+                onChange={(e) => {
+                  if (e.target.value === '__browse__') {
+                    void handleSelectDir()
+                  } else {
+                    setTargetDir(e.target.value)
+                  }
+                }}
+                className="flex-1 text-xs px-3 py-1.5 rounded-lg border outline-none"
                 style={{
                   backgroundColor: 'var(--bg-secondary)',
                   borderColor: 'var(--border-color)',
-                  color: targetDir ? 'var(--text-primary)' : 'var(--text-muted)',
+                  color: 'var(--text-primary)',
                 }}
               >
-                {targetDir || t('horseMode.noDirectory')}
-              </div>
-              <button
-                onClick={handleSelectDir}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-lg border text-xs transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-                style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
-              >
-                <FolderOpen size={13} />
-                {t('horseMode.browse')}
-              </button>
+                {openFolders.map((f) => (
+                  <option key={f.path} value={f.path}>{f.name} — {f.path}</option>
+                ))}
+                {targetDir && !openFolders.some((f) => f.path === targetDir) && (
+                  <option value={targetDir}>{targetDir}</option>
+                )}
+                <option value="__browse__">📂 {t('horseMode.browse')}...</option>
+              </select>
             </div>
           </div>
 

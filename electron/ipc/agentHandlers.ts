@@ -1,6 +1,15 @@
 import { ipcMain } from 'electron'
-import { sendMessage, sendOneShot, stopGeneration, testConnection } from '../services/aiService'
+import { sendMessage, sendOneShot, runTask, stopGeneration, testConnection, setTraceWindow } from '../services/aiService'
 import { saveMemory, getMemoryContext, clearMemory, extractSummaryFromConversation } from '../services/memoryService'
+import {
+  createSession,
+  restoreSession,
+  listSessions,
+  deleteSession,
+  saveSessionHistory,
+  getSessionHistory,
+  getSessionDir,
+} from '../services/sessionService'
 import {
   getDocSummary,
   setDocSummary,
@@ -10,9 +19,14 @@ import {
 import { getMainWindow } from '../main'
 
 export function registerAgentHandlers() {
+  // Wire up the trace window so aiService can emit trace events
+  const win = getMainWindow()
+  if (win) setTraceWindow(win)
+
   ipcMain.handle('agent:send-message', async (_event, request) => {
     const win = getMainWindow()
     if (!win) throw new Error('Main window is not available')
+    setTraceWindow(win)
     return sendMessage(win, request)
   })
 
@@ -54,6 +68,65 @@ export function registerAgentHandlers() {
 
   ipcMain.handle('memory:clear', async () => {
     return clearMemory()
+  })
+
+  ipcMain.handle(
+    'agent:run-task',
+    async (
+      _event,
+      request: {
+        task: string
+        systemPrompt?: string
+        qualityThreshold?: number
+        maxIterations?: number
+      },
+    ) => {
+      const win = getMainWindow()
+      if (!win) throw new Error('Main window is not available')
+      try {
+        const result = await runTask(win, request)
+        return { ok: true as const, result }
+      } catch (err) {
+        return { ok: false as const, error: err instanceof Error ? err.message : String(err) }
+      }
+    },
+  )
+
+  // Session handlers
+  ipcMain.handle('session:get-dir', () => {
+    return getSessionDir()
+  })
+
+  ipcMain.handle('session:create', async () => {
+    return createSession()
+  })
+
+  ipcMain.handle('session:restore', async (_event, sessionId: string) => {
+    return restoreSession(sessionId)
+  })
+
+  ipcMain.handle('session:list', async (_event, limit?: number) => {
+    return listSessions(limit)
+  })
+
+  ipcMain.handle('session:delete', async (_event, sessionId: string) => {
+    return deleteSession(sessionId)
+  })
+
+  ipcMain.handle(
+    'session:save-history',
+    async (
+      _event,
+      sessionId: string,
+      messages: Array<{ role: string; content: string }>,
+      metadata?: { source?: 'chat' | 'horse-mode' },
+    ) => {
+      return saveSessionHistory(sessionId, messages, metadata)
+    },
+  )
+
+  ipcMain.handle('session:get-history', async (_event, sessionId: string) => {
+    return getSessionHistory(sessionId)
   })
 
   // Per-document TL;DR cache

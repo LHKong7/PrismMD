@@ -25,6 +25,7 @@ import { useFileStore } from './store/fileStore'
 import { useToastStore } from './store/toastStore'
 import { detectFormat, kindOfFormat } from './lib/fileFormat'
 import { bootstrapExternalPlugins } from './lib/plugins/externalLoader'
+import { subscribeToTraceIPC } from './store/agentTraceStore'
 import { initI18n } from './i18n'
 
 initI18n()
@@ -67,6 +68,12 @@ function AppContent() {
   // useEffect — `bootstrapExternalPlugins` is idempotent.
   useEffect(() => {
     void bootstrapExternalPlugins()
+  }, [])
+
+  // Subscribe to agent trace IPC events for the developer debug panel (dev-only).
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    return subscribeToTraceIPC()
   }, [])
 
   // Ctrl/Cmd + , : settings  |  Ctrl/Cmd + S : save  |  Ctrl/Cmd + E : toggle edit

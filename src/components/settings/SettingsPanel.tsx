@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { X, Check, Globe, Palette, Bot, Eye, EyeOff, Shield, Trash2, Network, AlertTriangle, RefreshCw, Puzzle, FolderOpen, CircleAlert, Info, Download, Keyboard, Pencil, BookMarked, FileStack, MessageSquare } from 'lucide-react'
+import { X, Check, Globe, Palette, Bot, Eye, EyeOff, Shield, Trash2, Network, AlertTriangle, RefreshCw, Puzzle, FolderOpen, CircleAlert, Info, Download, Keyboard, Pencil, BookMarked, FileStack, MessageSquare, ChevronDown, ChevronRight } from 'lucide-react'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
 import { Button } from '../ui/Button'
 import { Spinner } from '../ui/Spinner'
@@ -13,6 +13,7 @@ import { useUpdaterStore } from '../../store/updaterStore'
 import { useKnowledgeBaseStore } from '../../store/knowledgeBaseStore'
 import { TemplateSettings } from './TemplateSettings'
 import { PromptSettings } from './PromptSettings'
+import { AgentSessionsPanel } from './AgentSessionsPanel'
 import { themes } from '../../lib/theme/themes'
 import { LANGUAGES, changeLanguage, type SupportedLanguage } from '../../i18n'
 import { clsx } from 'clsx'
@@ -22,7 +23,7 @@ interface SettingsPanelProps {
   onClose: () => void
 }
 
-type Tab = 'language' | 'theme' | 'editor' | 'templates' | 'ai' | 'prompts' | 'knowledge' | 'privacy' | 'insightgraph' | 'plugins' | 'mcp' | 'shortcuts' | 'about'
+type Tab = 'language' | 'theme' | 'editor' | 'templates' | 'knowledge' | 'privacy' | 'insightgraph' | 'plugins' | 'mcp' | 'shortcuts' | 'agent' | 'about'
 
 export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const { t } = useTranslation()
@@ -45,7 +46,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
-  // When the panel opens via uiStore.openSettings('ai'), jump straight
+  // When the panel opens via uiStore.openSettings('agent'), jump straight
   // to that tab (used by the welcome / agent-sidebar onboarding CTAs).
   useEffect(() => {
     if (!open) return
@@ -89,8 +90,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
               { id: 'theme' as Tab, icon: Palette, label: t('settings.theme.title') },
               { id: 'editor' as Tab, icon: Pencil, label: t('settings.editor.title') },
               { id: 'templates' as Tab, icon: FileStack, label: t('settings.templates.title') },
-              { id: 'ai' as Tab, icon: Bot, label: t('settings.ai.title') },
-              { id: 'prompts' as Tab, icon: MessageSquare, label: t('settings.prompts.title', 'Prompts') },
+              { id: 'agent' as Tab, icon: Bot, label: t('settings.agentSessions.title') },
               { id: 'knowledge' as Tab, icon: BookMarked, label: t('settings.knowledge.title') },
               { id: 'insightgraph' as Tab, icon: Network, label: t('settings.insightgraph.title') },
               { id: 'plugins' as Tab, icon: Puzzle, label: t('settings.plugins.title') },
@@ -122,8 +122,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             {activeTab === 'theme' && <ThemeSettings />}
             {activeTab === 'editor' && <EditorSettings />}
             {activeTab === 'templates' && <TemplateSettings />}
-            {activeTab === 'ai' && <AISettings />}
-            {activeTab === 'prompts' && <PromptSettings />}
+            {activeTab === 'agent' && <AgentCombinedSettings />}
             {activeTab === 'knowledge' && <KnowledgeSettings />}
             {activeTab === 'insightgraph' && <InsightGraphSettings />}
             {activeTab === 'plugins' && <PluginsSettings />}
@@ -180,6 +179,69 @@ function ScrollPaneWithFade({ children }: { children: React.ReactNode }) {
           aria-hidden
         />
       )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Collapsible section wrapper
+// ---------------------------------------------------------------------------
+
+function CollapsibleSection({
+  title, defaultOpen = true, children,
+}: {
+  title: string
+  defaultOpen?: boolean
+  children: React.ReactNode
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div className="rounded-lg border overflow-hidden" style={{ borderColor: 'var(--border-color)' }}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-left hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+        style={{ color: 'var(--text-primary)', backgroundColor: 'var(--bg-secondary)' }}
+      >
+        {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        {title}
+      </button>
+      {open && (
+        <div className="px-4 py-4 border-t" style={{ borderColor: 'var(--border-color)' }}>
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Agent Combined Settings (AI Providers + Prompts + Sessions + Developer)
+// ---------------------------------------------------------------------------
+
+function AgentCombinedSettings() {
+  const { t } = useTranslation()
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+          {t('settings.agentSessions.title')}
+        </h3>
+        <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>
+          {t('settings.agentSessions.description')}
+        </p>
+      </div>
+
+      <CollapsibleSection title={t('settings.ai.title')}>
+        <AISettings />
+      </CollapsibleSection>
+
+      <CollapsibleSection title={t('settings.prompts.title', 'Prompts')} defaultOpen={false}>
+        <PromptSettings />
+      </CollapsibleSection>
+
+      <CollapsibleSection title={t('settings.agentSessions.sessionsTitle', 'Sessions')} defaultOpen={false}>
+        <AgentSessionsPanel />
+      </CollapsibleSection>
     </div>
   )
 }

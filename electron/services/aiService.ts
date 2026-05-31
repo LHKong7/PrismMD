@@ -1,19 +1,21 @@
 /**
- * AI Service — thin wrapper over Anthropic and OpenAI SDKs.
+ * AI Service — powered by the borderless-agent library.
  *
- * Replaces the former borderless-agent dependency with direct SDK calls.
- * Two code paths: Anthropic (native SDK) and OpenAI-compatible (covers
- * OpenAI, Ollama, Google, and custom endpoints).
+ * Uses AgentBuilder / AgentInstance from the local agent module (electron/agent)
+ * for unified multi-provider support, context management (token budgeting,
+ * history selection), tool execution with observation folding, and retry
+ * with exponential backoff.
  *
  * Exports the same four functions the IPC handlers expect:
- *   sendMessage()   — streaming chat
- *   sendOneShot()   — non-streaming single-turn
+ *   sendMessage()    — streaming chat
+ *   sendOneShot()    — non-streaming single-turn
  *   testConnection() — quick connectivity test
  *   stopGeneration() — abort in-flight stream
  */
-import Anthropic from '@anthropic-ai/sdk'
-import OpenAI from 'openai'
-import { BrowserWindow } from 'electron'
+import { app, BrowserWindow } from 'electron'
+import { AgentBuilder } from '../agent'
+import type { AgentInstance, ToolDefinition, StreamChunk } from '../agent'
+import type { ProviderName } from '../agent/providers/base'
 import { getActiveProvider, loadSettings } from './settingsStore'
 import { callTool as callMcpTool, discoverAll as discoverAllMcpTools } from './mcpService'
 
@@ -38,6 +40,29 @@ interface McpTool {
   execute: (args: Record<string, unknown>) => Promise<unknown>
 }
 
+// ─── Trace ─────────────────────────────────────────────────────────────────
+
+type TraceType = 'request' | 'system-prompt' | 'messages' | 'tools' | 'response' | 'tool-call' | 'error'
+
+let traceWindow: BrowserWindow | null = null
+
+export function setTraceWindow(win: BrowserWindow) {
+  traceWindow = win
+}
+
+function traceEvent(type: TraceType, label: string, data: unknown, durationMs?: number) {
+  if (app.isPackaged) return
+  if (!traceWindow || traceWindow.isDestroyed()) return
+  traceWindow.webContents.send('agent:trace', {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    timestamp: Date.now(),
+    type,
+    label,
+    data,
+    durationMs,
+  })
+}
+
 // ─── Abort ──────────────────────────────────────────────────────────────────
 
 let currentAbortController: AbortController | null = null
@@ -47,21 +72,6 @@ export function stopGeneration() {
     currentAbortController.abort()
     currentAbortController = null
   }
-}
-
-function raceAbort<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
-  if (signal.aborted) return Promise.reject(new DOMException('Aborted', 'AbortError'))
-  return new Promise<T>((resolve, reject) => {
-    const onAbort = () => {
-      signal.removeEventListener('abort', onAbort)
-      reject(new DOMException('Aborted', 'AbortError'))
-    }
-    signal.addEventListener('abort', onAbort, { once: true })
-    promise.then(
-      (v) => { signal.removeEventListener('abort', onAbort); resolve(v) },
-      (err) => { signal.removeEventListener('abort', onAbort); reject(err) },
-    )
-  })
 }
 
 // ─── MCP Tool Discovery ────────────────────────────────────────────────────
@@ -91,220 +101,84 @@ async function discoverMcpTools(): Promise<{ tools: McpTool[]; warning?: string 
   return { tools }
 }
 
-// ─── Provider Helpers ───────────────────────────────────────────────────────
+// ─── Provider Mapping ──────────────────────────────────────────────────────
 
-function resolveBaseUrl(provider: string, baseUrl?: string): string {
-  if (provider === 'ollama') return `${baseUrl ?? 'http://localhost:11434'}/v1`
-  if (provider === 'google') return 'https://generativelanguage.googleapis.com/v1beta/openai'
-  if (baseUrl) return baseUrl
-  return 'https://api.openai.com/v1'
-}
-
-function resolveApiKey(provider: string, apiKey: string): string {
-  return provider === 'ollama' ? 'ollama' : apiKey
-}
-
-// ─── Anthropic Streaming ────────────────────────────────────────────────────
-
-async function streamAnthropic(
-  apiKey: string,
-  model: string,
-  systemPrompt: string,
-  history: ChatMessage[],
-  userMessage: string,
-  signal: AbortSignal,
-  onChunk: (delta: string) => void,
-): Promise<void> {
-  const client = new Anthropic({ apiKey })
-
-  const messages = [
-    ...history.filter((m) => m.role !== 'system').map((m) => ({
-      role: m.role as 'user' | 'assistant',
-      content: m.content,
-    })),
-    { role: 'user' as const, content: userMessage },
-  ]
-
-  const stream = client.messages.stream({
-    model,
-    system: systemPrompt,
-    messages,
-    max_tokens: 4096,
-  })
-
-  for await (const event of stream) {
-    if (signal.aborted) break
-    if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-      onChunk(event.delta.text)
-    }
-  }
-}
-
-// ─── OpenAI-Compatible Streaming ────────────────────────────────────────────
-
-async function streamOpenAI(
-  apiKey: string,
-  baseUrl: string,
-  model: string,
-  systemPrompt: string,
-  history: ChatMessage[],
-  userMessage: string,
-  signal: AbortSignal,
-  onChunk: (delta: string) => void,
-): Promise<void> {
-  const client = new OpenAI({ apiKey, baseURL: baseUrl })
-
-  const messages: OpenAI.ChatCompletionMessageParam[] = [
-    { role: 'system', content: systemPrompt },
-    ...history.map((m) => ({ role: m.role, content: m.content } as OpenAI.ChatCompletionMessageParam)),
-    { role: 'user', content: userMessage },
-  ]
-
-  const stream = await client.chat.completions.create({
-    model,
-    messages,
-    stream: true,
-  })
-
-  for await (const chunk of stream) {
-    if (signal.aborted) break
-    const delta = chunk.choices[0]?.delta?.content
-    if (delta) onChunk(delta)
-  }
-}
-
-// ─── Anthropic One-Shot ─────────────────────────────────────────────────────
-
-async function chatAnthropic(
-  apiKey: string,
-  model: string,
-  systemPrompt: string | undefined,
-  prompt: string,
-  tools: McpTool[],
-  maxToolRounds: number,
-): Promise<string> {
-  const client = new Anthropic({ apiKey })
-
-  const messages: Anthropic.MessageParam[] = [{ role: 'user', content: prompt }]
-
-  // Tool definitions for Anthropic format
-  const anthropicTools: Anthropic.Tool[] = tools.map((t) => ({
-    name: t.name,
-    description: t.description,
-    input_schema: t.inputSchema as Anthropic.Tool.InputSchema,
-  }))
-
-  let rounds = 0
-  while (rounds < maxToolRounds) {
-    rounds++
-
-    const params: Anthropic.MessageCreateParams = {
-      model,
-      messages,
-      max_tokens: 4096,
-      ...(systemPrompt ? { system: systemPrompt } : {}),
-      ...(anthropicTools.length > 0 ? { tools: anthropicTools } : {}),
-    }
-
-    const response = await client.messages.create(params)
-
-    // Check for tool use
-    const toolUseBlocks = response.content.filter((b) => b.type === 'tool_use')
-    const textBlocks = response.content.filter((b) => b.type === 'text')
-
-    if (toolUseBlocks.length === 0 || rounds >= maxToolRounds) {
-      // No tool calls or max rounds reached — return text
-      return textBlocks.map((b) => b.type === 'text' ? b.text : '').join('')
-    }
-
-    // Execute tool calls
-    messages.push({ role: 'assistant', content: response.content })
-
-    const toolResults: Anthropic.ToolResultBlockParam[] = []
-    for (const block of toolUseBlocks) {
-      if (block.type !== 'tool_use') continue
-      const tool = tools.find((t) => t.name === block.name)
-      let result: string
-      try {
-        const output = await (tool?.execute(block.input as Record<string, unknown>) ?? Promise.resolve('Tool not found'))
-        result = typeof output === 'string' ? output : JSON.stringify(output)
-      } catch (err) {
-        result = `Error: ${err instanceof Error ? err.message : String(err)}`
+function mapProvider(active: {
+  provider: string
+  model: string
+  apiKey: string
+  baseUrl?: string
+}): { providerName: ProviderName; config: { apiKey: string; model: string; baseUrl?: string } } {
+  switch (active.provider) {
+    case 'anthropic':
+      return { providerName: 'anthropic', config: { apiKey: active.apiKey, model: active.model } }
+    case 'google':
+      return { providerName: 'google', config: { apiKey: active.apiKey, model: active.model } }
+    case 'ollama':
+      return {
+        providerName: 'openai',
+        config: {
+          apiKey: 'ollama',
+          model: active.model,
+          baseUrl: `${active.baseUrl ?? 'http://localhost:11434'}/v1`,
+        },
       }
-      toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
-    }
-
-    messages.push({ role: 'user', content: toolResults })
+    case 'custom':
+      return {
+        providerName: 'openai',
+        config: { apiKey: active.apiKey, model: active.model, baseUrl: active.baseUrl },
+      }
+    case 'openai':
+    default:
+      return {
+        providerName: 'openai',
+        config: { apiKey: active.apiKey, model: active.model, baseUrl: active.baseUrl },
+      }
   }
-
-  return ''
 }
 
-// ─── OpenAI-Compatible One-Shot ─────────────────────────────────────────────
+// ─── MCP → ToolDefinition Conversion ───────────────────────────────────────
 
-async function chatOpenAI(
-  apiKey: string,
-  baseUrl: string,
-  model: string,
-  systemPrompt: string | undefined,
-  prompt: string,
-  tools: McpTool[],
-  maxToolRounds: number,
-): Promise<string> {
-  const client = new OpenAI({ apiKey, baseURL: baseUrl })
-
-  const messages: OpenAI.ChatCompletionMessageParam[] = [
-    ...(systemPrompt ? [{ role: 'system' as const, content: systemPrompt }] : []),
-    { role: 'user', content: prompt },
-  ]
-
-  const openaiTools: OpenAI.ChatCompletionTool[] = tools.map((t) => ({
-    type: 'function',
-    function: {
+function mcpToolsToToolDefs(mcpTools: McpTool[]): ToolDefinition[] {
+  return mcpTools.map((t) => {
+    const schema = t.inputSchema as { properties?: Record<string, any>; required?: string[] }
+    return {
       name: t.name,
       description: t.description,
-      parameters: t.inputSchema,
-    },
-  }))
-
-  let rounds = 0
-  while (rounds < maxToolRounds) {
-    rounds++
-
-    const params: OpenAI.ChatCompletionCreateParams = {
-      model,
-      messages,
-      ...(openaiTools.length > 0 ? { tools: openaiTools } : {}),
+      parameters: schema.properties ?? {},
+      required: schema.required ?? [],
+      execute: async (args: Record<string, any>) => {
+        const result = await t.execute(args)
+        return typeof result === 'string' ? result : JSON.stringify(result)
+      },
     }
+  })
+}
 
-    const response = await client.chat.completions.create(params)
-    const choice = response.choices[0]
-    if (!choice) return ''
+// ─── Agent Builder ─────────────────────────────────────────────────────────
 
-    const msg = choice.message
+function buildAgent(
+  active: { provider: string; model: string; apiKey: string; baseUrl?: string },
+  systemPrompt: string,
+  options?: {
+    mcpTools?: McpTool[]
+    maxToolRounds?: number
+  },
+): AgentInstance {
+  const { providerName, config } = mapProvider(active)
+  const builder = new AgentBuilder()
+    .setProvider(providerName, config)
+    .setSystemPrompt(systemPrompt)
+    .setIncludeBuiltinTools(false)
+    .enableContext(true)
+    .enableMemory(false)
+    .setMaxToolRounds(options?.maxToolRounds ?? 8)
 
-    if (!msg.tool_calls || msg.tool_calls.length === 0 || rounds >= maxToolRounds) {
-      return msg.content ?? ''
-    }
-
-    // Execute tool calls
-    messages.push(msg)
-
-    for (const call of msg.tool_calls) {
-      const tool = tools.find((t) => t.name === call.function.name)
-      let result: string
-      try {
-        const args = JSON.parse(call.function.arguments || '{}')
-        const output = await (tool?.execute(args) ?? Promise.resolve('Tool not found'))
-        result = typeof output === 'string' ? output : JSON.stringify(output)
-      } catch (err) {
-        result = `Error: ${err instanceof Error ? err.message : String(err)}`
-      }
-      messages.push({ role: 'tool', tool_call_id: call.id, content: result })
-    }
+  if (options?.mcpTools?.length) {
+    builder.addTools(mcpToolsToToolDefs(options.mcpTools))
   }
 
-  return ''
+  return builder.build()
 }
 
 // ─── Public API ─────────────────────────────────────────────────────────────
@@ -320,11 +194,12 @@ export async function sendMessage(
     throw new Error('Privacy Mode is enabled. Only local models (Ollama) are allowed.')
   }
 
-  const { provider, model, apiKey, baseUrl } = active
+  const { provider, model } = active
 
-  // Build system prompt
+  // Build system prompt with structured context sections
   const systemParts: string[] = [
     'You are an intelligent reading assistant for PrismMD, a Markdown reader.',
+    'You answer questions about the document the user is reading, using the context provided below.',
   ]
   if (request.memoryContext) systemParts.push(`\n## Previous Knowledge\n${request.memoryContext}`)
   if (request.documentContext) systemParts.push(`\n## Current Document\n${request.documentContext}`)
@@ -338,9 +213,8 @@ export async function sendMessage(
       'that were not listed in the Evidence block.',
     )
   }
-  systemParts.push('\nAnswer the user\'s questions based on the context above.')
 
-  // MCP tool hint
+  // MCP tool hint (streaming path does not pass tools to the agent, only hints)
   const { tools: mcpTools, warning: mcpWarning } = await discoverMcpTools()
   if (mcpTools.length > 0) {
     systemParts.push(
@@ -350,36 +224,75 @@ export async function sendMessage(
   }
   if (mcpWarning) mainWindow.webContents.send('agent:mcp-warning', mcpWarning)
 
+  systemParts.push('\nAnswer the user\'s questions based on the context above. Be concise and precise.')
   const systemPrompt = systemParts.join('\n')
+
+  // ── Trace: request start ──
+  traceEvent('request', `Stream → ${provider}/${model}`, {
+    provider, model, baseUrl: active.baseUrl, type: 'stream',
+  })
+  traceEvent('system-prompt', 'System prompt', { text: systemPrompt })
+
+  if (mcpTools.length > 0) {
+    traceEvent('tools', `${mcpTools.length} MCP tool(s) attached`, {
+      tools: mcpTools.map((t) => t.name),
+      count: mcpTools.length,
+    })
+  }
 
   const history = request.messages.slice(0, -1)
   const lastMessage = request.messages[request.messages.length - 1]
   if (!lastMessage) throw new Error('No messages provided.')
 
+  traceEvent('messages', `${history.length + 1} message(s) sent`, {
+    messages: [...history, lastMessage].map((m) => ({
+      role: m.role,
+      content: m.content,
+    })),
+  })
+
+  // Build the agent — context management handles token budgeting and history trimming
+  const agent = buildAgent(active, systemPrompt)
+
   currentAbortController = new AbortController()
   const signal = currentAbortController.signal
+  const startMs = Date.now()
 
   try {
-    const onChunk = (delta: string) => {
-      mainWindow.webContents.send('agent:stream-chunk', delta)
+    let fullReply = ''
+    const agentHistory = history.filter((m) => m.role !== 'system').map((m) => ({
+      role: m.role,
+      content: m.content,
+    }))
+
+    // Agent's stream() uses its internal context management:
+    // - selectHistory() trims history based on token budget
+    // - Token budgeting ensures system prompt + history + output fit in window
+    const stream = agent.stream(lastMessage.content, agentHistory)
+
+    for await (const chunk of stream) {
+      if (signal.aborted) break
+      if (chunk.delta) {
+        fullReply += chunk.delta
+        mainWindow.webContents.send('agent:stream-chunk', chunk.delta)
+      }
     }
 
-    if (provider === 'anthropic') {
-      await streamAnthropic(apiKey, model, systemPrompt, history, lastMessage.content, signal, onChunk)
-    } else {
-      const resolvedBaseUrl = resolveBaseUrl(provider, baseUrl)
-      const resolvedKey = resolveApiKey(provider, apiKey)
-      await streamOpenAI(resolvedKey, resolvedBaseUrl, model, systemPrompt, history, lastMessage.content, signal, onChunk)
-    }
+    traceEvent('response', 'Stream complete', {
+      reply: fullReply,
+      length: fullReply.length,
+    }, Date.now() - startMs)
   } catch (err) {
     if ((err as { name?: string })?.name === 'AbortError') {
-      // User cancelled — not an error
+      traceEvent('response', 'Stream aborted by user', { aborted: true }, Date.now() - startMs)
     } else {
       const message = err instanceof Error ? err.message : String(err)
+      traceEvent('error', 'Stream error', { error: message }, Date.now() - startMs)
       mainWindow.webContents.send('agent:stream-error', message)
     }
   } finally {
     currentAbortController = null
+    await agent.close()
   }
 
   return { provider, model }
@@ -397,7 +310,7 @@ export async function sendOneShot(request: {
     throw new Error('Privacy Mode is enabled. Only local models (Ollama) are allowed.')
   }
 
-  const { provider, model, apiKey, baseUrl } = active
+  const { provider, model } = active
 
   const systemParts: string[] = []
   if (request.systemPrompt) systemParts.push(request.systemPrompt)
@@ -409,18 +322,53 @@ export async function sendOneShot(request: {
       JSON.stringify(request.jsonSchema, null, 2),
     ].join('\n'))
   }
-  const systemPrompt = systemParts.length > 0 ? systemParts.join('\n\n') : undefined
+  const systemPrompt = systemParts.length > 0 ? systemParts.join('\n\n') : 'You are a helpful assistant.'
 
   // Discover MCP tools for one-shot calls
   const { tools: mcpTools } = await discoverMcpTools()
 
+  // ── Trace: one-shot request ──
+  traceEvent('request', `One-shot → ${provider}/${model}`, {
+    provider, model, baseUrl: active.baseUrl, type: 'one-shot',
+    hasJsonSchema: !!request.jsonSchema,
+  })
+  if (systemPrompt) {
+    traceEvent('system-prompt', 'System prompt (one-shot)', { text: systemPrompt })
+  }
+  traceEvent('messages', 'Prompt sent', {
+    messages: [{
+      role: 'user',
+      content: request.prompt,
+    }],
+  })
+  if (mcpTools.length > 0) {
+    traceEvent('tools', `${mcpTools.length} MCP tool(s) attached`, {
+      tools: mcpTools.map((t) => t.name),
+      count: mcpTools.length,
+    })
+  }
+
+  const startMs = Date.now()
+
+  // Build agent WITH tools — agent's internal loop handles multi-round tool calls,
+  // observation folding, and retry with exponential backoff
+  const agent = buildAgent(active, systemPrompt, { mcpTools, maxToolRounds: 8 })
+
   let reply: string
-  if (provider === 'anthropic') {
-    reply = await chatAnthropic(apiKey, model, systemPrompt, request.prompt, mcpTools, 8)
-  } else {
-    const resolvedBaseUrl = resolveBaseUrl(provider, baseUrl)
-    const resolvedKey = resolveApiKey(provider, apiKey)
-    reply = await chatOpenAI(resolvedKey, resolvedBaseUrl, model, systemPrompt, request.prompt, mcpTools, 8)
+  try {
+    const result = await agent.chat(request.prompt)
+    reply = result.reply
+
+    traceEvent('response', 'One-shot complete', {
+      reply,
+      length: reply.length,
+    }, Date.now() - startMs)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    traceEvent('error', 'One-shot error', { error: message }, Date.now() - startMs)
+    throw err
+  } finally {
+    await agent.close()
   }
 
   let json: unknown | undefined
@@ -440,6 +388,82 @@ export async function sendOneShot(request: {
   return { provider, model, reply, json }
 }
 
+export async function runTask(
+  mainWindow: BrowserWindow,
+  request: {
+    task: string
+    systemPrompt?: string
+    qualityThreshold?: number
+    maxIterations?: number
+  },
+): Promise<{
+  provider: string
+  model: string
+  result: string
+  iterations: number
+  qualityScore: number
+  thresholdMet: boolean
+}> {
+  const settings = loadSettings()
+  const active = getActiveProvider()
+  if (!active) throw new Error('No AI provider configured. Please set up an API key in Settings.')
+  if (settings.privacyMode && active.provider !== 'ollama') {
+    throw new Error('Privacy Mode is enabled. Only local models (Ollama) are allowed.')
+  }
+
+  const { provider, model } = active
+  const systemPrompt = request.systemPrompt || 'You are a talented, creative writer. Format as markdown.'
+
+  traceEvent('request', `RunTask → ${provider}/${model}`, {
+    provider, model, type: 'run-task',
+    qualityThreshold: request.qualityThreshold ?? 7,
+    maxIterations: request.maxIterations ?? 5,
+  })
+
+  const agent = buildAgent(active, systemPrompt)
+  const startMs = Date.now()
+
+  try {
+    const taskResult = await agent.runTask({
+      task: request.task,
+      qualityThreshold: request.qualityThreshold ?? 7,
+      maxIterations: request.maxIterations ?? 5,
+      onProgress: (progress) => {
+        // Send progress events to renderer
+        if (!mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('agent:task-progress', {
+            iteration: progress.iteration,
+            phase: progress.phase,
+            qualityScore: progress.qualityScore,
+          })
+        }
+      },
+    })
+
+    traceEvent('response', 'RunTask complete', {
+      resultLength: taskResult.result.length,
+      iterations: taskResult.iterations,
+      qualityScore: taskResult.qualityScore,
+      thresholdMet: taskResult.thresholdMet,
+    }, Date.now() - startMs)
+
+    return {
+      provider,
+      model,
+      result: taskResult.result,
+      iterations: taskResult.iterations,
+      qualityScore: taskResult.qualityScore,
+      thresholdMet: taskResult.thresholdMet,
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    traceEvent('error', 'RunTask error', { error: message }, Date.now() - startMs)
+    throw err
+  } finally {
+    await agent.close()
+  }
+}
+
 export async function testConnection(
   provider: string,
   apiKey: string,
@@ -453,16 +477,16 @@ export async function testConnection(
       : 'gpt-4o-mini'
     const model = userModel || fallback
 
-    let reply: string
-    if (provider === 'anthropic') {
-      reply = await chatAnthropic(apiKey, model, undefined, 'hi', [], 1)
-    } else {
-      const resolvedBaseUrl = resolveBaseUrl(provider, baseUrl)
-      const resolvedKey = resolveApiKey(provider, apiKey)
-      reply = await chatOpenAI(resolvedKey, resolvedBaseUrl, model, undefined, 'hi', [], 1)
+    const agent = buildAgent(
+      { provider, model, apiKey, baseUrl },
+      'You are a test assistant.',
+    )
+    try {
+      const result = await agent.chat('hi')
+      return !!result.reply
+    } finally {
+      await agent.close()
     }
-
-    return !!reply
   } catch {
     return false
   }
