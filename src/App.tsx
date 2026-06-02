@@ -14,16 +14,14 @@ import { PluginNotificationHost } from './components/plugins/PluginNotificationH
 import { ToastHost } from './components/ui/Toast'
 import { MemoPanel } from './components/memo/MemoPanel'
 import { HorseModeDialog } from './components/horsemode/HorseModeDialog'
-import { useFileWatcher } from './hooks/useFileWatcher'
 import { useAutoHide } from './hooks/useAutoHide'
 import { useAnnotations } from './hooks/useAnnotations'
 import { useUpdaterBridge } from './hooks/useUpdaterBridge'
 import { useSettingsStore } from './store/settingsStore'
 import { useUIStore } from './store/uiStore'
 import { useEditorStore } from './store/editorStore'
-import { useFileStore } from './store/fileStore'
+import { useWorkspaceStore } from './store/workspaceStore'
 import { useToastStore } from './store/toastStore'
-import { detectFormat, kindOfFormat } from './lib/fileFormat'
 import { bootstrapExternalPlugins } from './lib/plugins/externalLoader'
 import { subscribeToTraceIPC } from './store/agentTraceStore'
 import { initI18n } from './i18n'
@@ -31,7 +29,6 @@ import { initI18n } from './i18n'
 initI18n()
 
 function AppContent() {
-  useFileWatcher()
   useAutoHide()
   useUpdaterBridge()
   const { addAnnotation } = useAnnotations()
@@ -45,7 +42,7 @@ function AppContent() {
   const [horseModeOpen, setHorseModeOpen] = useState(false)
   const loadSettings = useSettingsStore((s) => s.loadSettings)
   const loadLayout = useUIStore((s) => s.loadLayout)
-  const restoreSession = useFileStore((s) => s.restoreSession)
+  const restoreSession = useWorkspaceStore((s) => s.restoreSession)
 
   useEffect(() => { loadSettings() }, [loadSettings])
   useEffect(() => { loadLayout() }, [loadLayout])
@@ -82,7 +79,7 @@ function AppContent() {
       // Ctrl+Tab / Ctrl+Shift+Tab — cycle tabs (no meta required)
       if (e.ctrlKey && e.key === 'Tab') {
         e.preventDefault()
-        const { tabs, activeTabId, switchTab } = useFileStore.getState()
+        const { tabs, activeTabId, switchTab } = useWorkspaceStore.getState()
         if (tabs.length < 2) return
         const idx = tabs.findIndex((t) => t.id === activeTabId)
         const next = e.shiftKey
@@ -179,7 +176,7 @@ function AppContent() {
 
       if (e.key === 'n') {
         e.preventDefault()
-        void useFileStore.getState().createNewFile()
+        void useWorkspaceStore.getState().createPage('Untitled', null)
         return
       }
 
@@ -194,25 +191,23 @@ function AppContent() {
 
       if (e.key === 'e') {
         e.preventDefault()
-        const filePath = useFileStore.getState().currentFilePath
-        if (!filePath) return
-        const fmt = detectFormat(filePath)
-        if (fmt && kindOfFormat(fmt) === 'text') {
-          const editor = useEditorStore.getState()
-          if (editor.editing && editor.isDirty) {
-            const discard = window.confirm('You have unsaved changes. Discard them?')
-            if (!discard) return
-            editor.discardChanges()
-          }
-          editor.toggleEditing()
+        const pageId = useWorkspaceStore.getState().currentPageId
+        if (!pageId) return
+        // Pages are always markdown text — always editable.
+        const editor = useEditorStore.getState()
+        if (editor.editing && editor.isDirty) {
+          const discard = window.confirm('You have unsaved changes. Discard them?')
+          if (!discard) return
+          editor.discardChanges()
         }
+        editor.toggleEditing()
         return
       }
 
       // Cmd+W — close active tab
       if (e.key === 'w') {
         e.preventDefault()
-        const { activeTabId, closeTab } = useFileStore.getState()
+        const { activeTabId, closeTab } = useWorkspaceStore.getState()
         if (activeTabId) closeTab(activeTabId)
         return
       }
@@ -220,14 +215,14 @@ function AppContent() {
       // Cmd+Shift+T — reopen last closed tab
       if (e.key === 't' && e.shiftKey) {
         e.preventDefault()
-        void useFileStore.getState().reopenClosedTab()
+        void useWorkspaceStore.getState().reopenClosedTab()
         return
       }
 
       // Cmd+1..9 — switch to tab by index
       if (e.key >= '1' && e.key <= '9') {
         e.preventDefault()
-        const { tabs, switchTab } = useFileStore.getState()
+        const { tabs, switchTab } = useWorkspaceStore.getState()
         const idx = parseInt(e.key, 10) - 1
         if (idx < tabs.length) switchTab(tabs[idx].id)
         return

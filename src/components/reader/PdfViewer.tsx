@@ -10,7 +10,6 @@ import { usePaneFileData } from '../../hooks/usePaneFileData'
 // bundle without a network request.
 // @ts-expect-error — Vite handles the `?url` query param at bundle time.
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
-import { useFileStore } from '../../store/fileStore'
 
 // Register the worker URL once per renderer process. Guarded so HMR
 // doesn't spam the option setter.

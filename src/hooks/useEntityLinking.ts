@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useFileStore } from '../store/fileStore'
+import { useWorkspaceStore } from '../store/workspaceStore'
 import { useSettingsStore } from '../store/settingsStore'
 import { useUIStore } from '../store/uiStore'
 import { useInsightGraphStore } from '../store/insightGraphStore'
@@ -22,8 +22,8 @@ import { highlightEntitiesIn } from '../lib/graph/entityHighlighter'
 export function useEntityLinking(containerRef: React.RefObject<HTMLElement>) {
   const graphEnabled = useSettingsStore((s) => s.insightGraph.enabled)
   const entityLinking = useSettingsStore((s) => s.insightGraph.entityLinking)
-  const currentFilePath = useFileStore((s) => s.currentFilePath)
-  const currentContent = useFileStore((s) => s.currentContent)
+  const currentFilePath = useWorkspaceStore((s) => s.currentFilePath)
+  const currentContent = useWorkspaceStore((s) => s.currentContent)
   const reports = useInsightGraphStore((s) => s.reports)
   const findEntities = useInsightGraphStore((s) => s.findEntities)
   const entityNamesCacheStamp = useInsightGraphStore((s) => s.entityNamesCacheStamp)

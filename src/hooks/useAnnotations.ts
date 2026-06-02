@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { Annotation, AnnotationColor } from '../types/annotation'
-import { useFileStore } from '../store/fileStore'
+import { useWorkspaceStore } from '../store/workspaceStore'
 
 export function useAnnotations() {
-  const currentFilePath = useFileStore((s) => s.currentFilePath)
+  // `currentFilePath` is the page ID in the workspace model.
+  const currentFilePath = useWorkspaceStore((s) => s.currentFilePath)
   const [annotations, setAnnotations] = useState<Annotation[]>([])
 
   // Load annotations when file changes

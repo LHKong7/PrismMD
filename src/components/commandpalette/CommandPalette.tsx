@@ -1,18 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Command } from 'cmdk'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
-import { FileText, FilePlus, FolderPlus, Pencil, Trash2, Copy, ExternalLink, Sun, Moon, Monitor, Settings, Bot, Shield, Eye, Network, BookOpen, Puzzle, Search, Maximize2, Columns2, Rows2, X, Keyboard, FileStack, Zap } from 'lucide-react'
+import { FilePlus, Sun, Moon, Monitor, Settings, Bot, Shield, Eye, Network, BookOpen, Puzzle, Search, Maximize2, Columns2, Rows2, X, Keyboard, FileStack, Zap } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useUIStore } from '../../store/uiStore'
-import { useFileStore } from '../../store/fileStore'
+import { useWorkspaceStore } from '../../store/workspaceStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useAgentStore } from '../../store/agentStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
 import { useCommandRegistry } from '../../store/commandRegistry'
 import { useTemplateStore } from '../../store/templateStore'
-import { useSearchIndexStore } from '../../store/searchIndexStore'
 import { applyTheme, getThemeById } from '../../lib/theme/themes'
-import { flattenFiles, fileName } from '../../lib/fileTree'
 
 interface CommandPaletteProps {
   onOpenSettings: () => void
@@ -29,16 +27,9 @@ export function CommandPalette({ onOpenSettings, onOpenHorseMode }: CommandPalet
   const setPrivacyMode = useSettingsStore((s) => s.setPrivacyMode)
   const focusMode = useSettingsStore((s) => s.focusMode)
   const setFocusMode = useSettingsStore((s) => s.setFocusMode)
-  const openFile = useFileStore((s) => s.openFile)
-  const createNewFile = useFileStore((s) => s.createNewFile)
-  const createFolder = useFileStore((s) => s.createFolder)
-  const setRenamingPath = useFileStore((s) => s.setRenamingPath)
-  const setPendingDelete = useFileStore((s) => s.setPendingDelete)
-  const duplicateFileFn = useFileStore((s) => s.duplicateFile)
-  const showInFolder = useFileStore((s) => s.showInFolder)
-  const recentFiles = useFileStore((s) => s.recentFiles)
-  const openFolders = useFileStore((s) => s.openFolders)
-  const currentFilePath = useFileStore((s) => s.currentFilePath)
+  const createPage = useWorkspaceStore((s) => s.createPage)
+  const openPage = useWorkspaceStore((s) => s.openPage)
+  const currentPageId = useWorkspaceStore((s) => s.currentPageId)
   const toggleAgentSidebar = useAgentStore((s) => s.toggleAgentSidebar)
   const insightGraphEnabled = useSettingsStore((s) => s.insightGraph.enabled)
   const ingestFile = useInsightGraphStore((s) => s.ingestFile)
@@ -47,36 +38,28 @@ export function CommandPalette({ onOpenSettings, onOpenHorseMode }: CommandPalet
   const pluginCommands = useCommandRegistry((s) => s.commands)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [pageHits, setPageHits] = useState<Array<{ id: string; title: string }>>([])
   const dialogRef = useRef<HTMLDivElement>(null)
   useFocusTrap(dialogRef, open)
 
-  const buildIndex = useSearchIndexStore((s) => s.build)
-  const indexStatus = useSearchIndexStore((s) => s.status)
-  const indexedCount = useSearchIndexStore((s) => s.fileCount)
-  const runSearch = useSearchIndexStore((s) => s.search)
-
-  // Build the index lazily the first time the palette opens — the read
-  // pass is async, so paying it on demand keeps app startup snappy.
-  useEffect(() => {
-    if (open && indexStatus === 'idle') void buildIndex()
-  }, [open, indexStatus, buildIndex])
-
-  // Debounce the user's keystrokes before running MiniSearch so we don't
-  // re-rank on every character.
+  // Debounce keystrokes before querying the workspace search.
   useEffect(() => {
     const id = window.setTimeout(() => setDebouncedSearch(search), 150)
     return () => window.clearTimeout(id)
   }, [search])
 
-  const searchHits = useMemo(() => {
-    if (debouncedSearch.trim().length < 2) return []
-    if (indexStatus !== 'ready') return []
-    return runSearch(debouncedSearch)
-  }, [debouncedSearch, indexStatus, runSearch])
+  useEffect(() => {
+    let cancelled = false
+    if (debouncedSearch.trim().length < 2) {
+      setPageHits([])
+      return
+    }
+    window.electronAPI.workspaceSearch(debouncedSearch.trim())
+      .then((res) => { if (!cancelled) setPageHits(res.map((r) => ({ id: r.id, title: r.title }))) })
+      .catch(() => { if (!cancelled) setPageHits([]) })
+    return () => { cancelled = true }
+  }, [debouncedSearch])
 
-  // Group plugin commands by their `group` field so they can each render
-  // under their own heading. Core commands stay hard-coded below (their
-  // behaviour is tightly coupled to local component closures).
   const pluginGroups = useMemo(() => {
     const map = new Map<string, typeof pluginCommands>()
     for (const cmd of pluginCommands) {
@@ -102,8 +85,6 @@ export function CommandPalette({ onOpenSettings, onOpenHorseMode }: CommandPalet
     const theme = getThemeById(id); if (theme) applyTheme(theme)
     setOpen(false)
   }
-
-  const allFiles = openFolders.flatMap((f) => flattenFiles(f.tree))
 
   if (!open) return null
 
@@ -135,92 +116,27 @@ export function CommandPalette({ onOpenSettings, onOpenHorseMode }: CommandPalet
               {t('commandPalette.noResults')}
             </Command.Empty>
 
-            {debouncedSearch.trim().length >= 2 && (
+            {pageHits.length > 0 && (
               <Command.Group heading={t('commandPalette.searchResults')} style={{ color: 'var(--text-muted)' }}>
-                {indexStatus === 'building' && (
-                  <div className="px-3 py-2 text-xs flex items-center gap-2" style={{ color: 'var(--text-muted)' }}>
-                    <Search size={12} />
-                    <span>{t('commandPalette.indexing', { count: indexedCount })}</span>
-                  </div>
-                )}
-                {indexStatus === 'ready' && searchHits.length === 0 && (
-                  <div className="px-3 py-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-                    {t('commandPalette.noContentMatch')}
-                  </div>
-                )}
-                {searchHits.map((hit) => (
+                {pageHits.map((hit) => (
                   <Command.Item
-                    key={`hit:${hit.path}`}
-                    value={`${search} ${hit.path}`}
-                    onSelect={() => { openFile(hit.path); setOpen(false) }}
+                    key={`hit:${hit.id}`}
+                    value={`${search} ${hit.title}`}
+                    onSelect={() => { void openPage(hit.id); setOpen(false) }}
                     className={cls}
                     style={{ color: 'var(--text-secondary)' }}
                   >
                     <Search size={14} style={{ color: 'var(--text-muted)' }} />
-                    <div className="flex-1 min-w-0">
-                      <div className="truncate">{hit.name}</div>
-                      {hit.snippet && (
-                        <div className="text-[11px] truncate" style={{ color: 'var(--text-muted)' }}>
-                          {hit.snippet}
-                        </div>
-                      )}
-                    </div>
-                  </Command.Item>
-                ))}
-              </Command.Group>
-            )}
-
-            {recentFiles.length > 0 && (
-              <Command.Group heading={t('commandPalette.recentFiles')} style={{ color: 'var(--text-muted)' }}>
-                {recentFiles.map((fp) => (
-                  <Command.Item key={fp} value={fileName(fp)} onSelect={() => { openFile(fp); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
-                    <FileText size={14} style={{ color: 'var(--text-muted)' }} />
-                    <span className="truncate">{fileName(fp)}</span>
-                  </Command.Item>
-                ))}
-              </Command.Group>
-            )}
-
-            {allFiles.length > 0 && (
-              <Command.Group heading={t('commandPalette.files')} style={{ color: 'var(--text-muted)' }}>
-                {allFiles.map((fp) => (
-                  <Command.Item key={fp} value={fileName(fp)} onSelect={() => { openFile(fp); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
-                    <FileText size={14} style={{ color: 'var(--text-muted)' }} />
-                    <span className="truncate">{fileName(fp)}</span>
+                    <span className="truncate">{hit.title || 'Untitled'}</span>
                   </Command.Item>
                 ))}
               </Command.Group>
             )}
 
             <Command.Group heading={t('commandPalette.commands')} style={{ color: 'var(--text-muted)' }}>
-              <Command.Item value="New File" onSelect={() => { createNewFile(); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
-                <FilePlus size={14} /><span>{t('commandPalette.newFile')}</span>
+              <Command.Item value="New Page" onSelect={() => { void createPage('Untitled', null); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
+                <FilePlus size={14} /><span>{t('sidebar.newPage', 'New page')}</span>
               </Command.Item>
-              {openFolders.length > 0 && (
-                <Command.Item value="New Folder" onSelect={() => { createFolder(openFolders[0].path); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
-                  <FolderPlus size={14} /><span>{t('commandPalette.newFolder')}</span>
-                </Command.Item>
-              )}
-              {currentFilePath && (
-                <Command.Item value="Rename File" onSelect={() => { setRenamingPath(currentFilePath); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
-                  <Pencil size={14} /><span>{t('commandPalette.renameFile')}</span>
-                </Command.Item>
-              )}
-              {currentFilePath && (
-                <Command.Item value="Duplicate File" onSelect={() => { void duplicateFileFn(currentFilePath); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
-                  <Copy size={14} /><span>{t('commandPalette.duplicateFile')}</span>
-                </Command.Item>
-              )}
-              {currentFilePath && (
-                <Command.Item value="Delete File" onSelect={() => { setPendingDelete({ path: currentFilePath, name: currentFilePath.split(/[/\\]/).pop() ?? '', isDirectory: false }); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
-                  <Trash2 size={14} /><span>{t('commandPalette.deleteFile')}</span>
-                </Command.Item>
-              )}
-              {currentFilePath && (
-                <Command.Item value="Reveal in Finder" onSelect={() => { showInFolder(currentFilePath); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
-                  <ExternalLink size={14} /><span>{t('commandPalette.revealInFinder')}</span>
-                </Command.Item>
-              )}
               <Command.Item value="Light theme" onSelect={() => switchTheme('light')} className={cls} style={{ color: 'var(--text-secondary)' }}>
                 <Sun size={14} /><span>{t('commandPalette.lightTheme')}</span>
               </Command.Item>
@@ -264,10 +180,10 @@ export function CommandPalette({ onOpenSettings, onOpenHorseMode }: CommandPalet
                   <X size={14} /><span>{t('split.unsplit')}</span>
                 </Command.Item>
               )}
-              {insightGraphEnabled && currentFilePath && (
+              {insightGraphEnabled && currentPageId && (
                 <Command.Item
                   value="Save Document to Knowledge Graph"
-                  onSelect={() => { ingestFile(currentFilePath); setOpen(false) }}
+                  onSelect={() => { void ingestFile(currentPageId); setOpen(false) }}
                   className={cls}
                   style={{ color: 'var(--text-secondary)' }}
                 >
@@ -291,7 +207,7 @@ export function CommandPalette({ onOpenSettings, onOpenHorseMode }: CommandPalet
               )}
             </Command.Group>
 
-            {/* Templates */}
+            {/* Templates → create a new page from the template */}
             <Command.Group heading={t('commandPalette.templates', 'Templates')} style={{ color: 'var(--text-muted)' }}>
               {useTemplateStore.getState().templates.map((tpl) => (
                 <Command.Item
@@ -306,12 +222,15 @@ export function CommandPalette({ onOpenSettings, onOpenHorseMode }: CommandPalet
                       const pos = view.state.selection.main.head
                       view.dispatch({ changes: { from: pos, insert: content } })
                     } else {
-                      void useFileStore.getState().createNewFile()
-                      setTimeout(() => {
-                        const ed = require('../../store/editorStore').useEditorStore.getState()
-                        ed.setEditing(true)
-                        ed.setEditorContent(content)
-                      }, 500)
+                      void (async () => {
+                        const ws = useWorkspaceStore.getState()
+                        const id = await ws.createPage(tpl.name, null)
+                        if (id) {
+                          await ws.savePage(id, content)
+                          await ws.loadTree()
+                          await ws.openPage(id)
+                        }
+                      })()
                     }
                   }}
                   className={cls}
@@ -324,9 +243,6 @@ export function CommandPalette({ onOpenSettings, onOpenHorseMode }: CommandPalet
               ))}
             </Command.Group>
 
-            {/* Plugin-contributed commands. Grouped by the `group` the
-                plugin provided so multiple plugins sharing a group (e.g.
-                "Export") render under one heading. */}
             {pluginGroups.map(([group, items]) => (
               <Command.Group key={group} heading={group} style={{ color: 'var(--text-muted)' }}>
                 {items.map((cmd) => {

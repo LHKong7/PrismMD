@@ -1,16 +1,14 @@
-import { BookOpen, FilePlus, FolderOpen, Zap, Settings, Calendar, CheckSquare, FileText, Layers } from 'lucide-react'
+import { BookOpen, FilePlus, Upload, Calendar, CheckSquare } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useFileStore } from '../../store/fileStore'
+import { useWorkspaceStore } from '../../store/workspaceStore'
 import { useTaskStore } from '../../plugins/workspace/useTaskStore'
 import { openTodayDiary } from '../../lib/workspace/diaryService'
 import { Button } from '../ui/Button'
 
 export function Dashboard() {
   const { t } = useTranslation()
-  const recentFiles = useFileStore((s) => s.recentFiles)
-  const openFile = useFileStore((s) => s.openFile)
-  const createNewFile = useFileStore((s) => s.createNewFile)
-  const openFolderDialog = useFileStore((s) => s.openFolderDialog)
+  const createPage = useWorkspaceStore((s) => s.createPage)
+  const importFile = useWorkspaceStore((s) => s.importFile)
   const counts = useTaskStore((s) => s.counts)()
   const recentCompleted = useTaskStore((s) => s.recentCompleted)(3)
   const todoTasks = useTaskStore((s) => s.getByStatus)('todo').slice(0, 3)
@@ -79,42 +77,17 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* Recent Files */}
-        {recentFiles.length > 0 && (
-          <div className="mb-6">
-            <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>
-              {t('workspace.dashboard.recentFiles', 'Recent Files')}
-            </h3>
-            <div className="space-y-1">
-              {recentFiles.slice(0, 6).map((filePath) => {
-                const name = filePath.split(/[/\\]/).pop() ?? filePath
-                return (
-                  <button
-                    key={filePath}
-                    onClick={() => void openFile(filePath)}
-                    className="w-full flex items-center gap-2 px-3 py-1.5 rounded text-xs text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-                    style={{ color: 'var(--text-secondary)' }}
-                  >
-                    <FileText size={12} style={{ color: 'var(--text-muted)' }} />
-                    <span className="truncate">{name}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
         {/* Quick Actions */}
         <div>
           <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>
             {t('workspace.dashboard.quickActions', 'Quick Actions')}
           </h3>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={() => void createNewFile()} className="text-xs">
-              <FilePlus size={13} /> {t('app.welcome.newFile')}
+            <Button variant="outline" size="sm" onClick={() => void createPage('Untitled', null)} className="text-xs">
+              <FilePlus size={13} /> {t('sidebar.newPage', 'New page')}
             </Button>
-            <Button variant="outline" size="sm" onClick={openFolderDialog} className="text-xs">
-              <FolderOpen size={13} /> {t('app.welcome.openFolder')}
+            <Button variant="outline" size="sm" onClick={() => void importFile(null)} className="text-xs">
+              <Upload size={13} /> {t('sidebar.importFile', 'Import Markdown')}
             </Button>
             <Button variant="outline" size="sm" onClick={() => void openTodayDiary()} className="text-xs">
               <Calendar size={13} /> {t('workspace.dashboard.diary', 'Diary')}

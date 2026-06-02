@@ -1,4 +1,4 @@
-import { useFileStore } from '../../store/fileStore'
+import { useWorkspaceStore } from '../../store/workspaceStore'
 import { useEditorStore } from '../../store/editorStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { markdownToHtml, markdownToHast } from './exportPipeline'
@@ -7,14 +7,13 @@ import { hastToDocxBuffer } from './hastToDocx'
 
 function getDocumentInfo(): { content: string; title: string; themeId: string } | null {
   const editor = useEditorStore.getState()
-  const file = useFileStore.getState()
+  const ws = useWorkspaceStore.getState()
 
-  // Use editor content if editing, otherwise use file content
-  const content = editor.editing ? editor.editorContent : file.currentContent
+  // Use editor content if editing, otherwise the active page content.
+  const content = editor.editing ? editor.editorContent : ws.currentContent
   if (!content) return null
 
-  const filePath = file.currentFilePath ?? 'Untitled'
-  const title = filePath.split(/[/\\]/).pop()?.replace(/\.[^/.]+$/, '') ?? 'Untitled'
+  const title = ws.currentTitle || 'Untitled'
   const themeId = useSettingsStore.getState().themeId
 
   return { content, title, themeId }

@@ -3,11 +3,10 @@ import { Minus, Square, X, Palette, PanelLeft, PanelRight, Settings, Bot, Networ
 import { Tooltip } from '../ui/Tooltip'
 import { useTranslation } from 'react-i18next'
 import { useUIStore } from '../../store/uiStore'
-import { useFileStore } from '../../store/fileStore'
+import { useWorkspaceStore } from '../../store/workspaceStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useAgentStore } from '../../store/agentStore'
 import { useEditorStore } from '../../store/editorStore'
-import { detectFormat, kindOfFormat } from '../../lib/fileFormat'
 import { themes, applyTheme, getThemeById } from '../../lib/theme/themes'
 import { Button } from '../ui/Button'
 
@@ -26,7 +25,8 @@ export function TitleBar({ onOpenSettings, onOpenHorseMode }: TitleBarProps) {
   const toggleRightSidebar = useUIStore((s) => s.toggleRightSidebar)
   const mainViewMode = useUIStore((s) => s.mainViewMode)
   const toggleMainViewMode = useUIStore((s) => s.toggleMainViewMode)
-  const currentFilePath = useFileStore((s) => s.currentFilePath)
+  const currentPageId = useWorkspaceStore((s) => s.currentPageId)
+  const currentTitle = useWorkspaceStore((s) => s.currentTitle)
   const themeId = useSettingsStore((s) => s.themeId)
   const setThemeId = useSettingsStore((s) => s.setThemeId)
   const setThemeMode = useSettingsStore((s) => s.setThemeMode)
@@ -40,11 +40,8 @@ export function TitleBar({ onOpenSettings, onOpenHorseMode }: TitleBarProps) {
   const isDirty = useEditorStore((s) => s.isDirty)
   const toggleEditing = useEditorStore((s) => s.toggleEditing)
 
-  const canEdit = (() => {
-    if (!currentFilePath) return false
-    const fmt = detectFormat(currentFilePath)
-    return fmt ? kindOfFormat(fmt) === 'text' : false
-  })()
+  // Pages are always markdown text — editable whenever one is open.
+  const canEdit = !!currentPageId
 
   const isMac = window.electronAPI.platform === 'darwin'
 
@@ -63,9 +60,7 @@ export function TitleBar({ onOpenSettings, onOpenHorseMode }: TitleBarProps) {
     applyTheme(next)
   }
 
-  const rawFileName = currentFilePath
-    ? currentFilePath.split(/[/\\]/).pop()
-    : 'PrismMD'
+  const rawFileName = currentTitle || 'PrismMD'
   const fileName = isDirty ? `● ${rawFileName}` : rawFileName
 
   return (
@@ -141,7 +136,7 @@ export function TitleBar({ onOpenSettings, onOpenHorseMode }: TitleBarProps) {
             </Button>
           </Tooltip>
         )}
-        {currentFilePath && <ExportDropdown />}
+        {currentPageId && <ExportDropdown />}
         {onOpenHorseMode && (
           <Tooltip label={t('horseMode.title', 'Horse Mode')} side="bottom">
             <Button

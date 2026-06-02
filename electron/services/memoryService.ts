@@ -4,13 +4,13 @@ import path from 'path'
 import crypto from 'crypto'
 
 /**
- * Long-term memory service for storing conversation summaries
- * and user preferences per document.
+ * Long-term memory service for storing conversation summaries and user
+ * preferences per page. Entries are keyed by workspace page ID.
  */
 
 interface MemoryEntry {
   id: string
-  filePath: string
+  pageId: string
   summary: string
   topics: string[]
   timestamp: string
@@ -45,14 +45,14 @@ async function saveMemoryStore(store: MemoryStore): Promise<void> {
 }
 
 /**
- * Save a conversation summary for a specific document
+ * Save a conversation summary for a specific page.
  */
-export async function saveMemory(filePath: string, summary: string, topics: string[]): Promise<void> {
+export async function saveMemory(pageId: string, summary: string, topics: string[]): Promise<void> {
   const store = await loadMemoryStore()
 
   const entry: MemoryEntry = {
     id: crypto.randomUUID(),
-    filePath,
+    pageId,
     summary,
     topics,
     timestamp: new Date().toISOString(),
@@ -69,22 +69,22 @@ export async function saveMemory(filePath: string, summary: string, topics: stri
 }
 
 /**
- * Retrieve relevant memory context for a document or query
+ * Retrieve relevant memory context for a page or query.
  */
-export async function getMemoryContext(filePath?: string, query?: string): Promise<string> {
+export async function getMemoryContext(pageId?: string, query?: string): Promise<string> {
   const store = await loadMemoryStore()
 
   if (store.entries.length === 0) return ''
 
   let relevant = store.entries
 
-  // Filter by file path if provided
-  if (filePath) {
-    const fileEntries = relevant.filter((e) => e.filePath === filePath)
-    const otherEntries = relevant.filter((e) => e.filePath !== filePath)
+  // Filter by page if provided
+  if (pageId) {
+    const pageEntries = relevant.filter((e) => e.pageId === pageId)
+    const otherEntries = relevant.filter((e) => e.pageId !== pageId)
 
-    // Prioritize entries from the same file, then add recent general entries
-    relevant = [...fileEntries.slice(-5), ...otherEntries.slice(-3)]
+    // Prioritize entries from the same page, then add recent general entries
+    relevant = [...pageEntries.slice(-5), ...otherEntries.slice(-3)]
   } else {
     relevant = relevant.slice(-8)
   }

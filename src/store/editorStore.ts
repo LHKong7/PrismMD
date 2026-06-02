@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { useFileStore } from './fileStore'
+import { useWorkspaceStore } from './workspaceStore'
 import { extractHeadingsFromSource, type EditorTocEntry } from '../lib/markdown/extractHeadings'
 import type { EditorView } from '@codemirror/view'
 
@@ -42,7 +42,7 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
 
   setEditing: (on: boolean) => {
     if (on) {
-      const content = useFileStore.getState().currentContent ?? ''
+      const content = useWorkspaceStore.getState().currentContent ?? ''
       const editorToc = extractHeadingsFromSource(content)
       set({
         editing: true,
@@ -51,8 +51,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
         isDirty: false,
         editorToc,
       })
-      // Update fileStore TOC so sidebar reflects editor headings
-      useFileStore.getState().setToc(editorToc)
+      // Update workspace TOC so sidebar reflects editor headings
+      useWorkspaceStore.getState().setToc(editorToc)
     } else {
       set({ editing: false, editorToc: [] })
     }
@@ -74,22 +74,23 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     tocUpdateTimer = setTimeout(() => {
       const editorToc = extractHeadingsFromSource(content)
       set({ editorToc })
-      useFileStore.getState().setToc(editorToc)
+      useWorkspaceStore.getState().setToc(editorToc)
     }, 300)
   },
 
   saveFile: async () => {
     const { editorContent } = get()
-    const filePath = useFileStore.getState().currentFilePath
-    if (!filePath || editorContent == null) return
+    const pageId = useWorkspaceStore.getState().currentPageId
+    if (!pageId || editorContent == null) return
 
     try {
-      await window.electronAPI.writeFile(filePath, editorContent)
-      useFileStore.getState().setContent(editorContent)
+      // setContent updates the in-memory tab and debounce-saves to SQLite;
+      // savePage forces an immediate persist for explicit Cmd+S.
+      useWorkspaceStore.getState().setContent(editorContent)
+      await useWorkspaceStore.getState().savePage(pageId, editorContent)
       set({ savedContent: editorContent, isDirty: false })
-      // Lazy import to avoid circular init.
       const { useToastStore } = await import('./toastStore')
-      useToastStore.getState().show('success', 'File saved')
+      useToastStore.getState().show('success', 'Page saved')
     } catch (err) {
       const { useToastStore } = await import('./toastStore')
       const msg = err instanceof Error ? err.message : String(err)

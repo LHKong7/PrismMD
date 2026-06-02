@@ -1,14 +1,14 @@
 import { useState, useCallback, useEffect } from 'react'
 import { Layers, RefreshCw, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useFileStore } from '../../store/fileStore'
+import { useWorkspaceStore } from '../../store/workspaceStore'
 import { useFlashcards } from './useFlashcards'
 import type { FlashCard } from './types'
 
 export function FlashCardPanel() {
   const { t } = useTranslation()
-  const currentFilePath = useFileStore((s) => s.currentFilePath)
-  const currentContent = useFileStore((s) => s.currentContent)
+  const currentFilePath = useWorkspaceStore((s) => s.currentFilePath)
+  const currentContent = useWorkspaceStore((s) => s.currentContent)
 
   const { deck, generating, error, generateCards, updateCardStatus, getReviewQueue, stats } =
     useFlashcards(currentFilePath)

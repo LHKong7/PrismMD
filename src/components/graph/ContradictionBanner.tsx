@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle, X, ChevronRight } from 'lucide-react'
-import { useFileStore } from '../../store/fileStore'
+import { useWorkspaceStore } from '../../store/workspaceStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useUIStore } from '../../store/uiStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
@@ -34,7 +34,7 @@ interface EntityContradictions {
 export function ContradictionBanner() {
   const { t } = useTranslation()
   const graphEnabled = useSettingsStore((s) => s.insightGraph.enabled)
-  const currentFilePath = useFileStore((s) => s.currentFilePath)
+  const currentFilePath = useWorkspaceStore((s) => s.currentFilePath)
   const reports = useInsightGraphStore((s) => s.reports)
   const getContradictions = useInsightGraphStore((s) => s.getContradictions)
   const focusEntity = useUIStore((s) => s.focusEntity)

@@ -2,7 +2,7 @@ import { useRef, useState, useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { X, FileText, FileSpreadsheet, FileJson, File as FileIcon } from 'lucide-react'
 import { clsx } from 'clsx'
-import { useFileStore, type Tab } from '../../store/fileStore'
+import { useWorkspaceStore, type WorkspaceTab } from '../../store/workspaceStore'
 import { useToastStore } from '../../store/toastStore'
 import { ContextMenu, type ContextMenuItem } from '../ui/ContextMenu'
 import type { FileFormat } from '../../lib/fileFormat'
@@ -18,19 +18,15 @@ function iconForFormat(format: FileFormat | null) {
   }
 }
 
-function fileName(filePath: string): string {
-  return filePath.split(/[/\\]/).pop() ?? filePath
-}
-
 export function TabBar() {
   const { t } = useTranslation()
-  const tabs = useFileStore((s) => s.tabs)
-  const activeTabId = useFileStore((s) => s.activeTabId)
-  const switchTab = useFileStore((s) => s.switchTab)
-  const closeTab = useFileStore((s) => s.closeTab)
-  const moveTab = useFileStore((s) => s.moveTab)
-  const closeOtherTabs = useFileStore((s) => s.closeOtherTabs)
-  const closeTabsToRight = useFileStore((s) => s.closeTabsToRight)
+  const tabs = useWorkspaceStore((s) => s.tabs)
+  const activeTabId = useWorkspaceStore((s) => s.activeTabId)
+  const switchTab = useWorkspaceStore((s) => s.switchTab)
+  const closeTab = useWorkspaceStore((s) => s.closeTab)
+  const moveTab = useWorkspaceStore((s) => s.moveTab)
+  const closeOtherTabs = useWorkspaceStore((s) => s.closeOtherTabs)
+  const closeTabsToRight = useWorkspaceStore((s) => s.closeTabsToRight)
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const [hasOverflow, setHasOverflow] = useState(false)
@@ -102,13 +98,13 @@ export function TabBar() {
       disabled: tabs.findIndex((t) => t.id === ctxMenu.tabId) === tabs.length - 1,
     },
     {
-      id: 'copyPath',
-      label: t('tabs.copyPath', 'Copy Path'),
+      id: 'copyTitle',
+      label: t('tabs.copyTitle', 'Copy Title'),
       onSelect: () => {
         const tab = tabs.find((t) => t.id === ctxMenu.tabId)
         if (tab) {
-          navigator.clipboard.writeText(tab.filePath)
-          useToastStore.getState().show('success', 'Path copied')
+          navigator.clipboard.writeText(tab.title)
+          useToastStore.getState().show('success', 'Title copied')
         }
       },
     },
@@ -167,7 +163,7 @@ export function TabBar() {
 }
 
 interface TabItemProps {
-  tab: Tab
+  tab: WorkspaceTab
   isActive: boolean
   index: number
   onClick: () => void
@@ -189,7 +185,7 @@ function TabItem({
   onDrop,
 }: TabItemProps) {
   const Icon = iconForFormat(tab.format)
-  const name = fileName(tab.filePath)
+  const name = tab.title || 'Untitled'
 
   return (
     <div
@@ -221,7 +217,7 @@ function TabItem({
         backgroundColor: isActive ? 'var(--bg-primary)' : undefined,
         color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
       }}
-      title={tab.filePath}
+      title={tab.title}
       role="tab"
       aria-selected={isActive}
     >

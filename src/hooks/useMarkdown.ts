@@ -3,7 +3,7 @@ import type { ReactElement } from 'react'
 import { processMarkdown, type MarkdownResult } from '../lib/markdown/pipeline'
 import type { TocEntry } from '../lib/markdown/remarkToc'
 import type { CodeBlockMarker } from '../lib/markdown/remarkCodeAnalysis'
-import { useFileStore } from '../store/fileStore'
+import { useWorkspaceStore } from '../store/workspaceStore'
 
 interface UseMarkdownResult {
   content: ReactElement | null
@@ -17,7 +17,7 @@ export function useMarkdown(source: string | null): UseMarkdownResult {
   const [result, setResult] = useState<MarkdownResult | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const setToc = useFileStore((s) => s.setToc)
+  const setToc = useWorkspaceStore((s) => s.setToc)
 
   useEffect(() => {
     if (!source) {

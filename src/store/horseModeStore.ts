@@ -8,8 +8,7 @@ export type HorseModeStage = 'idle' | 'generating' | 'writing' | 'completed' | '
 interface HorseModeStore {
   active: boolean
   task: string
-  targetDir: string
-  fileName: string
+  title: string
   stage: HorseModeStage
   error: string | null
   iterations: number
@@ -18,7 +17,7 @@ interface HorseModeStore {
   qualityScore: number | null
   cancelled: boolean
 
-  start: (task: string, targetDir: string, fileName: string, iterations?: number, documentContent?: string) => Promise<void>
+  start: (task: string, title: string, iterations?: number, documentContent?: string) => Promise<void>
   cancel: () => void
 }
 
@@ -29,8 +28,7 @@ function hlog(message: string, level: 'info' | 'success' | 'error' = 'info') {
 export const useHorseModeStore = create<HorseModeStore>((set, get) => ({
   active: false,
   task: '',
-  targetDir: '',
-  fileName: '',
+  title: '',
   stage: 'idle',
   error: null,
   iterations: 1,
@@ -39,10 +37,11 @@ export const useHorseModeStore = create<HorseModeStore>((set, get) => ({
   qualityScore: null,
   cancelled: false,
 
-  start: async (task, targetDir, fileName, iterations = 1, documentContent) => {
+  start: async (task, title, iterations = 1, documentContent) => {
     const hasDocContext = !!documentContent?.trim()
+    const pageTitle = title.trim() || 'Untitled'
     set({
-      active: true, task, targetDir, fileName, stage: 'generating',
+      active: true, task, title: pageTitle, stage: 'generating',
       error: null, iterations, currentIteration: 1, currentPhase: 'plan',
       qualityScore: null, cancelled: false,
     })
@@ -50,11 +49,9 @@ export const useHorseModeStore = create<HorseModeStore>((set, get) => ({
     useAgentLogStore.getState().panelOpen || useAgentLogStore.setState({ panelOpen: true })
 
     hlog(`Task: ${task.slice(0, 120)}${task.length > 120 ? '...' : ''}`)
-    hlog(`Target: ${targetDir}/${fileName}`)
+    hlog(`Page: ${pageTitle}`)
     hlog(`Max iterations: ${iterations}`)
     if (hasDocContext) hlog('Using current document as reference')
-
-    const filePath = `${targetDir}/${fileName}`
 
     // Subscribe to progress events — cleanup in finally to prevent leaks
     let progressCleanup: (() => void) | null = null
@@ -136,10 +133,19 @@ export const useHorseModeStore = create<HorseModeStore>((set, get) => ({
       const wordCount = content.split(/\s+/).length
       hlog(`Final document: ${wordCount} words (${res.result.provider}/${res.result.model})`, 'success')
 
-      // Write final output to file
+      // Create a workspace page with the generated content.
       set({ stage: 'writing' })
-      await window.electronAPI.writeFile(filePath, content)
-      hlog(`Saved to ${filePath}`)
+      const { useWorkspaceStore } = await import('./workspaceStore')
+      const ws = useWorkspaceStore.getState()
+      const pageId = await ws.createPage(pageTitle, null)
+      if (!pageId) {
+        set({ stage: 'failed', error: 'Failed to create page' })
+        hlog('Error: failed to create workspace page', 'error')
+        return
+      }
+      await ws.savePage(pageId, content)
+      await ws.loadTree()
+      hlog(`Saved to page "${pageTitle}"`)
 
       // Save as a session so it appears in the Agent panel
       try {
@@ -151,7 +157,7 @@ export const useHorseModeStore = create<HorseModeStore>((set, get) => ({
             {
               role: 'assistant',
               content: [
-                `**File:** \`${filePath}\``,
+                `**Page:** ${pageTitle}`,
                 `**Iterations:** ${res.result.iterations} | **Score:** ${res.result.qualityScore}/10${res.result.thresholdMet ? ' (threshold met)' : ''}`,
                 `**Words:** ${wordCount}`,
                 '',
@@ -169,17 +175,14 @@ export const useHorseModeStore = create<HorseModeStore>((set, get) => ({
         // Session save best-effort
       }
 
-      // Open in PrismMD
+      // Open the new page in PrismMD.
       set({ stage: 'completed' })
       hlog('Opening in PrismMD...')
-      const { useFileStore } = await import('./fileStore')
-      const finalContent = await window.electronAPI.readFile(filePath)
-      await useFileStore.getState().openFile(filePath)
-      useFileStore.getState().setContent(finalContent)
+      await ws.openPage(pageId)
       hlog(`Done! (${res.result.iterations} iteration${res.result.iterations > 1 ? 's' : ''}, score: ${res.result.qualityScore})`, 'success')
 
       const { useToastStore } = await import('./toastStore')
-      useToastStore.getState().show('success', `Horse Mode complete! Saved to ${fileName}`, 5000)
+      useToastStore.getState().show('success', `Horse Mode complete! Created "${pageTitle}"`, 5000)
 
       setTimeout(() => {
         if (get().stage === 'completed') set({ active: false, stage: 'idle' })

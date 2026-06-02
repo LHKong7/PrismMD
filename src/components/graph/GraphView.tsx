@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useUIStore, type GraphScope } from '../../store/uiStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
 import { useSettingsStore } from '../../store/settingsStore'
-import { useFileStore } from '../../store/fileStore'
+import { useWorkspaceStore } from '../../store/workspaceStore'
 import { Network, AlertCircle, Globe, FileText, Target, BookOpen } from 'lucide-react'
 import { Spinner } from '../ui/Spinner'
 import { graphPalette } from '../../lib/theme/tokens'
@@ -51,7 +51,7 @@ export function GraphView() {
   const insightGraphEnabled = useSettingsStore((s) => s.insightGraph.enabled)
   const reports = useInsightGraphStore((s) => s.reports)
   const refreshReports = useInsightGraphStore((s) => s.refreshReports)
-  const currentFilePath = useFileStore((s) => s.currentFilePath)
+  const currentFilePath = useWorkspaceStore((s) => s.currentFilePath)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 800, height: 600 })

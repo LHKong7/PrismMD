@@ -1,13 +1,14 @@
 import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FileText, FolderOpen, Upload, Bot, FilePlus } from 'lucide-react'
-import { useFileStore } from '../../store/fileStore'
+import { useWorkspaceStore } from '../../store/workspaceStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useUIStore } from '../../store/uiStore'
-import { detectFormat, kindOfFormat } from '../../lib/fileFormat'
+import { kindOfFormat } from '../../lib/fileFormat'
 import { useEditorStore } from '../../store/editorStore'
 import { usePaneFileData } from '../../hooks/usePaneFileData'
 import { MarkdownReader } from './MarkdownReader'
+import { PageHeader } from './PageHeader'
 import { Dashboard } from '../workspace/Dashboard'
 import { JsonViewer } from './JsonViewer'
 import { CsvViewer } from './CsvViewer'
@@ -32,10 +33,7 @@ import { Button } from '../ui/Button'
 export function DocumentReader() {
   const { t } = useTranslation()
   const { filePath: currentFilePath, format: currentFormat, isActivePane } = usePaneFileData()
-  const openError = useFileStore((s) => s.openError)
-  const openFileDialog = useFileStore((s) => s.openFileDialog)
-  const openFolderDialog = useFileStore((s) => s.openFolderDialog)
-  const createNewFile = useFileStore((s) => s.createNewFile)
+  const openError = useWorkspaceStore((s) => s.openError)
   const activeProvider = useSettingsStore((s) => s.activeProvider)
   const openSettings = useUIStore((s) => s.openSettings)
   // First-run users have no provider configured — surface a fast path
@@ -55,27 +53,23 @@ export function DocumentReader() {
     e.preventDefault()
     e.stopPropagation()
 
-    const files = Array.from(e.dataTransfer.files)
-    const file = files.find((f) => {
-      const fmt = detectFormat((f as File & { path?: string }).path ?? f.name)
-      return fmt !== null
-    })
-    if (!file) return
+    // Dropping Markdown files imports them as new workspace pages.
+    const files = Array.from(e.dataTransfer.files).filter((f) =>
+      /\.(md|markdown|mdx)$/i.test(f.name),
+    )
+    if (files.length === 0) return
 
-    const filePath = (file as File & { path?: string }).path ?? file.name
-    const format = detectFormat(filePath)
-    const kind = format ? kindOfFormat(format) : 'text'
-    const reader = new FileReader()
-    reader.onload = () => {
-      const store = useFileStore.getState()
-      if (kind === 'binary') {
-        store.openFileWithBytes(filePath, reader.result as ArrayBuffer)
-      } else {
-        store.openFileWithContent(filePath, reader.result as string)
+    for (const file of files) {
+      const reader = new FileReader()
+      reader.onload = async () => {
+        const title = file.name.replace(/\.(md|markdown|mdx)$/i, '')
+        const store = useWorkspaceStore.getState()
+        const id = await store.createPage(title, null)
+        if (id) await store.savePage(id, reader.result as string)
+        await store.loadTree()
       }
+      reader.readAsText(file)
     }
-    if (kind === 'binary') reader.readAsArrayBuffer(file)
-    else reader.readAsText(file)
   }, [])
 
   // Welcome screen — unified entry point shared by every format.
@@ -164,6 +158,7 @@ export function DocumentReader() {
           fullPage={false}
         />
       )}
+      {currentFormat === 'markdown' && isActivePane && <PageHeader />}
       <div className="flex-1 min-h-0">{body}</div>
     </div>
   )

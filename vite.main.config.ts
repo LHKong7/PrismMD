@@ -15,6 +15,7 @@ export default defineConfig({
       external: [
         'fsevents',
         'neo4j-driver',
+        'better-sqlite3',
       ],
     },
   },

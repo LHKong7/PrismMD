@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { PaneContext } from '../../contexts/PaneContext'
 import { useUIStore } from '../../store/uiStore'
-import { useFileStore } from '../../store/fileStore'
+import { useWorkspaceStore } from '../../store/workspaceStore'
 import { Breadcrumb } from './Breadcrumb'
 import { DocumentReader } from '../reader/DocumentReader'
 import { ErrorBoundary } from '../ErrorBoundary'
@@ -20,8 +20,8 @@ interface PaneViewProps {
 export function PaneView({ paneId }: PaneViewProps) {
   const splitLayout = useUIStore((s) => s.splitLayout)
   const setActivePaneId = useUIStore((s) => s.setActivePaneId)
-  const tabs = useFileStore((s) => s.tabs)
-  const activeTabId = useFileStore((s) => s.activeTabId)
+  const tabs = useWorkspaceStore((s) => s.tabs)
+  const activeTabId = useWorkspaceStore((s) => s.activeTabId)
 
   const paneState = splitLayout.panes.find((p) => p.id === paneId)
   const isActive = splitLayout.activePaneId === paneId
@@ -35,12 +35,13 @@ export function PaneView({ paneId }: PaneViewProps) {
 
   const paneData: PaneData = useMemo(() => ({
     paneId,
-    filePath: tab?.filePath ?? null,
+    filePath: tab?.pageId ?? null,
+    title: tab?.title ?? null,
     content: tab?.content ?? null,
     format: tab?.format ?? null,
-    bytes: tab?.bytes ?? null,
+    bytes: null,
     isActivePane: isActive,
-  }), [paneId, tab?.filePath, tab?.content, tab?.format, tab?.bytes, isActive])
+  }), [paneId, tab?.pageId, tab?.title, tab?.content, tab?.format, isActive])
 
   return (
     <div

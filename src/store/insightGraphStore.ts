@@ -2,7 +2,9 @@ import { create } from 'zustand'
 
 export interface IngestedReport {
   reportId: string
+  /** Source workspace page ID (legacy field name, now holds the page ID). */
   filePath?: string
+  /** Page title for display. */
   filename?: string
   entities?: number
   claims?: number
@@ -107,9 +109,6 @@ interface InsightGraphStore {
   clearGraphCaches: () => void
 }
 
-function filenameOf(fp: string): string {
-  return fp.split(/[/\\]/).pop() ?? fp
-}
 
 export const useInsightGraphStore = create<InsightGraphStore>((set, get) => {
   // Subscribe to progress events from the main process at store creation so
@@ -171,7 +170,7 @@ export const useInsightGraphStore = create<InsightGraphStore>((set, get) => {
         // So we rehydrate the canonical reports from Neo4j and match by
         // source filename instead of trusting the ingest-response id.
         await get().refreshReports()
-        const match = get().reports.find((r) => r.filePath === filePath || r.filename === filenameOf(filePath))
+        const match = get().reports.find((r) => r.filePath === filePath)
         const reportId = match?.reportId ?? ''
         set((state) => ({
           ingest: {
@@ -201,18 +200,17 @@ export const useInsightGraphStore = create<InsightGraphStore>((set, get) => {
           return
         }
         const reports: IngestedReport[] = res.reports.map((r) => {
-          const sourcePath =
-            (r.source_path as string | undefined) ?? (r.filePath as string | undefined)
-          const sourceFilename = r.source_filename as string | undefined
+          // Reports now store the workspace page ID + page title.
+          const pageId = (r.source_page_id as string | undefined) ?? (r.filePath as string | undefined)
+          const title =
+            (r.title as string | undefined) ??
+            (r.source_filename as string | undefined) ??
+            (r.filename as string | undefined)
           return {
-            // Neo4j stores the property as snake_case `report_id`; the SDK
-            // surfaces raw properties, so check that first.
+            // Neo4j stores the property as snake_case `report_id`.
             reportId: String(r.report_id ?? r.reportId ?? r.id ?? ''),
-            filePath: sourcePath,
-            filename:
-              (r.filename as string | undefined) ??
-              sourceFilename ??
-              (sourcePath ? filenameOf(sourcePath) : undefined),
+            filePath: pageId, // holds the page ID
+            filename: title,  // page title for display
             entities: Number(r.entities ?? 0),
             claims: Number(r.claims ?? 0),
             relationships: Number(r.relationships ?? 0),

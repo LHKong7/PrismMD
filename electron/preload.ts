@@ -108,6 +108,8 @@ const electronAPI = {
   // Knowledge Base
   kbAdd: (filePath: string, title?: string, tags?: string[]): Promise<{ ok: boolean; entry?: unknown; error?: string }> =>
     ipcRenderer.invoke('kb:add', filePath, title, tags),
+  kbAddPage: (pageId: string, tags?: string[]): Promise<{ ok: boolean; entry?: unknown; error?: string }> =>
+    ipcRenderer.invoke('kb:add-page', pageId, tags),
   kbRemove: (id: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('kb:remove', id),
   kbList: (): Promise<{ ok: boolean; entries?: unknown[]; error?: string }> =>
@@ -471,6 +473,36 @@ const electronAPI = {
   pluginsGetDir: (): Promise<string> => ipcRenderer.invoke('plugins:get-dir'),
   pluginsOpenDir: (): Promise<{ ok: true } | { ok: false; error: string }> =>
     ipcRenderer.invoke('plugins:open-dir'),
+
+  // Workspace (Notion-like page management)
+  workspaceCreatePage: (title?: string, parentId?: string, content?: string): Promise<{ ok: boolean; page?: any; error?: string }> =>
+    ipcRenderer.invoke('workspace:create-page', title, parentId, content),
+  workspaceGetPage: (pageId: string): Promise<any> =>
+    ipcRenderer.invoke('workspace:get-page', pageId),
+  workspaceUpdatePage: (pageId: string, updates: Record<string, any>): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('workspace:update-page', pageId, updates),
+  workspaceDeletePage: (pageId: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('workspace:delete-page', pageId),
+  workspaceRestorePage: (pageId: string): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('workspace:restore-page', pageId),
+  workspaceGetChildren: (parentId: string | null): Promise<any[]> =>
+    ipcRenderer.invoke('workspace:get-children', parentId),
+  workspaceGetTree: (): Promise<any[]> =>
+    ipcRenderer.invoke('workspace:get-tree'),
+  workspaceMovePage: (pageId: string, newParentId: string | null, position: number): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('workspace:move-page', pageId, newParentId, position),
+  workspaceGetAncestors: (pageId: string): Promise<any[]> =>
+    ipcRenderer.invoke('workspace:get-ancestors', pageId),
+  workspaceSearch: (query: string): Promise<any[]> =>
+    ipcRenderer.invoke('workspace:search', query),
+  workspaceGetPageCount: (): Promise<number> =>
+    ipcRenderer.invoke('workspace:get-page-count'),
+  workspaceImportFile: (parentId?: string): Promise<{ ok: boolean; pages?: any[]; canceled?: boolean; error?: string }> =>
+    ipcRenderer.invoke('workspace:import-file', parentId),
+  workspaceImportFolder: (parentId?: string): Promise<{ ok: boolean; count?: number; canceled?: boolean; error?: string }> =>
+    ipcRenderer.invoke('workspace:import-folder', parentId),
+  workspaceExportPage: (pageId: string): Promise<{ ok: boolean; filePath?: string; canceled?: boolean; error?: string }> =>
+    ipcRenderer.invoke('workspace:export-page', pageId),
 
   // Platform info
   platform: process.platform,

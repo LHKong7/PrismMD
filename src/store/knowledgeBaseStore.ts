@@ -7,6 +7,7 @@ interface KnowledgeBaseStore {
 
   refresh: () => Promise<void>
   addDocument: (filePath: string, title?: string, tags?: string[]) => Promise<boolean>
+  addPage: (pageId: string, tags?: string[]) => Promise<boolean>
   removeDocument: (id: string) => Promise<void>
   search: (query: string) => Promise<KBEntry[]>
 }
@@ -39,6 +40,24 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
         useToastStore.getState().show('error', res.error ?? 'Failed to add')
         return false
       }
+    } catch (err) {
+      const { useToastStore } = await import('./toastStore')
+      useToastStore.getState().show('error', err instanceof Error ? err.message : String(err))
+      return false
+    }
+  },
+
+  addPage: async (pageId, tags) => {
+    try {
+      const res = await window.electronAPI.kbAddPage(pageId, tags)
+      const { useToastStore } = await import('./toastStore')
+      if (res.ok) {
+        await get().refresh()
+        useToastStore.getState().show('success', 'Added to Knowledge Base')
+        return true
+      }
+      useToastStore.getState().show('error', res.error ?? 'Failed to add')
+      return false
     } catch (err) {
       const { useToastStore } = await import('./toastStore')
       useToastStore.getState().show('error', err instanceof Error ? err.message : String(err))

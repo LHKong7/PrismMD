@@ -1,214 +1,78 @@
-import { useMemo, useRef, useState, type RefObject } from 'react'
-import { ChevronRight, Database, FilePlus, FolderOpen, FolderPlus, Loader2, Pin, PinOff, Plus, X } from 'lucide-react'
-import { clsx } from 'clsx'
+import { useState } from 'react'
+import { FilePlus, Upload, FolderUp, Pin, PinOff, Search, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useFileStore } from '../../store/fileStore'
+import { useWorkspaceStore } from '../../store/workspaceStore'
 import { useUIStore } from '../../store/uiStore'
-import { useSettingsStore } from '../../store/settingsStore'
-import { useBatchIngestStore } from '../../store/batchIngestStore'
-import { FileTree } from '../filetree/FileTree'
-import type { FileTreeNode } from '../../types/electron'
-import { isSupported } from '../../lib/fileFormat'
+import { PageTree } from '../filetree/PageTree'
 import { useWindowBreakpoint } from '../../lib/hooks/useWindowBreakpoint'
 
 /**
- * Walk the tree and collect paths of every file the knowledge-graph SDK
- * can ingest (markdown, PDF, CSV, JSON, XLSX). The tree itself is already
- * filtered to supported extensions on the main-process side, but we guard
- * here defensively in case of stray nodes.
+ * LeftSidebar — the workspace page browser.
+ *
+ * Replaces the former filesystem folder browser. Shows the nested page
+ * tree from the workspace database, with actions to create pages and
+ * import/export Markdown.
  */
-function collectIngestableFiles(nodes: FileTreeNode[]): string[] {
-  const out: string[] = []
-  const visit = (n: FileTreeNode) => {
-    if (n.type === 'file' && isSupported(n.path)) out.push(n.path)
-    else if (n.children) n.children.forEach(visit)
-  }
-  nodes.forEach(visit)
-  return out
-}
-
-function FolderSection({ folderPath, folderName, tree, onClose, scrollParentRef }: {
-  folderPath: string
-  folderName: string
-  tree: FileTreeNode[]
-  onClose: () => void
-  scrollParentRef: RefObject<HTMLElement>
-}) {
-  const { t } = useTranslation()
-  const [expanded, setExpanded] = useState(true)
-  const insightGraphEnabled = useSettingsStore((s) => s.insightGraph.enabled)
-  const startBatchIngest = useBatchIngestStore((s) => s.startBatchIngest)
-  const batchStatus = useBatchIngestStore((s) => s.status)
-  const batchDone = useBatchIngestStore((s) => s.done.length)
-  const batchFailed = useBatchIngestStore((s) => s.failed.length)
-  const batchTotal = useBatchIngestStore((s) => s.total)
-
-  const createFolder = useFileStore((s) => s.createFolder)
-  const createNewFile = useFileStore((s) => s.createNewFile)
-  const ingestableFiles = useMemo(() => collectIngestableFiles(tree), [tree])
-
-  const handleBuildGraph = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (!ingestableFiles.length || batchStatus === 'running') return
-    void startBatchIngest(ingestableFiles)
-  }
-
-  const running = batchStatus === 'running'
-  const buildTitle = running
-    ? t('sidebar.ingestingGraph', { done: batchDone + batchFailed, total: batchTotal })
-    : ingestableFiles.length > 0
-      ? t('sidebar.buildGraph', { count: ingestableFiles.length })
-      : t('sidebar.buildGraphEmpty')
-
-  return (
-    <div className="border-b" style={{ borderColor: 'var(--border-color)' }}>
-      <div
-        className="flex items-center justify-between px-2 py-1.5 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer group"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <div className="flex items-center gap-1 min-w-0">
-          <ChevronRight
-            size={14}
-            className={clsx('transition-transform flex-shrink-0', expanded && 'rotate-90')}
-            style={{ color: 'var(--text-muted)' }}
-          />
-          <FolderOpen size={14} className="flex-shrink-0" style={{ color: 'var(--text-muted)' }} />
-          <span
-            className="text-xs font-semibold uppercase tracking-wider truncate"
-            style={{ color: 'var(--text-secondary)' }}
-            title={folderPath}
-          >
-            {folderName}
-          </span>
-        </div>
-        <div className="flex items-center gap-0.5 flex-shrink-0">
-          <button
-            onClick={(e) => { e.stopPropagation(); createFolder(folderPath) }}
-            className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 transition-all"
-            title={t('filetree.newFolder')}
-          >
-            <FolderPlus size={12} style={{ color: 'var(--text-muted)' }} />
-          </button>
-          {insightGraphEnabled && (
-            <button
-              onClick={handleBuildGraph}
-              disabled={running || ingestableFiles.length === 0}
-              className={clsx(
-                'p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-all',
-                running ? 'opacity-100' : 'opacity-0 group-hover:opacity-100',
-                'disabled:cursor-not-allowed',
-              )}
-              title={buildTitle}
-            >
-              {running ? (
-                <Loader2 size={12} className="animate-spin" style={{ color: 'var(--accent-color)' }} />
-              ) : batchStatus === 'done' && batchTotal > 0 ? (
-                <Database
-                  size={12}
-                  style={{ color: batchFailed > 0 ? 'var(--color-error)' : 'var(--accent-color)' }}
-                />
-              ) : (
-                <Database size={12} style={{ color: 'var(--text-muted)' }} />
-              )}
-            </button>
-          )}
-          <button
-            onClick={(e) => { e.stopPropagation(); onClose() }}
-            className="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 transition-all"
-            title={t('sidebar.closeFolder')}
-          >
-            <X size={12} style={{ color: 'var(--text-muted)' }} />
-          </button>
-        </div>
-      </div>
-      {expanded && (
-        <div className="pb-1">
-          {tree.length > 0 ? (
-            <FileTree nodes={tree} scrollParentRef={scrollParentRef} />
-          ) : (
-            <div className="px-3 py-3 text-center" style={{ color: 'var(--text-muted)' }}>
-              <p className="text-xs mb-2">{t('sidebar.emptyFolder')}</p>
-              <div className="flex items-center justify-center gap-2">
-                <button
-                  onClick={() => createNewFile(folderPath)}
-                  className="text-xs px-2 py-1 rounded border transition-colors hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-1"
-                  style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
-                >
-                  <FilePlus size={12} />
-                  {t('filetree.newFile')}
-                </button>
-                <button
-                  onClick={() => createFolder(folderPath)}
-                  className="text-xs px-2 py-1 rounded border transition-colors hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-1"
-                  style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
-                >
-                  <FolderPlus size={12} />
-                  {t('filetree.newFolder')}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
 export function LeftSidebar() {
   const { t } = useTranslation()
-  const openFolders = useFileStore((s) => s.openFolders)
-  const closeFolder = useFileStore((s) => s.closeFolder)
-  const openFolderDialog = useFileStore((s) => s.openFolderDialog)
-  const createNewFile = useFileStore((s) => s.createNewFile)
-  const createFolder = useFileStore((s) => s.createFolder)
+  const createPage = useWorkspaceStore((s) => s.createPage)
+  const importFile = useWorkspaceStore((s) => s.importFile)
+  const importFolder = useWorkspaceStore((s) => s.importFolder)
+  const pageTree = useWorkspaceStore((s) => s.pageTree)
+  const openPage = useWorkspaceStore((s) => s.openPage)
   const leftSidebarPinned = useUIStore((s) => s.leftSidebarPinned)
   const pinLeftSidebar = useUIStore((s) => s.pinLeftSidebar)
   const breakpoint = useWindowBreakpoint()
   const canPin = breakpoint === 'wide'
-  // The overflow-y-auto container serves as the scroll parent for all
-  // FileTree virtualizers so huge folders don't spawn a DOM node per
-  // file. We pass the ref down instead of letting FileTree introduce
-  // its own scroller (nested scrollers fragment navigation).
-  const scrollParentRef = useRef<HTMLDivElement>(null)
+
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<Array<{ id: string; title: string }>>([])
+
+  const handleSearch = async (q: string) => {
+    setQuery(q)
+    if (!q.trim()) { setResults([]); return }
+    try {
+      const found = await window.electronAPI.workspaceSearch(q.trim())
+      setResults(found.map((r) => ({ id: r.id, title: r.title })))
+    } catch {
+      setResults([])
+    }
+  }
 
   return (
     <div
       className="h-full flex flex-col border-r"
       style={{ backgroundColor: 'var(--bg-sidebar)', borderColor: 'var(--border-color)' }}
     >
+      {/* Header */}
       <div
         className="flex items-center justify-between px-3 py-2 border-b"
         style={{ borderColor: 'var(--border-color)' }}
       >
         <span className="text-xs font-semibold uppercase tracking-wider truncate min-w-0" style={{ color: 'var(--text-muted)' }}>
-          {t('sidebar.explorer')}
+          {t('sidebar.workspace', 'Workspace')}
         </span>
         <div className="flex items-center gap-1 flex-shrink-0">
           <button
-            onClick={() => createNewFile()}
+            onClick={() => void createPage('Untitled', null)}
             className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-            title={t('filetree.newFile')}
+            title={t('sidebar.newPage', 'New page')}
           >
             <FilePlus size={14} style={{ color: 'var(--text-muted)' }} />
           </button>
           <button
-            onClick={() => openFolders.length > 0 ? createFolder(openFolders[0].path) : undefined}
-            disabled={openFolders.length === 0}
-            className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            title={t('filetree.newFolder')}
+            onClick={() => void importFile(null)}
+            className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+            title={t('sidebar.importFile', 'Import Markdown')}
           >
-            <FolderPlus size={14} style={{ color: 'var(--text-muted)' }} />
+            <Upload size={14} style={{ color: 'var(--text-muted)' }} />
           </button>
           <button
-            onClick={openFolderDialog}
+            onClick={() => void importFolder(null)}
             className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-            title={openFolders.length > 0 ? t('sidebar.addFolder') : t('sidebar.openFolder')}
+            title={t('sidebar.importFolder', 'Import folder')}
           >
-            {openFolders.length > 0 ? (
-              <Plus size={14} style={{ color: 'var(--text-muted)' }} />
-            ) : (
-              <FolderOpen size={14} style={{ color: 'var(--text-muted)' }} />
-            )}
+            <FolderUp size={14} style={{ color: 'var(--text-muted)' }} />
           </button>
           {canPin && (
             <button
@@ -226,31 +90,76 @@ export function LeftSidebar() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto" ref={scrollParentRef}>
-        {openFolders.length > 0 ? (
-          openFolders.map((folder) => (
-            <FolderSection
-              key={folder.path}
-              folderPath={folder.path}
-              folderName={folder.name}
-              tree={folder.tree}
-              onClose={() => closeFolder(folder.path)}
-              scrollParentRef={scrollParentRef}
-            />
-          ))
+      {/* Search */}
+      <div className="px-2 py-1.5 border-b" style={{ borderColor: 'var(--border-color)' }}>
+        <div
+          className="flex items-center gap-1.5 px-2 py-1 rounded border"
+          style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-primary)' }}
+        >
+          <Search size={12} style={{ color: 'var(--text-muted)' }} />
+          <input
+            value={query}
+            onChange={(e) => void handleSearch(e.target.value)}
+            placeholder={t('sidebar.searchPages', 'Search pages...')}
+            className="flex-1 min-w-0 text-xs bg-transparent outline-none"
+            style={{ color: 'var(--text-primary)' }}
+          />
+          {query && (
+            <button onClick={() => handleSearch('')} className="p-0.5">
+              <X size={11} style={{ color: 'var(--text-muted)' }} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Body: search results or full tree */}
+      <div className="flex-1 overflow-y-auto">
+        {query.trim() ? (
+          results.length > 0 ? (
+            <div className="py-1">
+              {results.map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => void openPage(r.id)}
+                  className="w-full text-left px-3 py-1.5 text-sm truncate hover:bg-black/5 dark:hover:bg-white/5"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  {r.title || t('pagetree.untitled', 'Untitled')}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="px-3 py-4 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
+              {t('sidebar.noResults', 'No pages found')}
+            </div>
+          )
+        ) : pageTree.length > 0 ? (
+          <PageTree />
         ) : (
           <div className="px-3 py-4 text-center" style={{ color: 'var(--text-muted)' }}>
-            <p className="text-sm mb-2">{t('sidebar.noFolder')}</p>
+            <p className="text-sm mb-2">{t('sidebar.noPages', 'No pages yet')}</p>
             <button
-              onClick={openFolderDialog}
+              onClick={() => void createPage('Untitled', null)}
               className="text-xs px-3 py-1.5 rounded border transition-colors hover:bg-black/5 dark:hover:bg-white/5"
               style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
             >
-              {t('sidebar.openFolder')}
+              {t('sidebar.newPage', 'New page')}
             </button>
           </div>
         )}
       </div>
+
+      {/* Persistent footer — Notion-style "New page" affordance */}
+      {!query.trim() && pageTree.length > 0 && (
+        <button
+          onClick={() => void createPage('Untitled', null)}
+          className="flex items-center gap-2 px-3 py-2 border-t text-sm transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+          style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
+        >
+          <FilePlus size={14} />
+          {t('sidebar.newPage', 'New page')}
+        </button>
+      )}
     </div>
   )
 }

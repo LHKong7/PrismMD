@@ -127,6 +127,12 @@ app.on('before-quit', (event) => {
   // timeout race exists because a misbehaving MCP subprocess (not
   // SIGTERM-responsive) would otherwise keep the main process alive
   // forever, leaving orphan children in the user's process tree.
+  // Close workspace database synchronously (SQLite, no async needed)
+  try {
+    const { closeDb } = require('./services/workspaceDb')
+    closeDb()
+  } catch { /* DB may not have been opened */ }
+
   const shutdown = Promise.all([
     shutdownInsightGraph().catch(() => {}),
     shutdownMcpServers().catch(() => {}),

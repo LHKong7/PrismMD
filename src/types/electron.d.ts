@@ -1,7 +1,31 @@
+export interface WorkspacePage {
+  id: string
+  title: string
+  content: string
+  format: string
+  parentId: string | null
+  position: number
+  createdAt: number
+  updatedAt: number
+  isDeleted: boolean
+  icon: string | null
+}
+
+export interface PageTreeNode {
+  id: string
+  title: string
+  icon: string | null
+  format: string
+  parentId: string | null
+  position: number
+  children: PageTreeNode[]
+}
+
 export interface KBEntry {
   id: string
   title: string
-  originalPath: string
+  originalPath?: string
+  sourcePageId?: string
   tags: string[]
   summary: string
   addedAt: number
@@ -77,6 +101,7 @@ export interface ElectronAPI {
 
   // Knowledge Base
   kbAdd: (filePath: string, title?: string, tags?: string[]) => Promise<{ ok: boolean; entry?: KBEntry; error?: string }>
+  kbAddPage: (pageId: string, tags?: string[]) => Promise<{ ok: boolean; entry?: KBEntry; error?: string }>
   kbRemove: (id: string) => Promise<{ ok: boolean; error?: string }>
   kbList: () => Promise<{ ok: boolean; entries?: KBEntry[]; error?: string }>
   kbSearch: (query: string) => Promise<{ ok: boolean; entries?: KBEntry[]; error?: string }>
@@ -157,11 +182,32 @@ export interface ElectronAPI {
     content: string
   }> | null>
 
+  // Per-page TL;DR cache
+  docSummaryGet: (pageId: string) => Promise<null | { tldr: string; questions: string[]; generatedAt: number; signature: string }>
+  docSummarySet: (pageId: string, summary: { tldr: string; questions: string[]; generatedAt: number; signature: string }) => Promise<void>
+  docSummaryClear: () => Promise<void>
+
   // Memory
   memorySave: (filePath: string, summary: string, topics: string[]) => Promise<void>
   memoryGetContext: (filePath?: string, query?: string) => Promise<string>
   memoryExtractSummary: (messages: Array<{ role: string; content: string }>) => Promise<{ summary: string; topics: string[] }>
   memoryClear: () => Promise<void>
+
+  // Workspace
+  workspaceCreatePage: (title?: string, parentId?: string, content?: string) => Promise<{ ok: boolean; page?: WorkspacePage; error?: string }>
+  workspaceGetPage: (pageId: string) => Promise<WorkspacePage | null>
+  workspaceUpdatePage: (pageId: string, updates: Partial<Pick<WorkspacePage, 'title' | 'content' | 'parentId' | 'position' | 'icon' | 'format'>>) => Promise<{ ok: boolean; error?: string }>
+  workspaceDeletePage: (pageId: string) => Promise<{ ok: boolean; error?: string }>
+  workspaceRestorePage: (pageId: string) => Promise<{ ok: boolean; error?: string }>
+  workspaceGetChildren: (parentId: string | null) => Promise<WorkspacePage[]>
+  workspaceGetTree: () => Promise<PageTreeNode[]>
+  workspaceMovePage: (pageId: string, newParentId: string | null, position: number) => Promise<{ ok: boolean; error?: string }>
+  workspaceGetAncestors: (pageId: string) => Promise<Array<{ id: string; title: string; icon: string | null; format: string; updatedAt: number }>>
+  workspaceSearch: (query: string) => Promise<Array<{ id: string; title: string; icon: string | null; format: string; updatedAt: number }>>
+  workspaceGetPageCount: () => Promise<number>
+  workspaceImportFile: (parentId?: string) => Promise<{ ok: boolean; pages?: WorkspacePage[]; canceled?: boolean; error?: string }>
+  workspaceImportFolder: (parentId?: string) => Promise<{ ok: boolean; count?: number; canceled?: boolean; error?: string }>
+  workspaceExportPage: (pageId: string) => Promise<{ ok: boolean; filePath?: string; canceled?: boolean; error?: string }>
 
   // Platform
   platform: string

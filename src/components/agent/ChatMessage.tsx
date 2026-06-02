@@ -3,7 +3,7 @@ import { Bot, User, AlertCircle, RotateCcw, Copy, Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ChatMessage as ChatMessageType, CitationEvidence } from '../../store/agentStore'
 import { useAgentStore } from '../../store/agentStore'
-import { useFileStore } from '../../store/fileStore'
+import { useWorkspaceStore } from '../../store/workspaceStore'
 import { useReaderDomStore } from '../../store/readerDomStore'
 
 interface ChatMessageProps {
@@ -91,8 +91,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const isError = !isUser && message.status === 'error'
   const scrollToEvidence = useReaderDomStore((s) => s.scrollToEvidence)
   const retryMessage = useAgentStore((s) => s.retryMessage)
-  const currentContent = useFileStore((s) => s.currentContent)
-  const currentFilePath = useFileStore((s) => s.currentFilePath)
+  const currentContent = useWorkspaceStore((s) => s.currentContent)
+  const currentFilePath = useWorkspaceStore((s) => s.currentFilePath)
   const [copied, setCopied] = useState(false)
 
   const body = useMemo(() => {

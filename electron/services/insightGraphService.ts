@@ -7,13 +7,12 @@
  *
  * Exports the same functions the IPC handlers expect — zero renderer changes.
  */
-import { app, BrowserWindow } from 'electron'
-import path from 'path'
-import fs from 'fs/promises'
+import { BrowserWindow } from 'electron'
 import crypto from 'crypto'
 import neo4j, { type Driver, type Session } from 'neo4j-driver'
 import { getActiveProvider, getInsightGraphSettings, loadSettings, type InsightGraphSettings } from './settingsStore'
 import { agentWorker } from './agentWorkerManager'
+import { getPage } from './documentService'
 
 // ─── Error Types ────────────────────────────────────────────────────────────
 
@@ -71,7 +70,7 @@ export interface RelatedReport {
   reportId: string
   title?: string
   date?: string
-  sourcePath?: string
+  sourcePageId?: string
   sharedEntities: string[]
   sharedEntityCount: number
 }
@@ -183,11 +182,10 @@ interface ExtractedGraph {
 }
 
 export async function ingestDocument(
-  filePath: string,
+  pageId: string,
   win?: BrowserWindow | null,
 ): Promise<Record<string, unknown>> {
-  if (!filePath) throw new InsightGraphConfigError('No file path provided.')
-  await fs.access(filePath)
+  if (!pageId) throw new InsightGraphConfigError('No page ID provided.')
 
   const emit = (stage: string, extra?: Record<string, unknown>) => {
     if (win && !win.isDestroyed()) {
@@ -195,10 +193,12 @@ export async function ingestDocument(
     }
   }
 
-  // Phase 1: Parse
+  // Phase 1: Parse — read the page content from the workspace DB.
   emit('parsing')
-  const content = await fs.readFile(filePath, 'utf-8')
-  const fileName = path.basename(filePath)
+  const page = getPage(pageId)
+  if (!page) throw new InsightGraphConfigError('Page not found.')
+  const content = page.content
+  const fileName = page.title || 'Untitled'
   const reportId = crypto.randomUUID()
 
   // Phase 2: Extract via AI
@@ -225,8 +225,8 @@ export async function ingestDocument(
     await withSession(async (session) => {
       // Create report node
       await session.run(
-        'CREATE (r:Report { report_id: $reportId, title: $title, source_path: $sourcePath, source_filename: $fileName, created_at: datetime() })',
-        { reportId, title: extracted.title || fileName, sourcePath: filePath, fileName },
+        'CREATE (r:Report { report_id: $reportId, title: $title, source_page_id: $pageId, source_filename: $fileName, created_at: datetime() })',
+        { reportId, title: extracted.title || fileName, pageId, fileName },
       )
 
       // Create entities + link to report
@@ -627,7 +627,7 @@ export async function getRelatedReports(reportId: string, limit = 20): Promise<R
       'WHERE r1 <> r2 ' +
       'WITH r2, collect(DISTINCT coalesce(e.canonical_name, e.name)) AS names ' +
       'RETURN r2.report_id AS reportId, r2.title AS title, r2.date AS date, ' +
-      'r2.source_path AS sourcePath, names AS sharedEntities, size(names) AS sharedEntityCount ' +
+      'r2.source_page_id AS sourcePageId, names AS sharedEntities, size(names) AS sharedEntityCount ' +
       'ORDER BY sharedEntityCount DESC LIMIT $limit',
       { reportId, limit: neo4j.int(limit) },
     )
@@ -635,7 +635,7 @@ export async function getRelatedReports(reportId: string, limit = 20): Promise<R
       reportId: String(r.get('reportId')),
       title: (r.get('title') as string | null) ?? undefined,
       date: (r.get('date') as string | null) ?? undefined,
-      sourcePath: (r.get('sourcePath') as string | null) ?? undefined,
+      sourcePageId: (r.get('sourcePageId') as string | null) ?? undefined,
       sharedEntities: (r.get('sharedEntities') as string[]).filter(Boolean),
       sharedEntityCount: Number(r.get('sharedEntityCount') ?? 0),
     }))

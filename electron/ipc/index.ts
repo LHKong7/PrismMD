@@ -1,4 +1,3 @@
-import { registerFileHandlers } from './fileHandlers'
 import { registerThemeHandlers } from './themeHandlers'
 import { registerAnnotationHandlers } from './annotationHandlers'
 import { registerSettingsHandlers } from './settingsHandlers'
@@ -9,6 +8,7 @@ import { registerMcpHandlers } from './mcpHandlers'
 import { registerUpdaterHandlers } from './updaterHandlers'
 import { registerExportHandlers } from './exportHandlers'
 import { registerKnowledgeBaseHandlers } from './knowledgeBaseHandlers'
+import { registerWorkspaceHandlers } from './workspaceHandlers'
 import { getMainWindow } from '../main'
 
 /**
@@ -20,7 +20,6 @@ import { getMainWindow } from '../main'
 export { getMainWindow }
 
 export function registerIpcHandlers() {
-  registerFileHandlers()
   registerThemeHandlers()
   registerAnnotationHandlers()
   registerSettingsHandlers()
@@ -31,4 +30,5 @@ export function registerIpcHandlers() {
   registerUpdaterHandlers()
   registerExportHandlers()
   registerKnowledgeBaseHandlers()
+  registerWorkspaceHandlers()
 }

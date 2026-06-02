@@ -1,10 +1,11 @@
 .markdown-body {
   max-width: 48rem;
   margin: 0 auto;
-  padding: 2rem 1.5rem 4rem;
+  /* The PageHeader above supplies the top space; keep this tight. */
+  padding: 0.25rem 1.5rem 4rem;
   font-family: var(--font-body, inherit);
   font-size: 1rem;
-  line-height: 1.8;
+  line-height: 1.7;
   color: var(--text-primary);
 }
 
@@ -14,15 +15,16 @@
 .markdown-body h4,
 .markdown-body h5,
 .markdown-body h6 {
-  margin-top: 1.5em;
-  margin-bottom: 0.5em;
+  margin-top: 1.4em;
+  margin-bottom: 0.4em;
   font-weight: 600;
   line-height: 1.3;
   color: var(--text-primary);
 }
 
-.markdown-body h1 { font-size: 2em; border-bottom: 1px solid var(--border-color); padding-bottom: 0.3em; }
-.markdown-body h2 { font-size: 1.5em; border-bottom: 1px solid var(--border-color); padding-bottom: 0.3em; }
+/* Notion-style headings: no underlines, slightly tighter scale. */
+.markdown-body h1 { font-size: 1.875em; }
+.markdown-body h2 { font-size: 1.5em; }
 .markdown-body h3 { font-size: 1.25em; }
 .markdown-body h4 { font-size: 1.1em; }
 .markdown-body h5 { font-size: 1em; }

@@ -1,53 +1,24 @@
-import { app } from 'electron'
-import fs from 'fs/promises'
-import path from 'path'
-
 /**
- * Per-document TL;DR / suggested-question cache.
+ * Per-page TL;DR / suggested-question cache — SQLite, keyed by page ID.
  *
- * Kept separate from memoryService because the shape (structured JSON per
- * file) and purpose (avoid regenerating the TL;DR on every re-open) are
- * different. Same on-disk pattern — a single JSON blob under userData —
- * so it adds no new infra.
+ * Stored in the `doc_summaries` table of the workspace DB with a foreign
+ * key to `pages` (ON DELETE CASCADE). Avoids regenerating the TL;DR on
+ * every re-open.
  */
+import { getDb } from './workspaceDb'
 
 export interface DocSummary {
   /** A short 2–3 sentence overview of the document. */
   tldr: string
-  /** Three suggested questions the reader might ask about it. */
+  /** Suggested questions the reader might ask about it. */
   questions: string[]
   /** Unix ms when the summary was last (re)generated. */
   generatedAt: number
   /**
-   * Hash-ish stamp of the source content at generation time, so if the
-   * document changes substantially we can decide to invalidate.
-   * We use a cheap size+first-chars signature (not a crypto hash).
+   * Cheap size+first/last-chars signature of the source content at
+   * generation time, so substantial edits can invalidate the cache.
    */
   signature: string
-}
-
-interface SummaryStore {
-  summaries: Record<string, DocSummary>
-}
-
-function storeFile(): string {
-  return path.join(app.getPath('userData'), 'memory', 'docSummaries.json')
-}
-
-async function load(): Promise<SummaryStore> {
-  try {
-    const raw = await fs.readFile(storeFile(), 'utf-8')
-    const parsed = JSON.parse(raw) as Partial<SummaryStore>
-    return { summaries: parsed.summaries ?? {} }
-  } catch {
-    return { summaries: {} }
-  }
-}
-
-async function save(store: SummaryStore): Promise<void> {
-  const dir = path.dirname(storeFile())
-  await fs.mkdir(dir, { recursive: true })
-  await fs.writeFile(storeFile(), JSON.stringify(store, null, 2), 'utf-8')
 }
 
 /** Cheap non-crypto signature; enough to detect substantial edits. */
@@ -58,24 +29,44 @@ export function signatureForContent(content: string): string {
   return `${len}:${head}…${tail}`
 }
 
-export async function getDocSummary(filePath: string): Promise<DocSummary | null> {
-  const store = await load()
-  return store.summaries[filePath] ?? null
+export async function getDocSummary(pageId: string): Promise<DocSummary | null> {
+  const db = getDb()
+  const row = db.prepare('SELECT * FROM doc_summaries WHERE page_id = ?').get(pageId) as any
+  if (!row) return null
+  let questions: string[] = []
+  try {
+    questions = JSON.parse(row.questions ?? '[]')
+  } catch {
+    questions = []
+  }
+  return {
+    tldr: row.tldr ?? '',
+    questions,
+    generatedAt: row.generated_at ?? 0,
+    signature: row.signature ?? '',
+  }
 }
 
-export async function setDocSummary(filePath: string, summary: DocSummary): Promise<void> {
-  const store = await load()
-  store.summaries[filePath] = summary
-  // Keep bounded so the file never grows unbounded on huge workspaces.
-  const MAX_ENTRIES = 500
-  const entries = Object.entries(store.summaries)
-  if (entries.length > MAX_ENTRIES) {
-    entries.sort((a, b) => (b[1].generatedAt ?? 0) - (a[1].generatedAt ?? 0))
-    store.summaries = Object.fromEntries(entries.slice(0, MAX_ENTRIES))
-  }
-  await save(store)
+export async function setDocSummary(pageId: string, summary: DocSummary): Promise<void> {
+  const db = getDb()
+  db.prepare(`
+    INSERT INTO doc_summaries (page_id, tldr, questions, generated_at, signature)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(page_id) DO UPDATE SET
+      tldr = excluded.tldr,
+      questions = excluded.questions,
+      generated_at = excluded.generated_at,
+      signature = excluded.signature
+  `).run(
+    pageId,
+    summary.tldr,
+    JSON.stringify(summary.questions ?? []),
+    summary.generatedAt,
+    summary.signature,
+  )
 }
 
 export async function clearDocSummaries(): Promise<void> {
-  await save({ summaries: {} })
+  const db = getDb()
+  db.prepare('DELETE FROM doc_summaries').run()
 }

@@ -2,11 +2,15 @@ import { app } from 'electron'
 import fs from 'fs/promises'
 import path from 'path'
 import crypto from 'crypto'
+import { getPage } from './documentService'
 
 export interface KBEntry {
   id: string
   title: string
-  originalPath: string
+  /** Source file path (legacy, external imports). Optional in workspace model. */
+  originalPath?: string
+  /** Source workspace page ID (for pages added from the workspace). */
+  sourcePageId?: string
   tags: string[]
   summary: string
   addedAt: number
@@ -81,6 +85,37 @@ export async function addDocument(
   } else {
     index.push(entry)
   }
+  await saveIndex(index)
+
+  return entry
+}
+
+/**
+ * Add a workspace page to the Knowledge Base. Reads the page content from
+ * the document service and stores a copy. Dedupes by source page ID.
+ */
+export async function addPage(pageId: string, tags?: string[], summary?: string): Promise<KBEntry> {
+  await ensureKBDir()
+
+  const page = getPage(pageId)
+  if (!page) throw new Error('Page not found')
+
+  const id = crypto.randomUUID()
+  await fs.writeFile(path.join(getDocsDir(), `${id}.md`), page.content, 'utf-8')
+
+  const entry: KBEntry = {
+    id,
+    title: page.title || 'Untitled',
+    sourcePageId: pageId,
+    tags: tags ?? [],
+    summary: summary ?? '',
+    addedAt: Date.now(),
+  }
+
+  const index = await loadIndex()
+  const existing = index.findIndex((e) => e.sourcePageId === pageId)
+  if (existing >= 0) index[existing] = entry
+  else index.push(entry)
   await saveIndex(index)
 
   return entry

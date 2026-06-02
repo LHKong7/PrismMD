@@ -49,10 +49,10 @@ export function registerInsightGraphHandlers() {
     return testNeo4jConnection(uri, user, password)
   })
 
-  ipcMain.handle('insightgraph:ingest', async (_e, filePath: string) => {
+  ipcMain.handle('insightgraph:ingest', async (_e, pageId: string) => {
     const win = getMainWindow()
     try {
-      const result = await ingestDocument(filePath, win)
+      const result = await ingestDocument(pageId, win)
       return { ok: true as const, result }
     } catch (err) {
       return { ok: false as const, error: err instanceof Error ? err.message : String(err) }

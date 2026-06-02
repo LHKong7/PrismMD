@@ -1,6 +1,7 @@
 import { ipcMain } from 'electron'
 import {
   addDocument,
+  addPage,
   removeDocument,
   listDocuments,
   searchDocuments,
@@ -20,6 +21,15 @@ export function registerKnowledgeBaseHandlers() {
       }
     },
   )
+
+  ipcMain.handle('kb:add-page', async (_event, pageId: string, tags?: string[]) => {
+    try {
+      const entry = await addPage(pageId, tags)
+      return { ok: true, entry }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
 
   ipcMain.handle('kb:remove', async (_event, id: string) => {
     try {

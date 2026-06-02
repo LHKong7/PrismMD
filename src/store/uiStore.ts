@@ -270,8 +270,8 @@ export const useUIStore = create<UIStore>((set, get) => {
 
   splitPane: (direction) => {
     // Use dynamic import to avoid circular dependency with fileStore.
-    void import('./fileStore').then(({ useFileStore }) => {
-      const { activeTabId, tabs } = useFileStore.getState()
+    void import('./workspaceStore').then(({ useWorkspaceStore }) => {
+      const { activeTabId, tabs } = useWorkspaceStore.getState()
       const secondTab = tabs.find((t) => t.id !== activeTabId) ?? tabs[0] ?? null
       set((state) => ({
         splitLayout: {
@@ -298,8 +298,8 @@ export const useUIStore = create<UIStore>((set, get) => {
     debouncedSaveLayout(storeRef)
     // Sync global activeTabId to the focused pane's tab.
     if (activePane?.tabId) {
-      void import('./fileStore').then(({ useFileStore }) => {
-        useFileStore.getState().switchTab(activePane.tabId!)
+      void import('./workspaceStore').then(({ useWorkspaceStore }) => {
+        useWorkspaceStore.getState().switchTab(activePane.tabId!)
       })
     }
   },
@@ -319,8 +319,8 @@ export const useUIStore = create<UIStore>((set, get) => {
     // Sync global activeTabId to the new pane's tab.
     const pane = s.splitLayout.panes.find((p) => p.id === paneId)
     if (pane?.tabId) {
-      void import('./fileStore').then(({ useFileStore }) => {
-        useFileStore.getState().switchTab(pane.tabId!)
+      void import('./workspaceStore').then(({ useWorkspaceStore }) => {
+        useWorkspaceStore.getState().switchTab(pane.tabId!)
       })
     }
   },

@@ -31,9 +31,9 @@ const flashcardPlugin: Plugin = {
       group: 'FlashCards',
       icon: Layers,
       handler: async () => {
-        const { useFileStore } = await import('../../store/fileStore')
+        const { useWorkspaceStore } = await import('../../store/workspaceStore')
         const { useUIStore } = await import('../../store/uiStore')
-        const content = useFileStore.getState().currentContent
+        const content = useWorkspaceStore.getState().currentContent
         if (!content) {
           host.notify('No document open', 'error')
           return

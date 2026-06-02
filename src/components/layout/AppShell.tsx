@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { ChevronRight, ChevronLeft } from 'lucide-react'
 import { useUIStore } from '../../store/uiStore'
-import { useFileStore } from '../../store/fileStore'
+import { useWorkspaceStore } from '../../store/workspaceStore'
 import { useAgentStore } from '../../store/agentStore'
 import { useWindowBreakpoint } from '../../lib/hooks/useWindowBreakpoint'
 import { LeftSidebar } from './LeftSidebar'
@@ -14,7 +14,6 @@ import { ReadingProgress } from '../reader/ReadingProgress'
 import { AgentSidebar } from '../agent/AgentSidebar'
 import { GraphView } from '../graph/GraphView'
 import { ErrorBoundary } from '../ErrorBoundary'
-import { DeleteConfirmDialog } from '../filetree/DeleteConfirmDialog'
 
 export function AppShell() {
   const { t } = useTranslation()
@@ -32,7 +31,7 @@ export function AppShell() {
   const setLeftSidebarWidth = useUIStore((s) => s.setLeftSidebarWidth)
   const setRightSidebarWidth = useUIStore((s) => s.setRightSidebarWidth)
   const setAgentSidebarWidth = useUIStore((s) => s.setAgentSidebarWidth)
-  const toc = useFileStore((s) => s.toc)
+  const toc = useWorkspaceStore((s) => s.toc)
   const agentSidebarOpen = useAgentStore((s) => s.agentSidebarOpen)
   const setAgentSidebarOpen = useAgentStore((s) => s.setAgentSidebarOpen)
 
@@ -214,7 +213,6 @@ export function AppShell() {
         </>
       )}
 
-      <DeleteConfirmDialog />
 
       {/* Agent sidebar */}
       <div

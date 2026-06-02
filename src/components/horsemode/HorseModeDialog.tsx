@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { Zap, FolderOpen, X, FileText } from 'lucide-react'
+import { Zap, X, FileText } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { useFileStore } from '../../store/fileStore'
+import { useWorkspaceStore } from '../../store/workspaceStore'
 import { useEditorStore } from '../../store/editorStore'
 import { useHorseModeStore } from '../../store/horseModeStore'
 
@@ -11,60 +11,48 @@ interface Props {
   onClose: () => void
 }
 
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .slice(0, 60)
+/** Derive a human-friendly title from the task text. */
+function titleFromTask(text: string): string {
+  const clean = text.trim().replace(/\s+/g, ' ')
+  if (!clean) return ''
+  const firstLine = clean.split(/[.\n]/)[0]
+  return firstLine.slice(0, 60)
 }
 
 export function HorseModeDialog({ open, onClose }: Props) {
   const { t } = useTranslation()
-  const openFolders = useFileStore((s) => s.openFolders)
-  const currentFilePath = useFileStore((s) => s.currentFilePath)
-  const currentContent = useFileStore((s) => s.currentContent)
+  const currentPageId = useWorkspaceStore((s) => s.currentPageId)
+  const currentTitle = useWorkspaceStore((s) => s.currentTitle)
+  const currentContent = useWorkspaceStore((s) => s.currentContent)
   const editorContent = useEditorStore((s) => s.editorContent)
   const editing = useEditorStore((s) => s.editing)
   const start = useHorseModeStore((s) => s.start)
 
   const [task, setTask] = useState('')
-  const [targetDir, setTargetDir] = useState('')
-  const [fileName, setFileName] = useState('')
-  const [fileNameManual, setFileNameManual] = useState(false)
+  const [title, setTitle] = useState('')
+  const [titleManual, setTitleManual] = useState(false)
   const [useDocContext, setUseDocContext] = useState(false)
   const [iterations, setIterations] = useState(1)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  const hasDocument = !!currentFilePath
-  const currentFileName = currentFilePath?.split(/[/\\]/).pop() ?? ''
+  const hasDocument = !!currentPageId
   // Use editor content if editing, otherwise reader content
   const documentContent = editing ? editorContent : currentContent
 
-  // Default target directory to first open folder
+  // Auto-generate the title from the task until the user edits it.
   useEffect(() => {
-    if (open && openFolders.length > 0 && !targetDir) {
-      setTargetDir(openFolders[0].path)
+    if (!titleManual && task.trim()) {
+      setTitle(titleFromTask(task) || 'Untitled')
     }
-  }, [open, openFolders, targetDir])
-
-  // Auto-generate filename from task
-  useEffect(() => {
-    if (!fileNameManual && task.trim()) {
-      const slug = slugify(task) || 'untitled'
-      setFileName(`${slug}.md`)
-    }
-  }, [task, fileNameManual])
+  }, [task, titleManual])
 
   // Reset state on open
   useEffect(() => {
     if (open) {
       setTimeout(() => textareaRef.current?.focus(), 50)
       setTask('')
-      setFileName('')
-      setFileNameManual(false)
+      setTitle('')
+      setTitleManual(false)
       setUseDocContext(hasDocument)
       setIterations(1)
     }
@@ -80,20 +68,11 @@ export function HorseModeDialog({ open, onClose }: Props) {
     return () => window.removeEventListener('keydown', handler)
   }, [open, onClose])
 
-  const handleSelectDir = async () => {
-    try {
-      const result = await window.electronAPI.openFolderDialog()
-      if (typeof result === 'string' && result) {
-        setTargetDir(result)
-      }
-    } catch { /* cancelled */ }
-  }
-
   const handleStart = () => {
-    if (!task.trim() || !targetDir || !fileName) return
+    if (!task.trim() || !title.trim()) return
     onClose()
     const docCtx = useDocContext && documentContent ? documentContent : undefined
-    void start(task.trim(), targetDir, fileName, iterations, docCtx)
+    void start(task.trim(), title.trim(), iterations, docCtx)
   }
 
   if (!open) return null
@@ -153,7 +132,7 @@ export function HorseModeDialog({ open, onClose }: Props) {
                 <div className="flex items-center gap-1 mt-1">
                   <FileText size={11} style={{ color: 'var(--text-muted)' }} />
                   <span className="text-[11px] truncate" style={{ color: 'var(--text-muted)' }}>
-                    {currentFileName}
+                    {currentTitle ?? ''}
                   </span>
                 </div>
               </div>
@@ -190,48 +169,16 @@ export function HorseModeDialog({ open, onClose }: Props) {
             />
           </div>
 
-          {/* Target directory */}
+          {/* Page title */}
           <div>
             <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>
-              {t('horseMode.directoryLabel')}
-            </label>
-            <div className="flex gap-2">
-              <select
-                value={targetDir}
-                onChange={(e) => {
-                  if (e.target.value === '__browse__') {
-                    void handleSelectDir()
-                  } else {
-                    setTargetDir(e.target.value)
-                  }
-                }}
-                className="flex-1 text-xs px-3 py-1.5 rounded-lg border outline-none"
-                style={{
-                  backgroundColor: 'var(--bg-secondary)',
-                  borderColor: 'var(--border-color)',
-                  color: 'var(--text-primary)',
-                }}
-              >
-                {openFolders.map((f) => (
-                  <option key={f.path} value={f.path}>{f.name} — {f.path}</option>
-                ))}
-                {targetDir && !openFolders.some((f) => f.path === targetDir) && (
-                  <option value={targetDir}>{targetDir}</option>
-                )}
-                <option value="__browse__">📂 {t('horseMode.browse')}...</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Filename */}
-          <div>
-            <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>
-              {t('horseMode.fileNameLabel')}
+              {t('horseMode.pageTitleLabel', 'Page title')}
             </label>
             <input
               type="text"
-              value={fileName}
-              onChange={(e) => { setFileName(e.target.value); setFileNameManual(true) }}
+              value={title}
+              onChange={(e) => { setTitle(e.target.value); setTitleManual(true) }}
+              placeholder={t('horseMode.pageTitlePlaceholder', 'Untitled')}
               className="w-full text-sm px-3 py-1.5 rounded-lg border outline-none"
               style={{
                 backgroundColor: 'var(--bg-secondary)',
@@ -289,7 +236,7 @@ export function HorseModeDialog({ open, onClose }: Props) {
             </button>
             <button
               onClick={handleStart}
-              disabled={!task.trim() || !targetDir || !fileName}
+              disabled={!task.trim() || !title.trim()}
               className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-40"
               style={{ backgroundColor: 'var(--accent-color)', color: '#fff' }}
             >

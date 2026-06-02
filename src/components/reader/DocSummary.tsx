@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Sparkles, RefreshCw, X, ChevronRight, Network } from 'lucide-react'
-import { useFileStore } from '../../store/fileStore'
 import { useAgentStore } from '../../store/agentStore'
 import { usePaneFileData } from '../../hooks/usePaneFileData'
 import { useSettingsStore } from '../../store/settingsStore'

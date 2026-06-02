@@ -1,7 +1,7 @@
-import { useFileStore } from '../../store/fileStore'
+import { useWorkspaceStore } from '../../store/workspaceStore'
 import { useTaskStore } from '../../plugins/workspace/useTaskStore'
 import { useAgentLogStore } from '../../store/agentLogStore'
-import { getRecentDiaryPaths } from './diaryService'
+import { getRecentDiaryPageIds } from './diaryService'
 
 function getWeekNumber(date: Date): number {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
@@ -15,22 +15,15 @@ export async function generateWeeklySummary(): Promise<boolean> {
   const log = (msg: string, level: 'info' | 'success' | 'error' = 'info') =>
     useAgentLogStore.getState().log('system', msg, level)
 
-  const folders = useFileStore.getState().openFolders
-  if (folders.length === 0) {
-    const { useToastStore } = await import('../../store/toastStore')
-    useToastStore.getState().show('error', 'Please open a folder first.')
-    return false
-  }
-
   log('Generating weekly summary...')
 
-  // Collect diary entries from past 7 days
-  const diaryPaths = await getRecentDiaryPaths(7)
+  // Collect diary entries from past 7 days (workspace pages)
+  const diaryPageIds = await getRecentDiaryPageIds(7)
   const diaryContents: string[] = []
-  for (const p of diaryPaths) {
+  for (const id of diaryPageIds) {
     try {
-      const content = await window.electronAPI.readFile(p)
-      diaryContents.push(`--- ${p.split('/').pop()} ---\n${content}`)
+      const page = await window.electronAPI.workspaceGetPage(id)
+      if (page) diaryContents.push(`--- ${page.title} ---\n${page.content}`)
     } catch { /* skip */ }
   }
 
@@ -72,21 +65,21 @@ Write in the same language as the diary entries. Format as markdown.`,
       return false
     }
 
-    // Save file
+    // Create a workspace page for the summary.
     const now = new Date()
     const year = now.getFullYear()
     const week = getWeekNumber(now).toString().padStart(2, '0')
-    const dir = `${folders[0].path}/diary`
+    const title = `Weekly Review ${year}-W${week}`
 
-    const dirExists = await window.electronAPI.exists(dir)
-    if (!dirExists) await window.electronAPI.createDirectory(dir)
+    const ws = useWorkspaceStore.getState()
+    const pageId = await ws.createPage(title, null)
+    if (pageId) {
+      await ws.savePage(pageId, res.result.reply.trim())
+      await ws.loadTree()
+      await ws.openPage(pageId)
+    }
 
-    const filePath = `${dir}/weekly-${year}-W${week}.md`
-    await window.electronAPI.writeFile(filePath, res.result.reply.trim())
-
-    log(`Saved to ${filePath}`, 'success')
-
-    await useFileStore.getState().openFile(filePath)
+    log(`Created page "${title}"`, 'success')
 
     const { useToastStore } = await import('../../store/toastStore')
     useToastStore.getState().show('success', 'Weekly summary generated!')

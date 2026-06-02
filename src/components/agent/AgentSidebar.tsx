@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { Send, Square, Trash2, Bot, ChevronDown, Brain, AlertTriangle, X, ArrowDown, Download, BookOpen } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAgentStore, type ChatMessage as ChatMessageType } from '../../store/agentStore'
-import { useFileStore } from '../../store/fileStore'
+import { useWorkspaceStore } from '../../store/workspaceStore'
 import { useSettingsStore, DEFAULT_MODELS, type AIProvider } from '../../store/settingsStore'
 import { useUIStore } from '../../store/uiStore'
 import { usePromptLibraryStore } from '../../store/promptLibraryStore'
@@ -37,8 +37,8 @@ export function AgentSidebar() {
   const sendMessage = useAgentStore((s) => s.sendMessage)
   const stopGeneration = useAgentStore((s) => s.stopGeneration)
   const clearMessages = useAgentStore((s) => s.clearMessages)
-  const currentContent = useFileStore((s) => s.currentContent)
-  const currentFilePath = useFileStore((s) => s.currentFilePath)
+  const currentContent = useWorkspaceStore((s) => s.currentContent)
+  const currentFilePath = useWorkspaceStore((s) => s.currentFilePath)
   const activeProvider = useSettingsStore((s) => s.activeProvider)
   const providers = useSettingsStore((s) => s.providers)
   const privacyMode = useSettingsStore((s) => s.privacyMode)

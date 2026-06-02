@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useFileStore } from '../../store/fileStore'
+import { useWorkspaceStore } from '../../store/workspaceStore'
 import { useEditorStore } from '../../store/editorStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
@@ -25,7 +25,7 @@ export function StatusBar() {
   const agentLogOpen = useAgentLogStore((s) => s.panelOpen)
   const toggleAgentLog = useAgentLogStore((s) => s.togglePanel)
   const clearAgentLog = useAgentLogStore((s) => s.clear)
-  const currentContent = useFileStore((s) => s.currentContent)
+  const currentContent = useWorkspaceStore((s) => s.currentContent)
   const editing = useEditorStore((s) => s.editing)
   const isDirty = useEditorStore((s) => s.isDirty)
   const language = useSettingsStore((s) => s.language)

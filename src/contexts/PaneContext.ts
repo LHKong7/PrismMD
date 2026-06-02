@@ -3,7 +3,9 @@ import type { FileFormat } from '../lib/fileFormat'
 
 export interface PaneData {
   paneId: string
+  /** Page ID of the document in this pane (legacy field name). */
   filePath: string | null
+  title?: string | null
   content: string | null
   format: FileFormat | null
   bytes: ArrayBuffer | null

@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FileText, Loader2, Share2 } from 'lucide-react'
-import { useFileStore } from '../../store/fileStore'
+import { useWorkspaceStore } from '../../store/workspaceStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
 
 interface RelatedReport {
   reportId: string
   title?: string
   date?: string
-  sourcePath?: string
+  sourcePageId?: string
   sharedEntities: string[]
   sharedEntityCount: number
 }
@@ -25,8 +25,8 @@ interface RelatedReport {
  */
 export function RelatedRail() {
   const { t } = useTranslation()
-  const currentFilePath = useFileStore((s) => s.currentFilePath)
-  const openFile = useFileStore((s) => s.openFile)
+  const currentFilePath = useWorkspaceStore((s) => s.currentFilePath)
+  const openPage = useWorkspaceStore((s) => s.openPage)
   const reports = useInsightGraphStore((s) => s.reports)
   const refreshReports = useInsightGraphStore((s) => s.refreshReports)
 
@@ -134,14 +134,13 @@ export function RelatedRail() {
   return (
     <div className="px-2 py-2 space-y-1 overflow-y-auto h-full">
       {items.map((r) => {
-        const label =
-          r.title ?? (r.sourcePath ? r.sourcePath.split(/[/\\]/).pop() : undefined) ?? r.reportId
-        const canOpen = !!r.sourcePath
+        const label = r.title ?? r.reportId
+        const canOpen = !!r.sourcePageId
         return (
           <button
             key={r.reportId}
             onClick={() => {
-              if (canOpen && r.sourcePath) openFile(r.sourcePath)
+              if (canOpen && r.sourcePageId) void openPage(r.sourcePageId)
             }}
             disabled={!canOpen}
             className="w-full text-left p-2 rounded border transition-colors hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-60 disabled:cursor-not-allowed"
