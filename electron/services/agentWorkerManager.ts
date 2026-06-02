@@ -143,8 +143,10 @@ class AgentWorkerPool {
     })
 
     worker.on('exit', (code) => {
-      if (code !== 0 && pw.pendingReject) {
-        pw.pendingReject(new Error(`Agent worker exited with code ${code}`))
+      // Always reject pending tasks on exit — even clean exit (code 0)
+      // mid-task means something went wrong
+      if (pw.pendingReject) {
+        pw.pendingReject(new Error(`Agent worker exited unexpectedly (code ${code})`))
       }
       this.removeWorker(pw)
       this.drainQueue()
@@ -186,7 +188,13 @@ class AgentWorkerPool {
 
   private drainQueue() {
     while (this.queue.length > 0) {
-      const pw = this.acquireWorker()
+      let pw: PooledWorker | null
+      try {
+        pw = this.acquireWorker()
+      } catch {
+        // spawnWorker() failed — stop draining, tasks stay queued
+        break
+      }
       if (!pw) break
       const task = this.queue.shift()!
       this.dispatch(pw, task)
@@ -315,9 +323,12 @@ class AgentWorkerPool {
    * Abort the currently streaming operation (targets the worker running a stream task).
    */
   abort(): void {
-    const streaming = this.pool.find((pw) => pw.busy && pw.taskType === 'stream')
-    if (streaming) {
-      streaming.worker.postMessage({ type: 'abort' })
+    // Abort any busy worker running a stream or autonomous task (Horse Mode)
+    const target = this.pool.find(
+      (pw) => pw.busy && (pw.taskType === 'stream' || pw.taskType === 'run-task'),
+    )
+    if (target) {
+      target.worker.postMessage({ type: 'abort' })
     }
   }
 

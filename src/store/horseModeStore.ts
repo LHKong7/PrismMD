@@ -56,6 +56,8 @@ export const useHorseModeStore = create<HorseModeStore>((set, get) => ({
 
     const filePath = `${targetDir}/${fileName}`
 
+    // Subscribe to progress events — cleanup in finally to prevent leaks
+    let progressCleanup: (() => void) | null = null
     try {
       // Build the system prompt from prompt config
       const systemPrompt = hasDocContext
@@ -67,8 +69,7 @@ export const useHorseModeStore = create<HorseModeStore>((set, get) => ({
         ? `## Reference Document\n\n${documentContent!.slice(0, 12000)}\n\n---\n\n## Task\n\n${task}`
         : task
 
-      // Subscribe to progress events
-      const cleanup = window.electronAPI.onAgentTaskProgress((progress) => {
+      progressCleanup = window.electronAPI.onAgentTaskProgress((progress) => {
         if (get().cancelled) return
         set({
           currentIteration: progress.iteration,
@@ -85,8 +86,6 @@ export const useHorseModeStore = create<HorseModeStore>((set, get) => ({
         qualityThreshold: 7,
         maxIterations: iterations,
       })
-
-      cleanup()
 
       if (!res.ok) {
         set({ stage: 'failed', error: res.error })
@@ -191,6 +190,8 @@ export const useHorseModeStore = create<HorseModeStore>((set, get) => ({
       hlog(`Error: ${msg}`, 'error')
       const { useToastStore } = await import('./toastStore')
       useToastStore.getState().show('error', `Horse Mode failed: ${msg}`)
+    } finally {
+      progressCleanup?.()
     }
   },
 

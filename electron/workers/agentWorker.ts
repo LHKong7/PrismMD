@@ -25,7 +25,9 @@ function checkAbort(): boolean {
 
 // ─── Tool Call Proxy ────────────────────────────────────────────────────────
 
-const pendingToolCalls = new Map<string, { resolve: (result: string) => void }>()
+const TOOL_CALL_TIMEOUT_MS = 30_000
+
+const pendingToolCalls = new Map<string, { resolve: (result: string) => void; timer: ReturnType<typeof setTimeout> }>()
 
 function createProxiedTools(
   toolDefs: Array<{ name: string; description: string; parameters?: Record<string, any>; required?: string[] }>,
@@ -39,7 +41,14 @@ function createProxiedTools(
       const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
       parentPort!.postMessage({ type: 'tool-call-request', id, name: def.name, args })
       return new Promise<string>((resolve) => {
-        pendingToolCalls.set(id, { resolve })
+        const timer = setTimeout(() => {
+          pendingToolCalls.delete(id)
+          resolve(`Error: Tool call "${def.name}" timed out after ${TOOL_CALL_TIMEOUT_MS / 1000}s`)
+        }, TOOL_CALL_TIMEOUT_MS)
+        pendingToolCalls.set(id, {
+          resolve: (result) => { clearTimeout(timer); resolve(result) },
+          timer,
+        })
       })
     },
   }))
