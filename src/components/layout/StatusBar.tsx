@@ -4,6 +4,7 @@ import { useWorkspaceStore } from '../../store/workspaceStore'
 import { useEditorStore } from '../../store/editorStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
+import { getThemeById } from '../../lib/theme/themes'
 import { useBatchIngestStore } from '../../store/batchIngestStore'
 import { useUpdaterStore } from '../../store/updaterStore'
 import { useUIStore } from '../../store/uiStore'
@@ -32,6 +33,7 @@ export function StatusBar() {
   const activeProvider = useSettingsStore((s) => s.activeProvider)
   const providers = useSettingsStore((s) => s.providers)
   const privacyMode = useSettingsStore((s) => s.privacyMode)
+  const themeId = useSettingsStore((s) => s.themeId)
   const [expanded, setExpanded] = useState(false)
 
   const stats = useMemo(() => {
@@ -70,8 +72,8 @@ export function StatusBar() {
 
   return (
     <div
-      className="flex items-center justify-between px-3 h-6 text-[11px] select-none flex-shrink-0 border-t"
-      style={{ backgroundColor: 'var(--bg-sidebar)', borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
+      className="flex items-center justify-between px-3 h-[26px] text-[11px] select-none flex-shrink-0 border-t"
+      style={{ backgroundColor: 'var(--titlebar, var(--bg-sidebar))', borderColor: 'var(--border-color)', color: 'var(--text-muted)', fontFamily: 'var(--font-ui)' }}
     >
       <div className="flex items-center gap-3">
         {/* Deep editing indicator */}
@@ -263,6 +265,12 @@ export function StatusBar() {
         ) : (
           <span>{t('statusBar.ready')}</span>
         )}
+
+        {/* Active reading identity */}
+        <span className="flex items-center gap-1.5">
+          <span className="w-[7px] h-[7px] rounded-full" style={{ backgroundColor: 'var(--accent-color)' }} />
+          {getThemeById(themeId)?.name ?? themeId}
+        </span>
       </div>
     </div>
   )

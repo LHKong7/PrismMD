@@ -16,13 +16,15 @@ interface Props {
   toc: TocEntry[]
 }
 
+// Theme-aware so the contextual minimap rides every Prism identity instead of
+// fighting it with hardcoded blues/greys.
 const CODE_COLORS: Record<string, string> = {
-  ok: '#9ca3af',
-  broken: '#ef4444',
-  empty: '#ef4444',
+  ok: 'var(--accent-color)',
+  broken: 'var(--color-error)',
+  empty: 'var(--color-error)',
 }
 
-const HEADING_COLOR = '#3b82f6'
+const HEADING_COLOR = 'var(--text-muted)'
 
 export function MiniMap({ scrollRef, codeMarkers, toc }: Props) {
   const [markers, setMarkers] = useState<MarkerPosition[]>([])

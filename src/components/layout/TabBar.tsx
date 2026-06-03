@@ -204,18 +204,19 @@ function TabItem({
       }}
       className={clsx(
         'group flex items-center gap-1.5 px-3 cursor-pointer select-none shrink-0',
-        'border-r text-xs transition-colors',
-        isActive
-          ? 'border-b-2'
-          : 'hover:bg-black/5 dark:hover:bg-white/5',
+        'text-xs transition-colors',
+        !isActive && 'hover:bg-black/5 dark:hover:bg-white/5',
       )}
       style={{
         height: 32,
         maxWidth: 180,
-        borderRightColor: 'var(--border-color)',
-        borderBottomColor: isActive ? 'var(--accent-primary)' : 'transparent',
+        borderTopLeftRadius: 8,
+        borderTopRightRadius: 8,
+        borderTop: isActive ? '2px solid var(--accent-color)' : '2px solid transparent',
+        borderRight: '1px solid var(--border-color)',
         backgroundColor: isActive ? 'var(--bg-primary)' : undefined,
         color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
+        fontFamily: 'var(--font-ui)',
       }}
       title={tab.title}
       role="tab"

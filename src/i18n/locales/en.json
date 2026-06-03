@@ -68,12 +68,23 @@
     "relatedSoon": "Related documents will appear here once documents share entities.",
     "noHeadings": "No headings found",
     "pinSidebar": "Pin sidebar",
-    "unpinSidebar": "Unpin sidebar"
+    "unpinSidebar": "Unpin sidebar",
+    "workspace": "Workspace",
+    "newPage": "New page",
+    "importFile": "Import Markdown",
+    "importFolder": "Import folder",
+    "searchPages": "Search pages…",
+    "noPages": "No pages yet",
+    "noResults": "No pages found"
+  },
+  "pagetree": {
+    "untitled": "Untitled"
   },
   "titlebar": {
     "toggleFileTree": "Toggle file tree",
     "toggleOutline": "Toggle outline",
     "toggleAgent": "Toggle AI Assistant",
+    "ask": "Ask",
     "settings": "Settings",
     "theme": "Theme",
     "showGraph": "Show Knowledge Graph",
@@ -206,12 +217,20 @@
       "morning": "Good morning",
       "afternoon": "Good afternoon",
       "evening": "Good evening",
+      "night": "Still up",
       "todayDiary": "Today's Diary",
       "diaryHint": "Click to open or create today's journal entry.",
       "tasks": "Tasks",
+      "todayTasks": "Today's tasks",
+      "noTasks": "Nothing due — enjoy the quiet.",
       "recentFiles": "Recent Files",
+      "recent": "Recent",
       "quickActions": "Quick Actions",
-      "diary": "Diary"
+      "diary": "Diary",
+      "dailyJournal": "Daily journal",
+      "blankDoc": "Blank document",
+      "journalSub": "Today's entry",
+      "importSub": "Bring a file in"
     },
     "tasks": {
       "addPlaceholder": "Add a task...",
@@ -226,6 +245,7 @@
     "print": "Print"
   },
   "commandPalette": {
+    "title": "Search",
     "placeholder": "Search files or commands...",
     "noResults": "No results found.",
     "recentFiles": "Recent Files",
@@ -265,7 +285,9 @@
       "light": "Light",
       "dark": "Dark",
       "system": "System",
-      "followSystem": "Follow system appearance"
+      "followSystem": "Follow system appearance",
+      "identities": "Reading identities",
+      "morePresets": "More presets"
     },
     "editor": {
       "title": "Editor",
@@ -526,7 +548,8 @@
     "close": "Close"
   },
   "highlightPopover": {
-    "highlightAs": "Highlight as {{color}}"
+    "highlightAs": "Highlight as {{color}}",
+    "askPrism": "Ask Prism"
   },
   "docSummary": {
     "title": "AI Summary",

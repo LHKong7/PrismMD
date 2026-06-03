@@ -10,7 +10,8 @@ export function ReadingProgress() {
         id="reading-progress-bar"
         style={{
           width: '0%',
-          backgroundColor: 'var(--progress-bar)',
+          // Prism's refracted spectrum — read progress literally refracts.
+          background: 'var(--prism-gradient, var(--progress-bar))',
         }}
       />
     </div>

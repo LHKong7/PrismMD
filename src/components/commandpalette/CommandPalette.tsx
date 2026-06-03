@@ -88,15 +88,18 @@ export function CommandPalette({ onOpenSettings, onOpenHorseMode }: CommandPalet
 
   if (!open) return null
 
-  const cls = "flex items-center gap-2 px-3 py-2 mx-2 rounded text-sm cursor-pointer aria-selected:bg-black/5 dark:aria-selected:bg-white/5"
+  const cls = "flex items-center gap-2.5 px-3 py-2 mx-2 rounded-lg text-sm cursor-pointer aria-selected:bg-[var(--accent-soft,rgba(0,0,0,0.06))] aria-selected:text-[var(--text-primary)]"
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]" onClick={() => setOpen(false)}>
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh] prism-fade-in" onClick={() => setOpen(false)}>
+      <div
+        className="absolute inset-0 backdrop-blur-[3px]"
+        style={{ backgroundColor: 'color-mix(in srgb, var(--text-primary) 28%, transparent)' }}
+      />
       <div
         ref={dialogRef}
-        className="relative w-full max-w-lg rounded-xl overflow-hidden shadow-2xl border"
-        style={{ backgroundColor: 'var(--bg-primary)', borderColor: 'var(--border-color)' }}
+        className="relative w-full max-w-xl rounded-2xl overflow-hidden border prism-fade-scale-in"
+        style={{ backgroundColor: 'var(--bg-secondary, var(--bg-primary))', borderColor: 'var(--border-color)', boxShadow: 'var(--shadow-lg, 0 24px 64px -18px rgba(0,0,0,.4))', fontFamily: 'var(--font-ui)' }}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -104,13 +107,22 @@ export function CommandPalette({ onOpenSettings, onOpenHorseMode }: CommandPalet
         tabIndex={-1}
       >
         <Command value={search} onValueChange={setSearch}
-          className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-2 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-semibold"
+          className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pt-3 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider"
           style={{ color: 'var(--text-primary)' }}>
-          <Command.Input
-            placeholder={t('commandPalette.placeholder')}
-            className="w-full px-4 py-3 text-sm outline-none border-b bg-transparent"
-            style={{ borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
-          />
+          <div className="flex items-center gap-3 px-4 border-b" style={{ borderColor: 'var(--border-color)' }}>
+            <Search size={16} style={{ color: 'var(--text-muted)' }} />
+            <Command.Input
+              placeholder={t('commandPalette.placeholder')}
+              className="flex-1 py-3.5 text-base outline-none bg-transparent"
+              style={{ color: 'var(--text-primary)' }}
+            />
+            <span
+              className="text-[10px] px-1.5 py-0.5 rounded border font-mono"
+              style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}
+            >
+              esc
+            </span>
+          </div>
           <Command.List className="max-h-72 overflow-y-auto py-2">
             <Command.Empty className="px-4 py-6 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
               {t('commandPalette.noResults')}

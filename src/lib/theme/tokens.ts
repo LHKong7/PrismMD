@@ -74,6 +74,22 @@ export const graphPalette = [
   '#84cc16', // lime
 ] as const
 
+/**
+ * Prism's refracted spectrum — the signature motif of the "reading instrument"
+ * identity. Drives the reading-progress bar gradient, knowledge-graph clusters,
+ * and the pipeline diagram. Unlike `graphPalette` (generic dataviz hues), these
+ * are warm, paper-friendly tones tuned to sit on the Parchment/Campfire/Newsprint
+ * surfaces. Order: ember · amber · gold · sage · slate · iris.
+ */
+export const prismSpectrum = [
+  '#c2532f', // ember
+  '#cf7a2a', // amber
+  '#c9a52a', // gold
+  '#5b8b4e', // sage
+  '#3a7196', // slate
+  '#6a5aa0', // iris
+] as const
+
 export type Spacing = keyof typeof spacing
 export type Radius = keyof typeof radius
 export type Shadow = keyof typeof shadow

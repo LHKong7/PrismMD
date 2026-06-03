@@ -112,82 +112,94 @@ export function HighlightPopover({ onHighlight }: HighlightPopoverProps) {
 
   return (
     <div
-      className="fixed z-50 flex items-center gap-1 p-1.5 rounded-lg shadow-lg border"
+      className="fixed z-50 prism-fade-scale-in"
       style={{
         left: position.x,
         top: position.y,
         transform: 'translate(-50%, -100%)',
-        backgroundColor: 'var(--bg-primary)',
-        borderColor: 'var(--border-color)',
       }}
       onClick={(e) => e.stopPropagation()}
     >
-      {COLORS.map(({ name, bg }) => (
-        <button
-          key={name}
-          onClick={() => {
-            onHighlight(selectedText, name)
-            setPosition(null)
-            window.getSelection()?.removeAllRanges()
-          }}
-          className="w-5 h-5 rounded-full border transition-transform hover:scale-125"
-          style={{
-            backgroundColor: bg,
-            borderColor: 'var(--border-color)',
-          }}
-          title={t('highlightPopover.highlightAs', { color: name })}
-        />
-      ))}
-
+      {/* Dark "instrument" pill — the design's selection → AI bubble */}
       <div
-        className="w-px h-5 mx-1"
-        style={{ backgroundColor: 'var(--border-color)' }}
+        className="flex items-center gap-1 p-1.5 rounded-[10px]"
+        style={{ backgroundColor: 'var(--text-primary)', boxShadow: 'var(--shadow-lg, 0 12px 32px -8px rgba(0,0,0,.5))' }}
+      >
+        {!aiDisabled && (
+          <>
+            <button
+              onClick={() => runAIAction('explain')}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md font-semibold transition-opacity hover:opacity-90"
+              style={{ color: 'var(--bg-primary)', fontFamily: 'var(--font-ui)', fontSize: 12 }}
+              title={t('selectionAI.action.explain')}
+            >
+              <span style={{ color: 'var(--accent-color)' }}>✦</span>
+              {t('highlightPopover.askPrism', 'Ask Prism')}
+            </button>
+            <Divider />
+          </>
+        )}
+
+        {COLORS.map(({ name, bg }) => (
+          <button
+            key={name}
+            onClick={() => {
+              onHighlight(selectedText, name)
+              setPosition(null)
+              window.getSelection()?.removeAllRanges()
+            }}
+            className="w-4 h-4 rounded-full transition-transform hover:scale-125"
+            style={{ backgroundColor: bg, border: '1px solid rgba(0,0,0,.12)' }}
+            title={t('highlightPopover.highlightAs', { color: name })}
+          />
+        ))}
+
+        {!aiDisabled && (
+          <>
+            <Divider />
+            <PillIcon onClick={() => runAIAction('translate')} title={t('selectionAI.action.translate')}>
+              <Languages size={13} />
+            </PillIcon>
+            <PillIcon onClick={() => runAIAction('simplify')} title={t('selectionAI.action.simplify')}>
+              <Minimize2 size={13} />
+            </PillIcon>
+          </>
+        )}
+        {aiDisabled && (
+          <span className="px-1.5 opacity-40" style={{ color: 'var(--bg-primary)' }}>
+            <Sparkles size={13} />
+          </span>
+        )}
+      </div>
+      {/* Pointer */}
+      <div
+        className="absolute left-1/2 -bottom-1 w-2.5 h-2.5"
+        style={{ backgroundColor: 'var(--text-primary)', transform: 'translateX(-50%) rotate(45deg)' }}
         aria-hidden
       />
-
-      <AIActionButton
-        disabled={aiDisabled}
-        onClick={() => runAIAction('explain')}
-        title={t('selectionAI.action.explain')}
-      >
-        <Sparkles size={13} />
-      </AIActionButton>
-      <AIActionButton
-        disabled={aiDisabled}
-        onClick={() => runAIAction('translate')}
-        title={t('selectionAI.action.translate')}
-      >
-        <Languages size={13} />
-      </AIActionButton>
-      <AIActionButton
-        disabled={aiDisabled}
-        onClick={() => runAIAction('simplify')}
-        title={t('selectionAI.action.simplify')}
-      >
-        <Minimize2 size={13} />
-      </AIActionButton>
     </div>
   )
 }
 
-function AIActionButton({
+function Divider() {
+  return <span className="w-px h-[18px] mx-0.5" style={{ backgroundColor: 'rgba(255,255,255,.16)' }} aria-hidden />
+}
+
+function PillIcon({
   onClick,
   title,
-  disabled,
   children,
 }: {
   onClick: () => void
   title: string
-  disabled?: boolean
   children: React.ReactNode
 }) {
   return (
     <button
       onClick={onClick}
       title={title}
-      disabled={disabled}
-      className="w-6 h-6 flex items-center justify-center rounded transition-colors hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed"
-      style={{ color: 'var(--text-secondary)' }}
+      className="w-7 h-7 flex items-center justify-center rounded-md transition-colors hover:bg-white/10"
+      style={{ color: 'var(--bg-primary)', opacity: 0.85 }}
     >
       {children}
     </button>

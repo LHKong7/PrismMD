@@ -44,6 +44,29 @@
   --motion-slow: 320ms;
   --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --motion-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ── Prism "reading instrument" type system ──
+   * Four roles, theme-independent: Newsreader (display/titles), Spectral
+   * (reading body — literally spectral, on-theme), Hanken Grotesk (UI chrome),
+   * JetBrains Mono (code). CJK fallbacks keep zh content coherent. */
+  --font-display: 'Newsreader', 'Noto Serif SC', 'Songti SC', Georgia, serif;
+  --font-read: 'Spectral', 'Noto Serif SC', 'Songti SC', Georgia, serif;
+  --font-ui: 'Hanken Grotesk', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Menlo', 'Consolas', monospace;
+
+  /* The refracted spectrum — Prism's signature motif (progress bar, graph
+   * clusters, pipeline). Mirrors `prismSpectrum` in src/lib/theme/tokens.ts. */
+  --spectrum-1: #c2532f;
+  --spectrum-2: #cf7a2a;
+  --spectrum-3: #c9a52a;
+  --spectrum-4: #5b8b4e;
+  --spectrum-5: #3a7196;
+  --spectrum-6: #6a5aa0;
+  --prism-gradient: linear-gradient(
+    90deg,
+    var(--spectrum-1), var(--spectrum-2), var(--spectrum-3),
+    var(--spectrum-4), var(--spectrum-5), var(--spectrum-6)
+  );
 }
 
 .dark {

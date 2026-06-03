@@ -68,12 +68,23 @@
     "relatedSoon": "当多篇文档共享实体时，这里会显示相关文档。",
     "noHeadings": "未找到标题",
     "pinSidebar": "固定侧栏",
-    "unpinSidebar": "取消固定"
+    "unpinSidebar": "取消固定",
+    "workspace": "工作区",
+    "newPage": "新建页面",
+    "importFile": "导入 Markdown",
+    "importFolder": "导入文件夹",
+    "searchPages": "搜索页面…",
+    "noPages": "暂无页面",
+    "noResults": "未找到页面"
+  },
+  "pagetree": {
+    "untitled": "未命名"
   },
   "titlebar": {
     "toggleFileTree": "切换文件树",
     "toggleOutline": "切换大纲",
     "toggleAgent": "切换 AI 助手",
+    "ask": "提问",
     "settings": "设置",
     "theme": "主题",
     "showGraph": "打开知识图谱",
@@ -206,12 +217,20 @@
       "morning": "早上好",
       "afternoon": "下午好",
       "evening": "晚上好",
+      "night": "还醒着",
       "todayDiary": "今日日记",
       "diaryHint": "点击打开或创建今天的日志。",
       "tasks": "任务",
+      "todayTasks": "今日任务",
+      "noTasks": "暂无待办 — 享受片刻安宁。",
       "recentFiles": "最近文件",
+      "recent": "最近",
       "quickActions": "快捷操作",
-      "diary": "日记"
+      "diary": "日记",
+      "dailyJournal": "每日日志",
+      "blankDoc": "空白文档",
+      "journalSub": "今天的记录",
+      "importSub": "导入一个文件"
     },
     "tasks": {
       "addPlaceholder": "添加任务...",
@@ -226,6 +245,7 @@
     "print": "打印"
   },
   "commandPalette": {
+    "title": "搜索",
     "placeholder": "搜索文件或命令...",
     "noResults": "没有找到结果。",
     "recentFiles": "最近的文件",
@@ -265,7 +285,9 @@
       "light": "浅色",
       "dark": "深色",
       "system": "跟随系统",
-      "followSystem": "跟随系统外观设置"
+      "followSystem": "跟随系统外观设置",
+      "identities": "阅读风格",
+      "morePresets": "更多预设"
     },
     "editor": {
       "title": "编辑器",
@@ -526,7 +548,8 @@
     "close": "关闭"
   },
   "highlightPopover": {
-    "highlightAs": "标记为 {{color}}"
+    "highlightAs": "标记为 {{color}}",
+    "askPrism": "问 Prism"
   },
   "docSummary": {
     "title": "AI 摘要",

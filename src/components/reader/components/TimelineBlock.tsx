@@ -24,33 +24,32 @@ export function TimelineBlock(props: Props) {
     <div className="timeline-block my-6 pl-6 relative">
       {/* Vertical line */}
       <div
-        className="absolute left-[11px] top-2 bottom-2 w-0.5"
+        className="absolute left-[5px] top-2 bottom-2 w-0.5"
         style={{ backgroundColor: 'var(--border-color)' }}
       />
 
       {items.map((item, i) => (
         <div key={i} className="relative mb-6 last:mb-0">
-          {/* Dot */}
+          {/* Dot — accent with a paper ring so it sits on the rule cleanly */}
           <div
-            className="absolute -left-6 top-1 w-3 h-3 rounded-full border-2"
+            className="absolute -left-6 top-1 w-3 h-3 rounded-full"
             style={{
-              borderColor: 'var(--accent-color)',
-              backgroundColor: i === 0 ? 'var(--accent-color)' : 'var(--bg-primary)',
+              backgroundColor: 'var(--accent-color)',
+              boxShadow: '0 0 0 4px var(--paper, var(--bg-primary))',
             }}
           />
 
           {/* Label */}
           <div
-            className="text-xs font-semibold mb-1"
-            style={{ color: 'var(--accent-color)' }}
+            className="mb-1 uppercase font-semibold"
+            style={{ color: 'var(--accent-color)', fontFamily: 'var(--font-ui)', fontSize: 11, letterSpacing: '0.06em' }}
           >
             {labels[i] ?? `Step ${i + 1}`}
           </div>
 
           {/* Content */}
           <div
-            className="text-sm"
-            style={{ color: 'var(--text-secondary)' }}
+            style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-read)', fontSize: 15, lineHeight: 1.55 }}
           >
             {item}
           </div>

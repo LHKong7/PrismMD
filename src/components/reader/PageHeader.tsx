@@ -141,11 +141,13 @@ export function PageHeader() {
         rows={1}
         placeholder="Untitled"
         spellCheck={false}
-        className="w-full bg-transparent outline-none resize-none font-bold leading-tight"
+        className="w-full bg-transparent outline-none resize-none leading-tight"
         style={{
           color: 'var(--text-primary)',
-          fontSize: '2.25rem',
-          fontFamily: 'var(--font-body, inherit)',
+          fontSize: '2.5rem',
+          fontWeight: 500,
+          letterSpacing: '-0.012em',
+          fontFamily: 'var(--font-display, inherit)',
         }}
       />
     </div>

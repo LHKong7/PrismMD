@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { ChevronRight } from 'lucide-react'
 import { useWorkspaceStore } from '../../store/workspaceStore'
 import { usePaneFileData } from '../../hooks/usePaneFileData'
 
@@ -36,19 +35,21 @@ export function Breadcrumb() {
 
   return (
     <div
-      className="group flex items-center gap-0.5 px-3 text-xs shrink-0 overflow-hidden"
+      className="group flex items-center gap-1.5 px-3.5 shrink-0 overflow-hidden"
       style={{
-        height: 24,
+        height: 30,
+        fontFamily: 'var(--font-ui)',
+        fontSize: 12.5,
         color: 'var(--text-muted)',
-        borderBottom: '1px solid var(--border-color)',
+        borderBottom: '1px solid var(--line-soft, var(--border-color))',
         backgroundColor: 'var(--bg-primary)',
       }}
     >
       {crumbs.map((seg, i) => {
         const isLast = i === crumbs.length - 1
         return (
-          <span key={seg.id} className="flex items-center gap-0.5 min-w-0">
-            {i > 0 && <ChevronRight size={10} className="shrink-0 opacity-50" />}
+          <span key={seg.id} className="flex items-center gap-1.5 min-w-0">
+            {i > 0 && <span className="shrink-0 opacity-50 select-none">/</span>}
             {seg.icon && <span className="shrink-0">{seg.icon}</span>}
             {isLast ? (
               <span className="truncate" style={{ color: 'var(--text-secondary)' }}>

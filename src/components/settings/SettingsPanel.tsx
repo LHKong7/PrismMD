@@ -295,11 +295,16 @@ function ThemeSettings() {
   const setThemeId = useSettingsStore((s) => s.setThemeId)
   const setThemeMode = useSettingsStore((s) => s.setThemeMode)
 
+  const pick = (id: string) => { setThemeId(id); if (themeMode === 'system') setThemeMode('manual') }
+  // The three Prism "reading instrument" identities lead; the rest follow.
+  const identities = themes.filter((th) => th.blurb)
+  const others = themes.filter((th) => !th.blurb)
+
   return (
     <div>
       <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{t('settings.theme.title')}</h3>
       <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>{t('settings.theme.description')}</p>
-      <label className="flex items-center gap-3 mb-4 cursor-pointer">
+      <label className="flex items-center gap-3 mb-5 cursor-pointer">
         <input
           type="checkbox"
           checked={themeMode === 'system'}
@@ -308,11 +313,50 @@ function ThemeSettings() {
         />
         <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>{t('settings.theme.followSystem')}</span>
       </label>
+
+      {/* Reading identities — the design's featured cards with live preview + blurb */}
+      <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
+        {t('settings.theme.identities', 'Reading identities')}
+      </p>
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        {identities.map((theme) => {
+          const on = themeId === theme.id
+          const swatch = [theme.colors['--bg-primary'], theme.colors['--accent-color'], theme.colors['--text-primary']]
+          return (
+            <button
+              key={theme.id}
+              onClick={() => pick(theme.id)}
+              className="rounded-xl overflow-hidden text-left transition-all"
+              style={{ border: on ? '2px solid var(--accent-color)' : '2px solid var(--border-color)', backgroundColor: 'var(--bg-secondary)' }}
+            >
+              <div className="h-[76px] p-2.5 flex flex-col justify-between" style={{ backgroundColor: theme.colors['--bg-primary'] }}>
+                <div className="h-2 w-3/5 rounded" style={{ backgroundColor: theme.colors['--text-primary'] }} />
+                <div className="flex gap-1">
+                  {swatch.map((c, i) => (
+                    <span key={i} className="w-4 h-4 rounded-full" style={{ backgroundColor: c, border: '1px solid rgba(0,0,0,.12)' }} />
+                  ))}
+                </div>
+              </div>
+              <div className="px-3 py-2.5">
+                <div className="flex items-center gap-1.5 text-[13px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  {theme.name}{on && <Check size={12} style={{ color: 'var(--accent-color)' }} />}
+                </div>
+                <div className="text-[11px] leading-snug mt-0.5" style={{ color: 'var(--text-muted)' }}>{theme.blurb}</div>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* More presets */}
+      <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
+        {t('settings.theme.morePresets', 'More presets')}
+      </p>
       <div className="grid grid-cols-3 gap-3">
-        {themes.map((theme) => (
+        {others.map((theme) => (
           <button
             key={theme.id}
-            onClick={() => { setThemeId(theme.id); if (themeMode === 'system') setThemeMode('manual') }}
+            onClick={() => pick(theme.id)}
             className={clsx(
               'rounded-lg border p-3 text-left transition-all',
               themeId === theme.id ? 'border-[var(--accent-color)] ring-1 ring-[var(--accent-color)]' : 'border-[var(--border-color)] hover:border-[var(--text-muted)]'

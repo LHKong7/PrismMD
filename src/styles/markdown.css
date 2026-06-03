@@ -34,6 +34,79 @@
   margin-bottom: 1.25em;
 }
 
+/* ─────────────────────────────────────────────────────────────────────────
+ * Prism "reading instrument" identities — the reading surface gets the
+ * editorial type system: Spectral for prose, Newsreader for headings. Scoped
+ * to the three warm identities so the other presets keep their own fonts.
+ * ───────────────────────────────────────────────────────────────────────── */
+[data-identity='parchment'] .markdown-body,
+[data-identity='campfire'] .markdown-body,
+[data-identity='newsprint'] .markdown-body {
+  font-family: var(--font-read);
+  font-size: 1.0625rem;
+  line-height: 1.75;
+}
+
+[data-identity='parchment'] .markdown-body h1,
+[data-identity='campfire'] .markdown-body h1,
+[data-identity='newsprint'] .markdown-body h1,
+[data-identity='parchment'] .markdown-body h2,
+[data-identity='campfire'] .markdown-body h2,
+[data-identity='newsprint'] .markdown-body h2,
+[data-identity='parchment'] .markdown-body h3,
+[data-identity='campfire'] .markdown-body h3,
+[data-identity='newsprint'] .markdown-body h3 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+/* Newsprint editorial signature — a genuine identity, not just a palette:
+ * a drop cap on the opening paragraph and a § rule under every h2. */
+[data-identity='newsprint'] .markdown-body > p:first-of-type::first-letter {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 3.4em;
+  float: left;
+  line-height: 0.78;
+  padding: 6px 12px 2px 0;
+  color: var(--accent-color);
+}
+[data-identity='newsprint'] .markdown-body h2 {
+  border-bottom: 1.5px solid var(--text-primary);
+  padding-bottom: 7px;
+}
+[data-identity='newsprint'] .markdown-body h2::before {
+  content: '\00a7  ';
+  color: var(--accent-color);
+  font-family: var(--font-ui);
+  font-weight: 700;
+}
+
+/* Editorial data tables — uppercase column labels + tabular figures, matching
+ * the design's "results" table. Scoped to the Prism identities. */
+[data-identity='parchment'] .markdown-body thead th,
+[data-identity='campfire'] .markdown-body thead th,
+[data-identity='newsprint'] .markdown-body thead th {
+  font-family: var(--font-ui);
+  font-size: 0.72em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+[data-identity='parchment'] .markdown-body tbody td,
+[data-identity='campfire'] .markdown-body tbody td,
+[data-identity='newsprint'] .markdown-body tbody td {
+  font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
+}
+[data-identity='parchment'] .markdown-body tbody tr:hover,
+[data-identity='campfire'] .markdown-body tbody tr:hover,
+[data-identity='newsprint'] .markdown-body tbody tr:hover {
+  background-color: var(--accent-soft, var(--bg-secondary));
+}
+
 .markdown-body a {
   color: var(--accent-color);
   text-decoration: none;

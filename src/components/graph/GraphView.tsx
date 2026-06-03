@@ -6,7 +6,7 @@ import { useSettingsStore } from '../../store/settingsStore'
 import { useWorkspaceStore } from '../../store/workspaceStore'
 import { Network, AlertCircle, Globe, FileText, Target, BookOpen } from 'lucide-react'
 import { Spinner } from '../ui/Spinner'
-import { graphPalette } from '../../lib/theme/tokens'
+import { prismSpectrum } from '../../lib/theme/tokens'
 import { D3ForceGraph } from './D3ForceGraph'
 
 export interface GraphNode {
@@ -226,8 +226,8 @@ export function GraphView() {
         className="flex items-center gap-2 px-3 py-2 border-b flex-shrink-0"
         style={{ borderColor: 'var(--border-color)' }}
       >
-        <Network size={14} style={{ color: 'var(--accent-color)' }} />
-        <span className="text-xs font-semibold uppercase tracking-wider mr-3" style={{ color: 'var(--text-muted)' }}>
+        <Network size={15} style={{ color: 'var(--accent-color)' }} />
+        <span className="mr-3" style={{ fontFamily: 'var(--font-display)', fontWeight: 500, fontSize: 16, color: 'var(--text-primary)' }}>
           {t('graphView.title')}
         </span>
 
@@ -336,7 +336,7 @@ function ScopeButton({
       className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       style={{
         backgroundColor: active ? 'var(--accent-color)' : 'transparent',
-        color: active ? '#fff' : 'var(--text-secondary)',
+        color: active ? 'var(--accent-ink, #fff)' : 'var(--text-secondary)',
         border: '1px solid var(--border-color)',
       }}
     >
@@ -476,9 +476,9 @@ function classifyGraphError(raw: string | null, t: (key: string, vars?: Record<s
  * user to pre-register types.
  */
 function makeNodeTypeColorizer(nodes: GraphNode[]) {
-  // Intentionally stable across themes — users memorize "red = conflicts"
-  // etc., and swapping hues on theme change would break that mental model.
-  const palette = graphPalette
+  // The refracted spectrum — Prism's signature cluster palette. Stable per
+  // entity type so users still memorize "sage = methods" etc.
+  const palette = prismSpectrum
   const fallback = '#94a3b8'
   const seen = new Set<string>()
   for (const n of nodes) if (n.type) seen.add(n.type)
