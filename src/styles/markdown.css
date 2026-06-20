@@ -1,8 +1,9 @@
 .markdown-body {
-  max-width: 48rem;
+  max-width: 720px;
   margin: 0 auto;
-  /* The PageHeader above supplies the top space; keep this tight. */
-  padding: 0.25rem 1.5rem 4rem;
+  /* The PageHeader above supplies the top space; keep this tight.
+   * Spec §4.5: reading column 720px wide, 40px side padding, deep bottom gutter. */
+  padding: 0.25rem 40px 200px;
   font-family: var(--font-body, inherit);
   font-size: 1rem;
   line-height: 1.7;
@@ -47,18 +48,47 @@
   line-height: 1.75;
 }
 
+/* Lede — the opening paragraph reads larger and softer (spec §4.5). */
+[data-identity='parchment'] .markdown-body > p:first-of-type,
+[data-identity='campfire'] .markdown-body > p:first-of-type,
+[data-identity='newsprint'] .markdown-body > p:first-of-type {
+  font-size: 20px;
+  line-height: 1.62;
+  color: var(--text-secondary);
+}
+
 [data-identity='parchment'] .markdown-body h1,
 [data-identity='campfire'] .markdown-body h1,
 [data-identity='newsprint'] .markdown-body h1,
 [data-identity='parchment'] .markdown-body h2,
 [data-identity='campfire'] .markdown-body h2,
-[data-identity='newsprint'] .markdown-body h2,
-[data-identity='parchment'] .markdown-body h3,
-[data-identity='campfire'] .markdown-body h3,
-[data-identity='newsprint'] .markdown-body h3 {
+[data-identity='newsprint'] .markdown-body h2 {
   font-family: var(--font-display);
   font-weight: 500;
   letter-spacing: -0.01em;
+}
+/* Spec §3.1 absolute type scale: H1 41px/1.12, H2 27px/1.25. */
+[data-identity='parchment'] .markdown-body h1,
+[data-identity='campfire'] .markdown-body h1,
+[data-identity='newsprint'] .markdown-body h1 {
+  font-size: 41px;
+  line-height: 1.12;
+  letter-spacing: -0.012em;
+}
+[data-identity='parchment'] .markdown-body h2,
+[data-identity='campfire'] .markdown-body h2,
+[data-identity='newsprint'] .markdown-body h2 {
+  font-size: 27px;
+  line-height: 1.25;
+}
+/* H3 is the UI sans (Hanken) 600 / 18px per spec, not the display serif. */
+[data-identity='parchment'] .markdown-body h3,
+[data-identity='campfire'] .markdown-body h3,
+[data-identity='newsprint'] .markdown-body h3 {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: 18px;
+  letter-spacing: 0;
 }
 
 /* Newsprint editorial signature — a genuine identity, not just a palette:
@@ -66,7 +96,7 @@
 [data-identity='newsprint'] .markdown-body > p:first-of-type::first-letter {
   font-family: var(--font-display);
   font-weight: 500;
-  font-size: 3.4em;
+  font-size: 3.5em;
   float: left;
   line-height: 0.78;
   padding: 6px 12px 2px 0;
@@ -77,6 +107,46 @@
   padding-bottom: 7px;
 }
 [data-identity='newsprint'] .markdown-body h2::before {
+  content: '\00a7  ';
+  color: var(--accent-color);
+  font-family: var(--font-ui);
+  font-weight: 700;
+}
+
+/* Theme Compare gallery — each tile carries its own data-identity, but the
+ * app-level <html data-identity> is also an ancestor, so the Newsprint
+ * signature above would leak onto Parchment/Campfire tiles whenever Newsprint
+ * is the active theme. Neutralize the leak inside a tile (these selectors tie
+ * on specificity and win by source order), then re-apply for the Newsprint
+ * tile alone at higher specificity. */
+.prism-compare-tile .markdown-body > p:first-of-type::first-letter {
+  font: inherit;
+  float: none;
+  padding: 0;
+  line-height: inherit;
+  color: inherit;
+}
+.prism-compare-tile .markdown-body h2 {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.prism-compare-tile .markdown-body h2::before {
+  content: none;
+}
+.prism-compare-tile[data-identity='newsprint'] .markdown-body > p:first-of-type::first-letter {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 3.5em;
+  float: left;
+  line-height: 0.78;
+  padding: 6px 12px 2px 0;
+  color: var(--accent-color);
+}
+.prism-compare-tile[data-identity='newsprint'] .markdown-body h2 {
+  border-bottom: 1.5px solid var(--text-primary);
+  padding-bottom: 7px;
+}
+.prism-compare-tile[data-identity='newsprint'] .markdown-body h2::before {
   content: '\00a7  ';
   color: var(--accent-color);
   font-family: var(--font-ui);
@@ -299,3 +369,28 @@
 .markdown-body .badge-red    { background: var(--color-error-bg); color: var(--color-error); border: 1px solid var(--color-error-border); }
 .markdown-body .badge-purple { background: rgba(139, 92, 246, 0.1); color: #8b5cf6; border: 1px solid rgba(139, 92, 246, 0.3); }
 .markdown-body .badge-gray   { background: var(--bg-secondary); color: var(--text-muted); border: 1px solid var(--border-color); }
+
+/* Reader code syntax highlighting — rehype-highlight (hljs) token classes
+ * mapped to the Prism token palette per spec §4.5. Semantic-token fallbacks
+ * keep non-identity themes (which lack --ink-3/--ok/--err/--info) readable. */
+.markdown-body pre code,
+.markdown-body code.hljs { color: var(--code-ink, var(--text-primary)); }
+.markdown-body .hljs-comment,
+.markdown-body .hljs-quote { color: var(--ink-3, var(--text-muted)); font-style: italic; }
+.markdown-body .hljs-string,
+.markdown-body .hljs-regexp,
+.markdown-body .hljs-symbol,
+.markdown-body .hljs-meta .hljs-string { color: var(--ok, var(--color-success)); }
+.markdown-body .hljs-number,
+.markdown-body .hljs-literal { color: var(--info, var(--color-info)); }
+.markdown-body .hljs-keyword,
+.markdown-body .hljs-selector-tag,
+.markdown-body .hljs-built_in,
+.markdown-body .hljs-type,
+.markdown-body .hljs-name,
+.markdown-body .hljs-tag { color: var(--accent-color); }
+.markdown-body .hljs-title,
+.markdown-body .hljs-title.function_,
+.markdown-body .hljs-function .hljs-title,
+.markdown-body .hljs-attr,
+.markdown-body .hljs-attribute { color: var(--err, var(--color-error)); }

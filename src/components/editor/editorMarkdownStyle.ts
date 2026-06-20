@@ -9,6 +9,8 @@ import {
   type ViewUpdate,
 } from '@codemirror/view'
 import { RangeSetBuilder } from '@codemirror/state'
+import { editorTableWidgetExtension } from './editorTableWidget'
+import { editorChecklistExtension } from './editorChecklistWidget'
 
 /**
  * Custom highlight style that makes markdown tokens visually styled
@@ -131,6 +133,9 @@ function buildHiddenDecos(view: EditorView): DecorationSet {
 
         // Unordered list markers → replace with bullet
         if (node.name === 'ListMark') {
+          // Task-list items render an interactive checkbox (see
+          // editorChecklistWidget) which swallows the marker — don't bullet them.
+          if (node.node.parent?.getChild('Task')) return
           const text = state.sliceDoc(node.from, node.to)
           // Only replace - and * (unordered); leave 1. 2. etc. (ordered) alone
           if (text.trim() === '-' || text.trim() === '*') {
@@ -176,4 +181,6 @@ export const editorMarkdownStyleExtension = [
   syntaxHighlighting(markdownHighlightStyle, { fallback: true }),
   markdownBaseTheme,
   syntaxHidingPlugin,
+  editorTableWidgetExtension,
+  editorChecklistExtension,
 ]

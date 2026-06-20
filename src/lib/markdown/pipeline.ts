@@ -6,6 +6,7 @@ import remarkMath from 'remark-math'
 import remarkRehype from 'remark-rehype'
 import rehypeSlug from 'rehype-slug'
 import rehypeKatex from 'rehype-katex'
+import rehypeHighlight from 'rehype-highlight'
 import rehypeReact from 'rehype-react'
 import { Fragment } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
@@ -43,6 +44,9 @@ export async function processMarkdown(source: string): Promise<MarkdownResult> {
     .use(remarkRehype, { allowDangerousHtml: true })
     .use(rehypeSlug)
     .use(rehypeKatex)
+    // Reader-side syntax highlighting; token classes are mapped to the Prism
+    // palette in markdown.css. detect=true highlights unlabeled blocks too.
+    .use(rehypeHighlight, { detect: true, ignoreMissing: true })
     // @ts-expect-error rehype-react types are complex
     .use(rehypeReact, {
       jsx,

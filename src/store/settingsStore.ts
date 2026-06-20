@@ -120,8 +120,8 @@ interface SettingsStore {
 
 export const useSettingsStore = create<SettingsStore>((set, get) => ({
   language: 'en',
-  themeId: 'light',
-  themeMode: 'system',
+  themeId: 'parchment',
+  themeMode: 'manual',
   vibrancy: false,
   wordWrap: true,
   editorFontSize: 14,
@@ -262,8 +262,8 @@ export const useSettingsStore = create<SettingsStore>((set, get) => ({
         const s = raw as Record<string, unknown>
         set({
           language: (s.language as SupportedLanguage) ?? 'en',
-          themeId: (s.themeId as string) ?? 'light',
-          themeMode: (s.themeMode as 'manual' | 'system') ?? 'system',
+          themeId: (s.themeId as string) ?? 'parchment',
+          themeMode: (s.themeMode as 'manual' | 'system') ?? 'manual',
           vibrancy: (s.vibrancy as boolean) ?? false,
           wordWrap: (s.wordWrap as boolean) ?? true,
           editorFontSize: (s.editorFontSize as number) ?? 14,

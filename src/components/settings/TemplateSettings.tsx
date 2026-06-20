@@ -118,7 +118,7 @@ export function TemplateSettings() {
               onClick={save}
               disabled={!formName.trim()}
               className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-40"
-              style={{ backgroundColor: 'var(--accent-color)', color: '#fff' }}
+              style={{ backgroundColor: 'var(--accent-color)', color: 'var(--accent-ink, #fff)' }}
             >
               <Check size={12} />
               {t('settings.templates.save')}

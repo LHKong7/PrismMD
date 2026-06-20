@@ -111,7 +111,7 @@ export function FlashCardPanel() {
         <button
           onClick={handleGenerate}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
-          style={{ backgroundColor: 'var(--accent-color)', color: '#fff' }}
+          style={{ backgroundColor: 'var(--accent-color)', color: 'var(--accent-ink, #fff)' }}
         >
           <Layers size={13} />
           {t('flashcard.generate')}

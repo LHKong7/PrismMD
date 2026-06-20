@@ -71,6 +71,7 @@
     "unpinSidebar": "Unpin sidebar",
     "workspace": "Workspace",
     "newPage": "New page",
+    "newFolder": "New folder",
     "importFile": "Import Markdown",
     "importFolder": "Import folder",
     "searchPages": "Search pages…",
@@ -78,7 +79,17 @@
     "noResults": "No pages found"
   },
   "pagetree": {
-    "untitled": "Untitled"
+    "untitled": "Untitled",
+    "newPage": "New page",
+    "newSubpage": "New subpage",
+    "newFolder": "New folder",
+    "rename": "Rename",
+    "export": "Export as Markdown",
+    "addToKb": "Add to Knowledge Base",
+    "moveToRoot": "Move to top level",
+    "delete": "Delete",
+    "more": "More",
+    "contextMenu": "Page actions"
   },
   "titlebar": {
     "toggleFileTree": "Toggle file tree",
@@ -157,6 +168,25 @@
     "reject": "Discard",
     "retry": "Retry"
   },
+  "editorTable": {
+    "columnOptions": "Column options",
+    "rowOptions": "Row options",
+    "insertColLeft": "Insert column left",
+    "insertColRight": "Insert column right",
+    "insertRowAbove": "Insert row above",
+    "insertRowBelow": "Insert row below",
+    "alignLeft": "Align left",
+    "alignCenter": "Align center",
+    "alignRight": "Align right",
+    "deleteColumn": "Delete column",
+    "deleteRow": "Delete row",
+    "deleteTable": "Delete table",
+    "addRow": "Add row",
+    "addColumn": "Add column"
+  },
+  "editorTask": {
+    "toggle": "Toggle task"
+  },
   "minimap": {
     "brokenBlock": "Broken code block",
     "emptyBlock": "Empty code block",
@@ -198,6 +228,8 @@
     "taskPlaceholder": "e.g. Write a 2000-word article about React Server Components...",
     "taskPlaceholderWithDoc": "e.g. Expand this outline into a full article, rewrite in formal tone...",
     "useDocContext": "Use current document as reference",
+    "humanVoice": "Human voice",
+    "humanVoiceDesc": "Write so it reads like a real person — varied rhythm, concrete detail, no AI filler.",
     "directoryLabel": "Save to",
     "noDirectory": "Select a directory",
     "browse": "Browse",
@@ -260,6 +292,7 @@
     "lightTheme": "Switch to Light Theme",
     "darkTheme": "Switch to Dark Theme",
     "systemTheme": "Use System Theme",
+    "compareIdentities": "Compare reading identities",
     "openSettings": "Open Settings",
     "toggleAgent": "Toggle AI Assistant",
     "toggleFocusMode": "Toggle Focus Mode",
@@ -272,6 +305,41 @@
     "searchResults": "Content Matches",
     "indexing": "Indexing… ({{count}} files)",
     "noContentMatch": "No matches in document content."
+  },
+  "themeCompare": {
+    "title": "Prism — three identities",
+    "subtitle": "The same workspace, one document, three warm reading systems. Drag to compare — open any frame full-screen with ⤢.",
+    "apply": "Use this identity",
+    "active": "Current",
+    "focus": "Open full-screen",
+    "prev": "Previous",
+    "next": "Next",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fit": "Fit to screen",
+    "hint": "Drag to pan · scroll to zoom · ⤢ to open full-screen",
+    "labels": {
+      "parchment": "warm daylight",
+      "campfire": "espresso dark",
+      "newsprint": "editorial"
+    },
+    "frame": {
+      "p2": "Field notes",
+      "p3": "The night shelf",
+      "p4": "Margins & marginalia"
+    },
+    "sample": {
+      "title": "On Reading by Warm Light",
+      "lede": "Prism treats a document as an instrument, not a page. The same words can be tuned to the hour — bright copper at noon, an ember glow at midnight, or the crisp ink of the morning edition.",
+      "heading": "Three tunings",
+      "body1": "Each identity sets type, paper and accent together. Highlight a passage and the ",
+      "marked": "marker warms",
+      "body2": " to match, while inline ",
+      "body3": " keeps its own grain.",
+      "quote": "Light is not a setting. It is part of how a sentence is read.",
+      "task1": "Pick a tuning",
+      "task2": "Read until dusk"
+    }
   },
   "settings": {
     "title": "Settings",
@@ -287,7 +355,8 @@
       "system": "System",
       "followSystem": "Follow system appearance",
       "identities": "Reading identities",
-      "morePresets": "More presets"
+      "morePresets": "More presets",
+      "compare": "Compare"
     },
     "editor": {
       "title": "Editor",
@@ -370,6 +439,21 @@
       "clearMemory": "Clear AI Memory",
       "clearMemoryDesc": "Remove all stored conversation history and preferences.",
       "cleared": "Memory cleared"
+    },
+    "storage": {
+      "title": "Storage",
+      "description": "Where PrismMD keeps your pages, settings, sessions and history.",
+      "current": "Current location",
+      "customBadge": "Custom",
+      "openFolder": "Open folder",
+      "change": "Change location…",
+      "reset": "Reset to default",
+      "newLocation": "New location",
+      "migrate": "Move existing data to the new location",
+      "restartWarn": "PrismMD will restart to apply the change.",
+      "applyRestart": "Apply & restart",
+      "applying": "Applying…",
+      "cancel": "Cancel"
     },
     "mcp": {
       "title": "MCP Servers",
@@ -481,7 +565,7 @@
       "focusNextPane": "Focus Next Pane",
       "focusPrevPane": "Focus Previous Pane",
       "editor": "Editor",
-      "toggleEdit": "Toggle Edit Mode",
+      "find": "Find in Document",
       "save": "Save File",
       "sidebars": "Sidebars & Panels",
       "toggleFileTree": "Toggle File Tree",

@@ -1,4 +1,7 @@
-import { app, BrowserWindow, screen } from 'electron'
+// MUST be first: sets the app name + redirects userData to a custom data
+// folder (if configured) BEFORE electron-store / better-sqlite3 resolve paths.
+import './bootstrap'
+import { app, BrowserWindow, ipcMain, screen } from 'electron'
 import path from 'path'
 import { registerIpcHandlers } from './ipc'
 import { appConfig } from '../app.config'
@@ -6,9 +9,6 @@ import { shutdown as shutdownInsightGraph } from './services/insightGraphService
 import { startAll as startMcpServers, shutdownAll as shutdownMcpServers } from './services/mcpService'
 import { initAutoUpdater } from './services/updaterService'
 import { loadSettings, saveSettings } from './services/settingsStore'
-
-// Apply app identity from the central config
-app.setName(appConfig.name)
 
 let mainWindow: BrowserWindow | null = null
 
@@ -117,33 +117,51 @@ let servicesShutdownStarted = false
 /** Hard ceiling for shutdown — beyond this we give up and exit so the
  * user isn't staring at a dock icon waiting on a hung MCP subprocess. */
 const SHUTDOWN_TIMEOUT_MS = 5000
+/** Ceiling for the renderer autosave flush before we close the DB anyway. */
+const FLUSH_TIMEOUT_MS = 1500
 
 app.on('before-quit', (event) => {
   if (servicesShutdownStarted) return
   servicesShutdownStarted = true
   event.preventDefault()
-  // Tear down both long-running services in parallel so the user
-  // isn't stuck waiting on one blocking the other on app close. The
-  // timeout race exists because a misbehaving MCP subprocess (not
-  // SIGTERM-responsive) would otherwise keep the main process alive
-  // forever, leaving orphan children in the user's process tree.
-  // Close workspace database synchronously (SQLite, no async needed)
-  try {
-    const { closeDb } = require('./services/workspaceDb')
-    closeDb()
-  } catch { /* DB may not have been opened */ }
+  void (async () => {
+    // Ask the renderer to flush any pending (debounced) autosave to SQLite before
+    // we close the DB, so the last edits aren't lost on quit. Bounded by a timeout
+    // in case the renderer is unresponsive.
+    const win = getMainWindow()
+    if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) {
+      await Promise.race([
+        new Promise<void>((resolve) => {
+          ipcMain.once('workspace:flush-complete', () => resolve())
+          win.webContents.send('app:flush-before-quit')
+        }),
+        new Promise<void>((resolve) => setTimeout(resolve, FLUSH_TIMEOUT_MS)),
+      ])
+    }
 
-  const shutdown = Promise.all([
-    shutdownInsightGraph().catch(() => {}),
-    shutdownMcpServers().catch(() => {}),
-  ])
-  const timeout = new Promise<void>((resolve) =>
-    setTimeout(() => {
-      console.warn(`[app] shutdown timed out after ${SHUTDOWN_TIMEOUT_MS}ms — force-exiting`)
-      resolve()
-    }, SHUTDOWN_TIMEOUT_MS),
-  )
-  Promise.race([shutdown, timeout]).finally(() => app.exit(0))
+    // Close workspace database synchronously (SQLite, no async needed)
+    try {
+      const { closeDb } = require('./services/workspaceDb')
+      closeDb()
+    } catch { /* DB may not have been opened */ }
+
+    // Tear down both long-running services in parallel so the user
+    // isn't stuck waiting on one blocking the other on app close. The
+    // timeout race exists because a misbehaving MCP subprocess (not
+    // SIGTERM-responsive) would otherwise keep the main process alive
+    // forever, leaving orphan children in the user's process tree.
+    const shutdown = Promise.all([
+      shutdownInsightGraph().catch(() => {}),
+      shutdownMcpServers().catch(() => {}),
+    ])
+    const timeout = new Promise<void>((resolve) =>
+      setTimeout(() => {
+        console.warn(`[app] shutdown timed out after ${SHUTDOWN_TIMEOUT_MS}ms — force-exiting`)
+        resolve()
+      }, SHUTDOWN_TIMEOUT_MS),
+    )
+    Promise.race([shutdown, timeout]).finally(() => app.exit(0))
+  })()
 })
 
 app.on('activate', () => {

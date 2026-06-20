@@ -71,6 +71,7 @@
     "unpinSidebar": "取消固定",
     "workspace": "工作区",
     "newPage": "新建页面",
+    "newFolder": "新建文件夹",
     "importFile": "导入 Markdown",
     "importFolder": "导入文件夹",
     "searchPages": "搜索页面…",
@@ -78,7 +79,17 @@
     "noResults": "未找到页面"
   },
   "pagetree": {
-    "untitled": "未命名"
+    "untitled": "未命名",
+    "newPage": "新建页面",
+    "newSubpage": "新建子页面",
+    "newFolder": "新建文件夹",
+    "rename": "重命名",
+    "export": "导出为 Markdown",
+    "addToKb": "加入知识库",
+    "moveToRoot": "移到顶层",
+    "delete": "删除",
+    "more": "更多",
+    "contextMenu": "页面操作"
   },
   "titlebar": {
     "toggleFileTree": "切换文件树",
@@ -157,6 +168,25 @@
     "reject": "放弃",
     "retry": "重试"
   },
+  "editorTable": {
+    "columnOptions": "列选项",
+    "rowOptions": "行选项",
+    "insertColLeft": "在左侧插入列",
+    "insertColRight": "在右侧插入列",
+    "insertRowAbove": "在上方插入行",
+    "insertRowBelow": "在下方插入行",
+    "alignLeft": "左对齐",
+    "alignCenter": "居中对齐",
+    "alignRight": "右对齐",
+    "deleteColumn": "删除列",
+    "deleteRow": "删除行",
+    "deleteTable": "删除表格",
+    "addRow": "添加行",
+    "addColumn": "添加列"
+  },
+  "editorTask": {
+    "toggle": "切换任务状态"
+  },
   "minimap": {
     "brokenBlock": "异常代码块",
     "emptyBlock": "空代码块",
@@ -198,6 +228,8 @@
     "taskPlaceholder": "例如：写一篇关于 React Server Components 的 2000 字技术文章...",
     "taskPlaceholderWithDoc": "例如：将这份大纲扩展为完整文章、用正式语气改写...",
     "useDocContext": "以当前文档为参考",
+    "humanVoice": "更像真人的语气",
+    "humanVoiceDesc": "让成稿读起来像真人写的——长短句交错、有具体细节、去掉 AI 套话。",
     "directoryLabel": "保存到",
     "noDirectory": "选择目录",
     "browse": "浏览",
@@ -260,6 +292,7 @@
     "lightTheme": "切换到浅色主题",
     "darkTheme": "切换到深色主题",
     "systemTheme": "跟随系统外观",
+    "compareIdentities": "对比阅读风格",
     "openSettings": "打开设置",
     "toggleAgent": "切换 AI 助手",
     "toggleFocusMode": "切换专注模式",
@@ -272,6 +305,41 @@
     "searchResults": "内容匹配",
     "indexing": "正在建立索引…（{{count}} 个文件）",
     "noContentMatch": "文档内容中未找到匹配。"
+  },
+  "themeCompare": {
+    "title": "Prism — 三种阅读风格",
+    "subtitle": "同一个工作区、同一篇文档，三套温暖的阅读系统。拖拽对比，按 ⤢ 全屏打开任一画板。",
+    "apply": "使用此风格",
+    "active": "当前",
+    "focus": "全屏打开",
+    "prev": "上一个",
+    "next": "下一个",
+    "zoomIn": "放大",
+    "zoomOut": "缩小",
+    "fit": "适配屏幕",
+    "hint": "拖拽平移 · 滚动缩放 · ⤢ 全屏打开",
+    "labels": {
+      "parchment": "暖日光",
+      "campfire": "浓夜",
+      "newsprint": "社论"
+    },
+    "frame": {
+      "p2": "随手笔记",
+      "p3": "夜读书架",
+      "p4": "页边与旁注"
+    },
+    "sample": {
+      "title": "在暖光下阅读",
+      "lede": "Prism 把文档视为一件乐器，而非一页纸。同样的文字可以随时辰调音——正午的明亮铜色、午夜的余烬微光，或是清晨报刊的利落墨迹。",
+      "heading": "三种调音",
+      "body1": "每种风格都把字体、纸张与强调色一同设定。高亮一段文字，",
+      "marked": "标记会随之变暖",
+      "body2": "，而行内的 ",
+      "body3": " 仍保留自己的质感。",
+      "quote": "光线不是一个设置。它本身就是句子被阅读的方式。",
+      "task1": "挑一种调音",
+      "task2": "读到日暮"
+    }
   },
   "settings": {
     "title": "设置",
@@ -287,7 +355,8 @@
       "system": "跟随系统",
       "followSystem": "跟随系统外观设置",
       "identities": "阅读风格",
-      "morePresets": "更多预设"
+      "morePresets": "更多预设",
+      "compare": "对比"
     },
     "editor": {
       "title": "编辑器",
@@ -370,6 +439,21 @@
       "clearMemory": "清除 AI 记忆",
       "clearMemoryDesc": "删除所有存储的对话历史与偏好。",
       "cleared": "记忆已清除"
+    },
+    "storage": {
+      "title": "存储",
+      "description": "PrismMD 存放页面、设置、会话与历史的位置。",
+      "current": "当前位置",
+      "customBadge": "自定义",
+      "openFolder": "打开文件夹",
+      "change": "更改位置…",
+      "reset": "恢复默认",
+      "newLocation": "新位置",
+      "migrate": "将现有数据迁移到新位置",
+      "restartWarn": "更改后 PrismMD 会重启以生效。",
+      "applyRestart": "应用并重启",
+      "applying": "正在应用…",
+      "cancel": "取消"
     },
     "mcp": {
       "title": "MCP 服务",
@@ -481,7 +565,7 @@
       "focusNextPane": "聚焦下一窗格",
       "focusPrevPane": "聚焦上一窗格",
       "editor": "编辑器",
-      "toggleEdit": "切换编辑模式",
+      "find": "文档内查找",
       "save": "保存文件",
       "sidebars": "侧栏与面板",
       "toggleFileTree": "切换文件树",

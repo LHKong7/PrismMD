@@ -241,7 +241,7 @@ export function AgentSidebar() {
             className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-medium shadow-md focus-visible:ring-2 focus-visible:ring-[var(--accent-color)]"
             style={{
               backgroundColor: 'var(--accent-color)',
-              color: '#fff',
+              color: 'var(--accent-ink, #fff)',
             }}
             aria-label={t('agent.jumpToLatest')}
           >

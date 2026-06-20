@@ -14,7 +14,8 @@ import type { PageTreeNode } from '../../types/electron'
 
 function flattenPages(nodes: PageTreeNode[], acc: PageTreeNode[] = []): PageTreeNode[] {
   for (const n of nodes) {
-    acc.push(n)
+    // Folders are containers, not documents — keep them out of "Recent".
+    if (!n.isFolder) acc.push(n)
     if (n.children?.length) flattenPages(n.children, acc)
   }
   return acc

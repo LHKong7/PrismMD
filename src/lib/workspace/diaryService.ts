@@ -30,7 +30,8 @@ async function ensureDiaryParent(): Promise<string> {
   await ws.loadTree()
   const existing = findDiaryParent(useWorkspaceStore.getState().pageTree)
   if (existing) return existing.id
-  const id = await ws.createPage(DIARY_PARENT_TITLE, null)
+  // The Diary root is a container for dated entries, not a document itself.
+  const id = await ws.createFolder(DIARY_PARENT_TITLE, null)
   await ws.loadTree()
   return id ?? ''
 }
@@ -79,5 +80,7 @@ export async function getRecentDiaryPageIds(days = 7): Promise<string[]> {
     validTitles.add(formatDate(date))
   }
 
-  return parent.children.filter((c) => validTitles.has(c.title)).map((c) => c.id)
+  // Skip folders — only dated diary documents count (a date-named subfolder
+  // would otherwise leak empty content into summaries).
+  return parent.children.filter((c) => !c.isFolder && validTitles.has(c.title)).map((c) => c.id)
 }

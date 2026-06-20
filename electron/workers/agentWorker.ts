@@ -147,9 +147,14 @@ async function handleRunTask(msg: {
   task: string
   qualityThreshold?: number
   maxIterations?: number
+  toolDefs?: Array<{ name: string; description: string; parameters?: Record<string, any>; required?: string[] }>
 }) {
   aborted = false
-  const agent = buildAgent(msg.provider, msg.systemPrompt)
+  const agent = buildAgent(
+    msg.provider,
+    msg.systemPrompt,
+    msg.toolDefs?.length ? { toolDefs: msg.toolDefs } : undefined,
+  )
   try {
     const result = await agent.runTask({
       task: msg.task,

@@ -25,9 +25,12 @@ function renderMarkdown(source: string): ReactElement {
 export function MarkdownPreview({
   content,
   className,
+  style,
 }: {
   content: string
   className?: string
+  /** Merged over the defaults — lets callers override color/font-size. */
+  style?: React.CSSProperties
 }) {
   const rendered = useMemo(() => renderMarkdown(content), [content])
 
@@ -38,6 +41,7 @@ export function MarkdownPreview({
         color: 'var(--text-secondary)',
         fontSize: '0.75rem',
         lineHeight: '1.5',
+        ...style,
       }}
     >
       {rendered}

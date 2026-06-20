@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Command } from 'cmdk'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
-import { FilePlus, Sun, Moon, Monitor, Settings, Bot, Shield, Eye, Network, BookOpen, Puzzle, Search, Maximize2, Columns2, Rows2, X, Keyboard, FileStack, Zap } from 'lucide-react'
+import { FilePlus, Sun, Moon, Monitor, Settings, Bot, Shield, Eye, Network, BookOpen, Puzzle, Search, Maximize2, Columns2, Rows2, X, Keyboard, FileStack, Zap, Palette } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useUIStore } from '../../store/uiStore'
 import { useWorkspaceStore } from '../../store/workspaceStore'
@@ -157,6 +157,9 @@ export function CommandPalette({ onOpenSettings, onOpenHorseMode }: CommandPalet
               </Command.Item>
               <Command.Item value="System theme" onSelect={() => { setThemeMode('system'); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
                 <Monitor size={14} /><span>{t('commandPalette.systemTheme')}</span>
+              </Command.Item>
+              <Command.Item value="Compare reading identities" onSelect={() => { useUIStore.getState().openCompare(); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
+                <Palette size={14} /><span>{t('commandPalette.compareIdentities', 'Compare reading identities')}</span>
               </Command.Item>
               <Command.Item value="Open Settings" onSelect={() => { onOpenSettings(); setOpen(false) }} className={cls} style={{ color: 'var(--text-secondary)' }}>
                 <Settings size={14} /><span>{t('commandPalette.openSettings')}</span>

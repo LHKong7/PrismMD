@@ -5,6 +5,23 @@ import { useSessionStore } from './sessionStore'
 
 export type HorseModeStage = 'idle' | 'generating' | 'writing' | 'completed' | 'failed'
 
+/**
+ * Style guide that nudges Horse Mode output to read like a human wrote it
+ * (toggled in the dialog). Appended to the Horse Mode system prompt, so it
+ * shapes both the iterative loop and the final consolidation pass.
+ */
+const HUMAN_VOICE = [
+  '## Writing voice',
+  'Write like a real person, not an AI assistant. Match the language of the task.',
+  '- Vary sentence length — mix short, punchy sentences with longer ones; avoid a uniform rhythm.',
+  '- Be specific: prefer concrete examples, names and numbers over generic statements.',
+  '- Take a position; make claims instead of hedging every sentence.',
+  "- Cut filler and signposting: no \"it's worth noting\", \"in conclusion\", \"overall\", \"first/second/finally\", \"moreover/furthermore\".",
+  '- Do not restate your own points or end with a summary unless the task asks for one.',
+  '- Contractions and the occasional sentence fragment are fine. Use plain words, not buzzwords (avoid "leverage", "robust", "seamless", "delve", "tapestry").',
+  '- Prefer flowing prose over bullet lists unless the content is genuinely a list.',
+].join('\n')
+
 interface HorseModeStore {
   active: boolean
   task: string
@@ -17,7 +34,7 @@ interface HorseModeStore {
   qualityScore: number | null
   cancelled: boolean
 
-  start: (task: string, title: string, iterations?: number, documentContent?: string) => Promise<void>
+  start: (task: string, title: string, iterations?: number, documentContent?: string, humanVoice?: boolean) => Promise<void>
   cancel: () => void
 }
 
@@ -37,7 +54,7 @@ export const useHorseModeStore = create<HorseModeStore>((set, get) => ({
   qualityScore: null,
   cancelled: false,
 
-  start: async (task, title, iterations = 1, documentContent) => {
+  start: async (task, title, iterations = 1, documentContent, humanVoice = true) => {
     const hasDocContext = !!documentContent?.trim()
     const pageTitle = title.trim() || 'Untitled'
     set({
@@ -56,10 +73,12 @@ export const useHorseModeStore = create<HorseModeStore>((set, get) => ({
     // Subscribe to progress events — cleanup in finally to prevent leaks
     let progressCleanup: (() => void) | null = null
     try {
-      // Build the system prompt from prompt config
-      const systemPrompt = hasDocContext
+      // Build the system prompt from prompt config, optionally nudging the
+      // output to read more like human writing.
+      const basePrompt = hasDocContext
         ? usePromptConfigStore.getState().getPrompt('horse-mode-with-context')
         : usePromptConfigStore.getState().getPrompt('horse-mode')
+      const systemPrompt = humanVoice ? `${basePrompt}\n\n${HUMAN_VOICE}` : basePrompt
 
       // Build the full task description for the autonomous loop
       const fullTask = hasDocContext

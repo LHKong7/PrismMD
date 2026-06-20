@@ -9,6 +9,8 @@ export interface WorkspacePage {
   updatedAt: number
   isDeleted: boolean
   icon: string | null
+  /** Folders are pure containers (no document content) that group pages. */
+  isFolder: boolean
 }
 
 export interface PageTreeNode {
@@ -18,6 +20,7 @@ export interface PageTreeNode {
   format: string
   parentId: string | null
   position: number
+  isFolder: boolean
   children: PageTreeNode[]
 }
 
@@ -89,9 +92,20 @@ export interface ElectronAPI {
   closeWindow: () => void
   isMaximized: () => Promise<boolean>
   onMaximizeChange: (callback: (isMaximized: boolean) => void) => () => void
+  /** Main asks the renderer to flush pending autosaves before the DB closes on quit. */
+  onFlushBeforeQuit: (callback: () => void) => () => void
+  /** Renderer tells main the flush is done so it can proceed to close the DB. */
+  notifyFlushComplete: () => void
 
   // Shell
   openExternal: (url: string) => Promise<void>
+
+  // Data storage location
+  dataLocationGet: () => Promise<{ currentDir: string; defaultDir: string; isCustom: boolean }>
+  dataLocationChoose: () => Promise<string | null>
+  dataLocationApply: (dir: string | null, migrate: boolean) => Promise<{ ok: boolean; error?: string }>
+  dataLocationReveal: () => Promise<void>
+  dataLocationRelaunch: () => Promise<void>
 
   // Export
   exportHtml: (html: string, title: string) => Promise<{ cancelled: boolean; filePath?: string }>
@@ -195,15 +209,16 @@ export interface ElectronAPI {
 
   // Workspace
   workspaceCreatePage: (title?: string, parentId?: string, content?: string) => Promise<{ ok: boolean; page?: WorkspacePage; error?: string }>
+  workspaceCreateFolder: (title?: string, parentId?: string) => Promise<{ ok: boolean; page?: WorkspacePage; error?: string }>
   workspaceGetPage: (pageId: string) => Promise<WorkspacePage | null>
-  workspaceUpdatePage: (pageId: string, updates: Partial<Pick<WorkspacePage, 'title' | 'content' | 'parentId' | 'position' | 'icon' | 'format'>>) => Promise<{ ok: boolean; error?: string }>
+  workspaceUpdatePage: (pageId: string, updates: Partial<Pick<WorkspacePage, 'title' | 'content' | 'parentId' | 'position' | 'icon' | 'format' | 'isFolder'>>) => Promise<{ ok: boolean; error?: string }>
   workspaceDeletePage: (pageId: string) => Promise<{ ok: boolean; error?: string }>
   workspaceRestorePage: (pageId: string) => Promise<{ ok: boolean; error?: string }>
   workspaceGetChildren: (parentId: string | null) => Promise<WorkspacePage[]>
   workspaceGetTree: () => Promise<PageTreeNode[]>
   workspaceMovePage: (pageId: string, newParentId: string | null, position: number) => Promise<{ ok: boolean; error?: string }>
-  workspaceGetAncestors: (pageId: string) => Promise<Array<{ id: string; title: string; icon: string | null; format: string; updatedAt: number }>>
-  workspaceSearch: (query: string) => Promise<Array<{ id: string; title: string; icon: string | null; format: string; updatedAt: number }>>
+  workspaceGetAncestors: (pageId: string) => Promise<Array<{ id: string; title: string; icon: string | null; format: string; updatedAt: number; isFolder: boolean }>>
+  workspaceSearch: (query: string) => Promise<Array<{ id: string; title: string; icon: string | null; format: string; updatedAt: number; isFolder: boolean }>>
   workspaceGetPageCount: () => Promise<number>
   workspaceImportFile: (parentId?: string) => Promise<{ ok: boolean; pages?: WorkspacePage[]; canceled?: boolean; error?: string }>
   workspaceImportFolder: (parentId?: string) => Promise<{ ok: boolean; count?: number; canceled?: boolean; error?: string }>

@@ -18,6 +18,7 @@ import type { EditorSelectionInfo } from './editorAIPlugin'
 import { setAIHighlight } from './editorAIHighlight'
 import { useTranslation } from 'react-i18next'
 import { usePromptConfigStore, type PromptMode } from '../../store/promptConfigStore'
+import { MarkdownPreview } from '../ui/MarkdownPreview'
 
 interface Props {
   selection: EditorSelectionInfo
@@ -292,7 +293,7 @@ export function EditorAIBubble({ selection, viewRef, onDismiss, focusCustomInput
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.backgroundColor = 'var(--accent-color)'
-                    e.currentTarget.style.color = '#fff'
+                    e.currentTarget.style.color = 'var(--accent-ink, #fff)'
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.backgroundColor = 'var(--bg-secondary)'
@@ -360,11 +361,8 @@ export function EditorAIBubble({ selection, viewRef, onDismiss, focusCustomInput
             maxWidth: 400,
           }}
         >
-          <div
-            className="px-3 py-2 text-xs max-h-48 overflow-y-auto whitespace-pre-wrap"
-            style={{ color: 'var(--text-primary)' }}
-          >
-            {result}
+          <div className="px-3 py-2 max-h-48 overflow-y-auto">
+            <MarkdownPreview content={result} style={{ color: 'var(--text-primary)' }} />
           </div>
           <div
             className="flex items-center gap-1 px-2 py-1.5 border-t"

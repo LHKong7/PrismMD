@@ -4,8 +4,6 @@ import { TitleBar } from './components/layout/TitleBar'
 import { AppShell } from './components/layout/AppShell'
 import { StatusBar } from './components/layout/StatusBar'
 import { CommandPalette } from './components/commandpalette/CommandPalette'
-import { HighlightPopover } from './components/annotations/HighlightPopover'
-import { SelectionAIBubble } from './components/annotations/SelectionAIBubble'
 import { SettingsPanel } from './components/settings/SettingsPanel'
 import { GhostText } from './components/ghosttext/GhostText'
 import { FocusOverlay } from './components/focusmode/FocusOverlay'
@@ -14,8 +12,8 @@ import { PluginNotificationHost } from './components/plugins/PluginNotificationH
 import { ToastHost } from './components/ui/Toast'
 import { MemoPanel } from './components/memo/MemoPanel'
 import { HorseModeDialog } from './components/horsemode/HorseModeDialog'
+import { ThemeCompare } from './components/theme/ThemeCompare'
 import { useAutoHide } from './hooks/useAutoHide'
-import { useAnnotations } from './hooks/useAnnotations'
 import { useUpdaterBridge } from './hooks/useUpdaterBridge'
 import { useSettingsStore } from './store/settingsStore'
 import { useUIStore } from './store/uiStore'
@@ -31,7 +29,6 @@ initI18n()
 function AppContent() {
   useAutoHide()
   useUpdaterBridge()
-  const { addAnnotation } = useAnnotations()
   const settingsOpen = useUIStore((s) => s.settingsOpen)
   const openSettings = useUIStore((s) => s.openSettings)
   const closeSettings = useUIStore((s) => s.closeSettings)
@@ -53,12 +50,26 @@ function AppContent() {
     const handler = (e: BeforeUnloadEvent) => {
       const editor = useEditorStore.getState()
       if (editor.editing && editor.isDirty) {
+        // Best-effort flush of the in-flight autosave before the window closes.
+        void useWorkspaceStore.getState().flushPendingSaves()
         e.preventDefault()
         e.returnValue = ''
       }
     }
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
+  }, [])
+
+  // On quit, the main process asks us to flush any in-flight autosave to SQLite
+  // before it closes the DB — so the last debounce window of edits isn't lost.
+  useEffect(() => {
+    return window.electronAPI.onFlushBeforeQuit(async () => {
+      try {
+        await useWorkspaceStore.getState().flushPendingSaves()
+      } finally {
+        window.electronAPI.notifyFlushComplete()
+      }
+    })
   }, [])
 
   // Load on-disk plugins once the IPC bridge is up. Safe to await inside
@@ -189,21 +200,6 @@ function AppContent() {
         return
       }
 
-      if (e.key === 'e') {
-        e.preventDefault()
-        const pageId = useWorkspaceStore.getState().currentPageId
-        if (!pageId) return
-        // Pages are always markdown text — always editable.
-        const editor = useEditorStore.getState()
-        if (editor.editing && editor.isDirty) {
-          const discard = window.confirm('You have unsaved changes. Discard them?')
-          if (!discard) return
-          editor.discardChanges()
-        }
-        editor.toggleEditing()
-        return
-      }
-
       // Cmd+W — close active tab
       if (e.key === 'w') {
         e.preventDefault()
@@ -240,14 +236,11 @@ function AppContent() {
       {!zenMode && <StatusBar />}
       <ZenMode />
       <CommandPalette onOpenSettings={() => openSettings()} onOpenHorseMode={() => setHorseModeOpen(true)} />
-      <HighlightPopover onHighlight={addAnnotation} />
-      <SelectionAIBubble
-        onSaveAsNote={(text, note) => addAnnotation(text, 'yellow', note)}
-      />
       <GhostText />
       <SettingsPanel open={settingsOpen} onClose={closeSettings} />
       <MemoPanel open={memoOpen} onClose={() => setMemoOpen(false)} />
       <HorseModeDialog open={horseModeOpen} onClose={() => setHorseModeOpen(false)} />
+      <ThemeCompare />
       <PluginNotificationHost />
       <ToastHost items={toasts} onDismiss={dismissToast} />
     </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type CSSProperties } from 'react'
-import { Minus, Square, X, PanelLeft, PanelRight, Settings, Network, BookOpen, Pencil, Columns2, Rows2, XCircle, Download, FileText, FileType, Printer, Zap } from 'lucide-react'
+import { Minus, Square, X, PanelLeft, PanelRight, Settings, Network, BookOpen, Columns2, Rows2, XCircle, Download, FileText, FileType, Printer, Zap } from 'lucide-react'
 import { Tooltip } from '../ui/Tooltip'
 import { useTranslation } from 'react-i18next'
 import { useUIStore } from '../../store/uiStore'
@@ -38,12 +38,7 @@ export function TitleBar({ onOpenSettings, onOpenHorseMode }: TitleBarProps) {
   const toggleSplitDirection = useUIStore((s) => s.toggleSplitDirection)
   const toggleAgentSidebar = useAgentStore((s) => s.toggleAgentSidebar)
   const agentSidebarOpen = useAgentStore((s) => s.agentSidebarOpen)
-  const editing = useEditorStore((s) => s.editing)
   const isDirty = useEditorStore((s) => s.isDirty)
-  const toggleEditing = useEditorStore((s) => s.toggleEditing)
-
-  // Pages are always markdown text — editable whenever one is open.
-  const canEdit = !!currentPageId
 
   const isMac = window.electronAPI.platform === 'darwin'
 
@@ -109,30 +104,6 @@ export function TitleBar({ onOpenSettings, onOpenHorseMode }: TitleBarProps) {
 
       {/* Right controls */}
       <div className="flex items-center gap-1 px-2" style={noDragStyle}>
-        {canEdit && (
-          <Tooltip label={editing ? `${t('titlebar.showReader', 'Reader')} (${isMac ? '⌘' : 'Ctrl'}+E)` : `${t('titlebar.showEditor', 'Edit')} (${isMac ? '⌘' : 'Ctrl'}+E)`} side="bottom">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                if (editing && isDirty) {
-                  const discard = window.confirm(t('editor.unsavedConfirm', 'You have unsaved changes. Discard them?'))
-                  if (!discard) return
-                  useEditorStore.getState().discardChanges()
-                }
-                toggleEditing()
-              }}
-              className="p-1.5"
-              aria-label={editing ? t('titlebar.showReader', 'Reader') : t('titlebar.showEditor', 'Edit')}
-            >
-              {editing ? (
-                <BookOpen size={16} style={{ color: 'var(--accent-color)' }} />
-              ) : (
-                <Pencil size={16} style={{ color: 'var(--text-secondary)' }} />
-              )}
-            </Button>
-          </Tooltip>
-        )}
         {graphEnabled && (
           <Tooltip label={mainViewMode === 'graph' ? t('titlebar.showReader') : t('titlebar.showGraph')} side="bottom">
             <Button
@@ -228,7 +199,7 @@ export function TitleBar({ onOpenSettings, onOpenHorseMode }: TitleBarProps) {
             aria-label={t('titlebar.theme')}
           >
             {['var(--bg-primary)', 'var(--accent-color)', 'var(--text-primary)'].map((c, i) => (
-              <span key={i} className="w-[9px] h-[9px] rounded-full" style={{ backgroundColor: c, border: '1px solid rgba(0,0,0,.12)' }} />
+              <span key={i} className="w-[9px] h-[9px] rounded-full" style={{ backgroundColor: c, border: '1px solid var(--border-color)' }} />
             ))}
           </button>
         </Tooltip>

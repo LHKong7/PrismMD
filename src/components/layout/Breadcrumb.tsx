@@ -6,6 +6,7 @@ interface Crumb {
   id: string
   title: string
   icon: string | null
+  isFolder: boolean
 }
 
 /**
@@ -25,7 +26,7 @@ export function Breadcrumb() {
     let cancelled = false
     window.electronAPI.workspaceGetAncestors(currentPageId)
       .then((ancestors) => {
-        if (!cancelled) setCrumbs(ancestors.map((a) => ({ id: a.id, title: a.title, icon: a.icon })))
+        if (!cancelled) setCrumbs(ancestors.map((a) => ({ id: a.id, title: a.title, icon: a.icon, isFolder: a.isFolder })))
       })
       .catch(() => { if (!cancelled) setCrumbs([]) })
     return () => { cancelled = true }
@@ -51,7 +52,9 @@ export function Breadcrumb() {
           <span key={seg.id} className="flex items-center gap-1.5 min-w-0">
             {i > 0 && <span className="shrink-0 opacity-50 select-none">/</span>}
             {seg.icon && <span className="shrink-0">{seg.icon}</span>}
-            {isLast ? (
+            {isLast || seg.isFolder ? (
+              // The current page (last) and folder ancestors aren't navigable
+              // documents, so they render as plain text rather than links.
               <span className="truncate" style={{ color: 'var(--text-secondary)' }}>
                 {seg.title || 'Untitled'}
               </span>

@@ -161,6 +161,8 @@ html, body, #root {
   font-family: var(--font-body, 'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif);
   background-color: var(--bg-primary);
   color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 /* Custom scrollbar */
@@ -186,7 +188,7 @@ html, body, #root {
 /* Selection color */
 ::selection {
   background-color: var(--accent-color);
-  color: white;
+  color: var(--accent-ink, white);
 }
 
 /* Micro-animations for overlay surfaces (Dialog, Tooltip, ContextMenu).
@@ -197,12 +199,28 @@ html, body, #root {
   to { opacity: 1; }
 }
 @keyframes prism-fade-scale-in {
-  from { opacity: 0; transform: scale(0.96); }
+  from { opacity: 0; transform: scale(0.97); }
   to { opacity: 1; transform: scale(1); }
+}
+/* Spec §3.7 entrance keyframes. Content is visible at rest; these animate
+ * *from* hidden, never gate the resting state. */
+@keyframes prismRise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes prismThink {
+  0%, 100% { opacity: 0.3; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-3px); }
 }
 .prism-fade-in {
   animation: prism-fade-in var(--motion-fast) var(--motion-ease-out);
 }
 .prism-fade-scale-in {
   animation: prism-fade-scale-in var(--motion-fast) var(--motion-ease-out);
+}
+.prism-rise {
+  animation: prismRise var(--motion-base, 200ms) var(--motion-ease-out);
+}
+@media (prefers-reduced-motion: reduce) {
+  .prism-fade-in, .prism-fade-scale-in, .prism-rise { animation: none; }
 }

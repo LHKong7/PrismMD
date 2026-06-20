@@ -31,7 +31,8 @@ ${task}
 ${previousContext}
 
 ## Instructions
-Output a detailed, structured plan with numbered steps. Be specific about what each step should accomplish.
+Output a detailed, structured plan with numbered steps. Be specific about what each step should accomplish, and note which of the available tools (if any) each step will use.
+Plan ONLY here — do not call any tools and do not do the work yet; execution happens in the next phase.
 If this is a refinement (previous context is provided), focus on addressing the identified improvements.`;
 }
 
@@ -47,7 +48,7 @@ ${plan}
 
 ## Instructions
 - Work through each step methodically
-- Use tools when they help (read_file, bash, WebSearch, WebFetch, etc.)
+- Use the available tools when they help — actually CALL them to gather information or perform actions, then use what they return (don't just describe what a tool would do)
 - Produce comprehensive, detailed output for each step
 - If a step fails, note the failure and continue with remaining steps`;
 }

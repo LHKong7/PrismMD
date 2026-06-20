@@ -169,7 +169,7 @@ function PromptEditor({
           onClick={() => canSave && onSave(name.trim(), content.trim(), category)}
           disabled={!canSave}
           className="flex items-center gap-1 text-[11px] px-3 py-1.5 rounded font-medium transition-colors disabled:opacity-50"
-          style={{ backgroundColor: 'var(--accent-color)', color: '#fff' }}
+          style={{ backgroundColor: 'var(--accent-color)', color: 'var(--accent-ink, #fff)' }}
         >
           <Check size={11} />
           {t('settings.promptLibrary.save')}

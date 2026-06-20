@@ -38,6 +38,7 @@ export function getDb(): Database.Database {
       updated_at INTEGER NOT NULL,
       is_deleted INTEGER DEFAULT 0,
       icon TEXT,
+      is_folder INTEGER NOT NULL DEFAULT 0,
       FOREIGN KEY (parent_id) REFERENCES pages(id) ON DELETE SET NULL
     );
 
@@ -67,6 +68,14 @@ export function getDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_pages_deleted ON pages(is_deleted);
     CREATE INDEX IF NOT EXISTS idx_annotations_page ON annotations(page_id);
   `)
+
+  // ── Migrations for pre-existing databases ──
+  // `CREATE TABLE IF NOT EXISTS` never adds columns to an already-existing
+  // pages table, so newly introduced columns must be backfilled idempotently.
+  const pageCols = db.prepare('PRAGMA table_info(pages)').all() as Array<{ name: string }>
+  if (!pageCols.some((c) => c.name === 'is_folder')) {
+    db.exec('ALTER TABLE pages ADD COLUMN is_folder INTEGER NOT NULL DEFAULT 0')
+  }
 
   return db
 }

@@ -72,8 +72,8 @@ const store = new Store<{ settings: AppSettings }>({
   defaults: {
     settings: {
       language: 'en',
-      themeId: 'light',
-      themeMode: 'system',
+      themeId: 'parchment',
+      themeMode: 'manual',
       vibrancy: false,
       privacyMode: false,
       providers: {

@@ -67,7 +67,7 @@ export function TaskPanel() {
             className="px-2 py-0.5 rounded text-[10px] font-medium transition-colors"
             style={{
               backgroundColor: filter === s ? 'var(--accent-color)' : 'transparent',
-              color: filter === s ? '#fff' : 'var(--text-muted)',
+              color: filter === s ? 'var(--accent-ink, #fff)' : 'var(--text-muted)',
             }}
           >
             {s === 'all' ? `All (${tasks.length})` : s === 'todo' ? `To Do (${counts.todo})` : s === 'in-progress' ? `Doing (${counts.inProgress})` : `Done (${counts.done})`}

@@ -10,6 +10,7 @@ import { Worker } from 'worker_threads'
 import * as path from 'path'
 import { app } from 'electron'
 import { callTool as callMcpTool } from './mcpService'
+import { traceEvent } from './agentTrace'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -49,6 +50,7 @@ interface RunTaskConfig {
   task: string
   qualityThreshold?: number
   maxIterations?: number
+  toolDefs?: ToolDef[]
 }
 
 export interface ChatResult {
@@ -216,6 +218,7 @@ class AgentWorkerPool {
     const serverId = sep > 0 ? toolName.slice(0, sep) : toolName
     const actualName = sep > 0 ? toolName.slice(sep + 2) : toolName
 
+    const startMs = Date.now()
     let result: string
     try {
       const output = await callMcpTool(serverId, actualName, args)
@@ -223,6 +226,18 @@ class AgentWorkerPool {
     } catch (err) {
       result = `Error: ${err instanceof Error ? err.message : String(err)}`
     }
+
+    traceEvent(
+      'tool-call',
+      `${serverId} → ${actualName}`,
+      {
+        tool: toolName,
+        server: serverId,
+        args,
+        result: result.length > 2000 ? `${result.slice(0, 2000)}…` : result,
+      },
+      Date.now() - startMs,
+    )
 
     pw.worker.postMessage({ type: 'tool-result', id, result })
   }

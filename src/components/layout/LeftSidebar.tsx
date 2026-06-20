@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FilePlus, Upload, FolderUp, Pin, PinOff, Search, X } from 'lucide-react'
+import { FilePlus, FolderPlus, Upload, FolderUp, Pin, PinOff, Search, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useWorkspaceStore } from '../../store/workspaceStore'
 import { useUIStore } from '../../store/uiStore'
@@ -16,10 +16,17 @@ import { useWindowBreakpoint } from '../../lib/hooks/useWindowBreakpoint'
 export function LeftSidebar() {
   const { t } = useTranslation()
   const createPage = useWorkspaceStore((s) => s.createPage)
+  const createFolder = useWorkspaceStore((s) => s.createFolder)
+  const setRenamingId = useWorkspaceStore((s) => s.setRenamingId)
   const importFile = useWorkspaceStore((s) => s.importFile)
   const importFolder = useWorkspaceStore((s) => s.importFolder)
   const pageTree = useWorkspaceStore((s) => s.pageTree)
   const openPage = useWorkspaceStore((s) => s.openPage)
+
+  const handleNewFolder = async () => {
+    const id = await createFolder('New Folder', null)
+    if (id) setRenamingId(id)
+  }
   const leftSidebarPinned = useUIStore((s) => s.leftSidebarPinned)
   const pinLeftSidebar = useUIStore((s) => s.pinLeftSidebar)
   const breakpoint = useWindowBreakpoint()
@@ -59,6 +66,13 @@ export function LeftSidebar() {
             title={t('sidebar.newPage', 'New page')}
           >
             <FilePlus size={14} style={{ color: 'var(--text-muted)' }} />
+          </button>
+          <button
+            onClick={() => void handleNewFolder()}
+            className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+            title={t('sidebar.newFolder', 'New folder')}
+          >
+            <FolderPlus size={14} style={{ color: 'var(--text-muted)' }} />
           </button>
           <button
             onClick={() => void importFile(null)}

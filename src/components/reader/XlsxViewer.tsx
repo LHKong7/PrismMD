@@ -143,7 +143,7 @@ export function XlsxViewer() {
               className="px-2 py-0.5 rounded text-xs whitespace-nowrap transition-colors"
               style={{
                 backgroundColor: active ? 'var(--accent-color)' : 'transparent',
-                color: active ? '#fff' : 'var(--text-secondary)',
+                color: active ? 'var(--accent-ink, #fff)' : 'var(--text-secondary)',
                 border: '1px solid var(--border-color)',
               }}
             >

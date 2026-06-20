@@ -77,10 +77,14 @@ interface WorkspaceStore {
 
   // --- Page actions ---
   createPage: (title?: string, parentId?: string | null) => Promise<string | null>
+  /** Create a folder (a container that groups pages — never opened as a doc). */
+  createFolder: (title?: string, parentId?: string | null) => Promise<string | null>
   openPage: (pageId: string) => Promise<void>
   savePage: (pageId: string, content: string) => Promise<void>
   /** Update the active tab's in-memory content + schedule an autosave. */
   setContent: (content: string) => void
+  /** Flush every pending debounced autosave to SQLite immediately (e.g. before a tab switch). */
+  flushPendingSaves: () => Promise<void>
   deletePage: (pageId: string) => Promise<void>
   movePage: (pageId: string, newParentId: string | null, position: number) => Promise<void>
   renamePage: (pageId: string, title: string) => Promise<void>
@@ -227,6 +231,27 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     }
   },
 
+  createFolder: async (title = 'New Folder', parentId = null) => {
+    try {
+      const res = await window.electronAPI.workspaceCreateFolder(title, parentId ?? undefined)
+      if (!res.ok || !res.page) {
+        showToast('error', res.error ?? 'Failed to create folder')
+        return null
+      }
+      await get().loadTree()
+      // Expand the parent (so the new folder shows) and the folder itself.
+      if (parentId) get().setExpanded(parentId, true)
+      get().setExpanded(res.page.id, true)
+      invalidateSearchIndex()
+      // NOTE: folders are not opened as documents — callers that want an
+      // inline rename affordance set `renamingId` to the returned id.
+      return res.page.id
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : String(err))
+      return null
+    }
+  },
+
   openPage: async (pageId: string) => {
     // Already open? Just switch.
     const existing = get().tabs.find((t) => t.pageId === pageId)
@@ -235,53 +260,87 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       return
     }
 
-    // Drop editor back to reader mode on switch.
-    const { useEditorStore } = await import('./editorStore')
-    const editor = useEditorStore.getState()
-    if (editor.editing && editor.isDirty) {
-      const discard = window.confirm('You have unsaved changes. Discard them?')
-      if (!discard) return
-    }
-    useEditorStore.getState().reset()
-
+    // Fetch first so folders short-circuit before any editor state is touched.
+    let page: WorkspacePage | null
     try {
-      const page = await window.electronAPI.workspaceGetPage(pageId)
-      if (!page) {
-        set({ openError: 'Page not found' })
-        return
-      }
-
-      const newTab: WorkspaceTab = {
-        id: crypto.randomUUID(),
-        pageId: page.id,
-        title: page.title,
-        format: formatFromString(page.format),
-        content: page.content,
-        scrollY: 0,
-      }
-
-      set((state) => {
-        let tabs = [...state.tabs, newTab]
-        if (tabs.length > MAX_TABS) tabs.shift()
-        return {
-          tabs,
-          activeTabId: newTab.id,
-          ...syncFromActiveTab(tabs, newTab.id),
-          toc: [],
-          openError: null,
-        }
-      })
+      page = await window.electronAPI.workspaceGetPage(pageId)
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       set({ openError: msg })
       showToast('error', msg, 5000)
+      return
     }
+    if (!page) {
+      set({ openError: 'Page not found' })
+      return
+    }
+    // Folders are containers, not documents — reveal their children instead
+    // of opening an (empty) editor tab. This guards every openPage caller
+    // (sidebar, search, breadcrumb, command palette, session restore…).
+    if (page.isFolder) {
+      get().setExpanded(pageId, true)
+      return
+    }
+
+    // Single always-editable mode — persist any pending edits before switching.
+    const { useEditorStore } = await import('./editorStore')
+    await get().flushPendingSaves()
+
+    const newTab: WorkspaceTab = {
+      id: crypto.randomUUID(),
+      pageId: page.id,
+      title: page.title,
+      format: formatFromString(page.format),
+      content: page.content,
+      scrollY: 0,
+    }
+
+    set((state) => {
+      let tabs = [...state.tabs, newTab]
+      if (tabs.length > MAX_TABS) tabs.shift()
+      return {
+        tabs,
+        activeTabId: newTab.id,
+        ...syncFromActiveTab(tabs, newTab.id),
+        toc: [],
+        openError: null,
+      }
+    })
+    // Load the freshly-active document into the editor buffer.
+    useEditorStore.getState().syncForActiveTab()
   },
 
   savePage: async (pageId: string, content: string) => {
     try {
       await window.electronAPI.workspaceUpdatePage(pageId, { content })
+      // Keep any open tab in sync with what we just persisted. Without this a
+      // programmatic save (e.g. Horse Mode writing into a freshly created page)
+      // leaves the already-open tab showing its stale initial content, because
+      // openPage() short-circuits to switchTab when the page is already open
+      // and never re-reads from SQLite.
+      set((state) => {
+        if (!state.tabs.some((t) => t.pageId === pageId && t.content !== content)) {
+          return {}
+        }
+        const tabs = state.tabs.map((t) =>
+          t.pageId === pageId ? { ...t, content } : t,
+        )
+        return { tabs, ...syncFromActiveTab(tabs, state.activeTabId) }
+      })
       invalidateSearchIndex()
+      // If this write targeted the currently-open page and the editor has no
+      // unsaved local edits, refresh its buffer — the editor renders from
+      // editorStore.editorContent, so a programmatic save (Horse Mode, weekly
+      // summary, template insert) would otherwise be clobbered on the next
+      // keystroke. The !isDirty guard preserves a user who is actively typing,
+      // and skips the editor's own autosave writes (dirty while saving).
+      if (get().currentPageId === pageId) {
+        const { useEditorStore } = await import('./editorStore')
+        const ed = useEditorStore.getState()
+        if (ed.editing && !ed.isDirty && ed.editorContent !== content) {
+          ed.loadExternalContent(content)
+        }
+      }
     } catch (err) {
       showToast('error', `Save failed: ${err instanceof Error ? err.message : String(err)}`, 5000)
     }
@@ -307,8 +366,31 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     if (existing) clearTimeout(existing)
     autosaveTimers.set(pageId, setTimeout(() => {
       autosaveTimers.delete(pageId)
-      void get().savePage(pageId, content)
+      void (async () => {
+        await get().savePage(pageId, content)
+        // Clear the editor's dirty flag once this page is actually persisted.
+        if (get().currentPageId === pageId) {
+          const { useEditorStore } = await import('./editorStore')
+          useEditorStore.getState().markSaved(content)
+        }
+      })()
     }, AUTOSAVE_DEBOUNCE_MS))
+  },
+
+  flushPendingSaves: async () => {
+    const entries = Array.from(autosaveTimers.entries())
+    for (const [pageId, timer] of entries) {
+      clearTimeout(timer)
+      autosaveTimers.delete(pageId)
+      const tab = get().tabs.find((t) => t.pageId === pageId)
+      if (!tab || tab.content == null) continue
+      const content = tab.content
+      await get().savePage(pageId, content)
+      if (get().currentPageId === pageId) {
+        const { useEditorStore } = await import('./editorStore')
+        useEditorStore.getState().markSaved(content)
+      }
+    }
   },
 
   deletePage: async (pageId: string) => {
@@ -435,39 +517,42 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   // ─── Tabs ─────────────────────────────────────────────────────────────────
 
   closeTab: (tabId: string) => {
-    set((state) => {
-      const idx = state.tabs.findIndex((t) => t.id === tabId)
-      if (idx < 0) return {}
-      const closing = state.tabs[idx]
-      const tabs = state.tabs.filter((t) => t.id !== tabId)
+    void import('./editorStore').then(async ({ useEditorStore }) => {
+      // Persist any pending edits (the closing tab may be the one being edited).
+      await get().flushPendingSaves()
+      set((state) => {
+        const idx = state.tabs.findIndex((t) => t.id === tabId)
+        if (idx < 0) return {}
+        const closing = state.tabs[idx]
+        const tabs = state.tabs.filter((t) => t.id !== tabId)
 
-      let activeTabId = state.activeTabId
-      if (activeTabId === tabId) {
-        if (tabs.length === 0) activeTabId = null
-        else if (idx < tabs.length) activeTabId = tabs[idx].id
-        else activeTabId = tabs[tabs.length - 1].id
-      }
+        let activeTabId = state.activeTabId
+        if (activeTabId === tabId) {
+          if (tabs.length === 0) activeTabId = null
+          else if (idx < tabs.length) activeTabId = tabs[idx].id
+          else activeTabId = tabs[tabs.length - 1].id
+        }
 
-      return {
-        tabs,
-        activeTabId,
-        ...syncFromActiveTab(tabs, activeTabId),
-        recentlyClosedIds: [closing.pageId, ...state.recentlyClosedIds].slice(0, 10),
-      }
+        return {
+          tabs,
+          activeTabId,
+          ...syncFromActiveTab(tabs, activeTabId),
+          recentlyClosedIds: [closing.pageId, ...state.recentlyClosedIds].slice(0, 10),
+        }
+      })
+      // Re-sync the editor to whatever tab is now active (or clear if none).
+      useEditorStore.getState().syncForActiveTab()
     })
   },
 
   switchTab: (tabId: string) => {
-    const { tabs, activeTabId } = get()
+    const { activeTabId } = get()
     if (tabId === activeTabId) return
-    void import('./editorStore').then(({ useEditorStore }) => {
-      const editor = useEditorStore.getState()
-      if (editor.editing && editor.isDirty) {
-        const discard = window.confirm('You have unsaved changes. Discard them?')
-        if (!discard) return
-      }
-      useEditorStore.getState().reset()
-      set({ activeTabId: tabId, ...syncFromActiveTab(tabs, tabId), toc: [] })
+    void import('./editorStore').then(async ({ useEditorStore }) => {
+      // Persist the outgoing tab's edits, switch, then load the new tab's buffer.
+      await get().flushPendingSaves()
+      set({ activeTabId: tabId, ...syncFromActiveTab(get().tabs, tabId), toc: [] })
+      useEditorStore.getState().syncForActiveTab()
     })
   },
 

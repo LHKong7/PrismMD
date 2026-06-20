@@ -65,6 +65,14 @@ const electronAPI = {
     ipcRenderer.on('fs:directory-changed', handler)
     return () => ipcRenderer.removeListener('fs:directory-changed', handler)
   },
+  onFlushBeforeQuit: (callback: () => void): (() => void) => {
+    const handler = () => callback()
+    ipcRenderer.on('app:flush-before-quit', handler)
+    return () => ipcRenderer.removeListener('app:flush-before-quit', handler)
+  },
+  notifyFlushComplete: (): void => {
+    ipcRenderer.send('workspace:flush-complete')
+  },
 
   // Annotations
   loadAnnotations: (filePath: string): Promise<Annotation[]> =>
@@ -94,6 +102,15 @@ const electronAPI = {
 
   // Shell
   openExternal: (url: string): Promise<void> => ipcRenderer.invoke('shell:open-external', url),
+
+  // Data storage location
+  dataLocationGet: (): Promise<{ currentDir: string; defaultDir: string; isCustom: boolean }> =>
+    ipcRenderer.invoke('data-location:get'),
+  dataLocationChoose: (): Promise<string | null> => ipcRenderer.invoke('data-location:choose'),
+  dataLocationApply: (dir: string | null, migrate: boolean): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('data-location:apply', dir, migrate),
+  dataLocationReveal: (): Promise<void> => ipcRenderer.invoke('data-location:reveal'),
+  dataLocationRelaunch: (): Promise<void> => ipcRenderer.invoke('data-location:relaunch'),
 
   // Export
   exportHtml: (html: string, title: string): Promise<{ cancelled: boolean; filePath?: string }> =>
@@ -477,6 +494,8 @@ const electronAPI = {
   // Workspace (Notion-like page management)
   workspaceCreatePage: (title?: string, parentId?: string, content?: string): Promise<{ ok: boolean; page?: any; error?: string }> =>
     ipcRenderer.invoke('workspace:create-page', title, parentId, content),
+  workspaceCreateFolder: (title?: string, parentId?: string): Promise<{ ok: boolean; page?: any; error?: string }> =>
+    ipcRenderer.invoke('workspace:create-folder', title, parentId),
   workspaceGetPage: (pageId: string): Promise<any> =>
     ipcRenderer.invoke('workspace:get-page', pageId),
   workspaceUpdatePage: (pageId: string, updates: Record<string, any>): Promise<{ ok: boolean; error?: string }> =>

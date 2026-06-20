@@ -99,6 +99,9 @@ interface UIStore {
   /** When non-null, SettingsPanel mounts with this tab pre-selected. */
   pendingSettingsTab: string | null
 
+  /** Theme "Compare identities" gallery overlay. */
+  compareOpen: boolean
+
   toggleLeftSidebar: () => void
   toggleRightSidebar: () => void
   setLeftSidebarOpen: (open: boolean) => void
@@ -135,6 +138,9 @@ interface UIStore {
   closeSettings: () => void
   /** Consume the pending tab id, returning it once. */
   consumePendingSettingsTab: () => string | null
+
+  openCompare: () => void
+  closeCompare: () => void
 
   /** Load persisted layout from electron-store. */
   loadLayout: () => Promise<void>
@@ -180,6 +186,10 @@ export const useUIStore = create<UIStore>((set, get) => {
 
   settingsOpen: false,
   pendingSettingsTab: null,
+  compareOpen: false,
+
+  openCompare: () => set({ compareOpen: true }),
+  closeCompare: () => set({ compareOpen: false }),
 
   openSettings: (tab?: string) =>
     set({ settingsOpen: true, pendingSettingsTab: tab ?? null }),
@@ -307,21 +317,19 @@ export const useUIStore = create<UIStore>((set, get) => {
   setActivePaneId: (paneId) => {
     const s = get()
     if (paneId === s.splitLayout.activePaneId) return
-    // Reset editor when switching panes to prevent stale editing state.
-    void import('./editorStore').then(({ useEditorStore }) => {
-      const editor = useEditorStore.getState()
-      if (editor.editing) editor.reset()
-    })
     // Update active pane immediately.
     set((state) => ({
       splitLayout: { ...state.splitLayout, activePaneId: paneId },
     }))
-    // Sync global activeTabId to the new pane's tab.
+    // Sync global activeTabId to the new pane's tab — switchTab re-loads the
+    // editor buffer for that tab. If the pane has no tab, clear the editor.
     const pane = s.splitLayout.panes.find((p) => p.id === paneId)
     if (pane?.tabId) {
       void import('./workspaceStore').then(({ useWorkspaceStore }) => {
         useWorkspaceStore.getState().switchTab(pane.tabId!)
       })
+    } else {
+      void import('./editorStore').then(({ useEditorStore }) => useEditorStore.getState().reset())
     }
   },
 

@@ -170,9 +170,6 @@ export function DocSummary() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentFilePath])
 
-  if (!currentFilePath) return null
-  if (dismissedFor === currentFilePath) return null
-
   const [graphStatusDismissed, setGraphStatusDismissed] = useState(false)
 
   // Reset the transient graph status dismissal when a new ingest starts
@@ -189,6 +186,11 @@ export function DocSummary() {
     const id = setTimeout(() => setGraphStatusDismissed(true), 8000)
     return () => clearTimeout(id)
   }, [ingestIsForCurrent, ingestStage])
+
+  // Every hook is declared above this line; only now is it safe to bail out
+  // (early-returning before a hook would break the Rules of Hooks).
+  if (!currentFilePath) return null
+  if (dismissedFor === currentFilePath) return null
 
   const handleBuildGraph = () => {
     if (!currentFilePath || !graphGateOpen || ingestInFlight) return
@@ -212,7 +214,7 @@ export function DocSummary() {
 
   return (
     <div
-      className="mx-auto my-4 max-w-[48rem] rounded-lg border"
+      className="mx-4 my-3 rounded-lg border"
       style={{
         borderColor: 'var(--border-color)',
         backgroundColor: 'var(--bg-secondary)',

@@ -6,10 +6,12 @@ export function ReadingProgress() {
       style={{ backgroundColor: 'transparent' }}
     >
       <div
-        className="h-full transition-[width] duration-150 ease-out"
+        className="h-full"
         id="reading-progress-bar"
         style={{
           width: '0%',
+          // Spec §3.7: progress refracts at width .12s linear.
+          transition: 'width 0.12s linear',
           // Prism's refracted spectrum — read progress literally refracts.
           background: 'var(--prism-gradient, var(--progress-bar))',
         }}

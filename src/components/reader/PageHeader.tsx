@@ -77,7 +77,7 @@ export function PageHeader() {
   }
 
   return (
-    <div className="px-[max(1.5rem,calc((100%-48rem)/2))] pt-8 pb-1">
+    <div className="px-[max(1.5rem,calc((100%-720px)/2))] pt-8 pb-1">
       {/* Icon */}
       <div className="relative mb-1" ref={emojiRef}>
         {icon ? (
@@ -144,7 +144,8 @@ export function PageHeader() {
         className="w-full bg-transparent outline-none resize-none leading-tight"
         style={{
           color: 'var(--text-primary)',
-          fontSize: '2.5rem',
+          fontSize: '41px',
+          lineHeight: 1.12,
           fontWeight: 500,
           letterSpacing: '-0.012em',
           fontFamily: 'var(--font-display, inherit)',

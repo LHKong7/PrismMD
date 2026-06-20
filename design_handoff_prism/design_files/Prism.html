@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Prism — a reading instrument</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Spectral:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --font-display: 'Newsreader', Georgia, serif;
+    --font-read: 'Spectral', Georgia, serif;
+    --font-ui: 'Hanken Grotesk', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+  html, body, #root { height: 100%; width: 100%; overflow: hidden; }
+  body {
+    font-family: var(--font-ui);
+    background: var(--bg);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  #root { display: flex; flex-direction: column; }
+  ::selection { background: var(--accent-soft); color: var(--ink); }
+
+  /* themed scrollbars */
+  ::-webkit-scrollbar { width: 9px; height: 9px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--scroll); border-radius: 6px; border: 2px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--ink-3); background-clip: padding-box; border: 2px solid transparent; }
+
+  button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+  input, textarea { font-family: inherit; color: inherit; }
+  input:focus, textarea:focus, button:focus { outline: none; }
+  [data-focusable]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 5px; }
+
+  /* App fade */
+  @keyframes prismFade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes prismRise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes prismScale { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: scale(1); } }
+  @keyframes prismSweep { from { transform: translateX(-100%); } to { transform: translateX(0); } }
+  @keyframes prismThink { 0%, 100% { opacity: .3; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-3px); } }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  }
+
+  /* Newsprint identity — editorial signature: drop cap + heading rules */
+  [data-identity="newsprint"] .prism-lede::first-letter {
+    font-family: var(--font-display); font-weight: 500; font-size: 3.5em;
+    float: left; line-height: 0.78; padding: 6px 12px 2px 0; color: var(--accent);
+  }
+  [data-identity="newsprint"] .prism-prose h2 {
+    border-bottom: 1.5px solid var(--ink); padding-bottom: 7px;
+  }
+  [data-identity="newsprint"] .prism-prose h2::before {
+    content: "\00a7  "; color: var(--accent); font-family: var(--font-ui); font-weight: 700;
+  }
+
+  #boot {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: #e9e2d6; z-index: 9999; flex-direction: column; gap: 18px;
+    font-family: 'Hanken Grotesk', sans-serif; transition: opacity .4s ease;
+  }
+  #boot .mark { width: 52px; height: 52px; }
+  #boot .name { font-family: 'Newsreader', serif; font-size: 22px; letter-spacing: .04em; color: #2c2620; font-weight: 500; }
+  #boot .sub { font-size: 12px; color: #8c8273; letter-spacing: .18em; text-transform: uppercase; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+  // Adapt boot splash to a URL-forced theme so compare tiles don't flash light.
+  (function () {
+    var t = new URLSearchParams(location.search).get('theme');
+    var map = {
+      campfire: { bg: '#17130f', name: '#ece2d2', sub: '#7d7263', stroke: '#ece2d2', accent: '#e08a3c' },
+      newsprint: { bg: '#e4e0d7', name: '#211e19', sub: '#857d6f', stroke: '#211e19', accent: '#8c3a2b' },
+    };
+    var c = map[t];
+    if (!c) return;
+    document.addEventListener('DOMContentLoaded', function () {
+      var b = document.getElementById('boot'); if (!b) return;
+      b.style.background = c.bg;
+      b.querySelector('.name').style.color = c.name;
+      b.querySelector('.sub').style.color = c.sub;
+      b.querySelectorAll('path')[0].setAttribute('stroke', c.stroke);
+      b.querySelectorAll('path')[1].setAttribute('stroke', c.accent);
+    });
+  })();
+</script>
+<div id="boot">
+  <svg class="mark" viewBox="0 0 100 100" fill="none">
+    <path d="M50 14 L86 78 L14 78 Z" stroke="#2c2620" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M50 14 L50 78" stroke="#b06a2c" stroke-width="2"/>
+    <path d="M62 56 L90 44" stroke="#c2532f" stroke-width="2.5"/>
+    <path d="M62 60 L92 56" stroke="#c98a2a" stroke-width="2.5"/>
+    <path d="M62 64 L90 68" stroke="#5b8b4e" stroke-width="2.5"/>
+  </svg>
+  <div class="name">Prism</div>
+  <div class="sub">a reading instrument</div>
+</div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script src="prism/theme.js"></script>
+<script src="prism/content.js"></script>
+<script type="text/babel" src="prism/graph.jsx"></script>
+<script type="text/babel" src="prism/reader.jsx"></script>
+<script type="text/babel" src="prism/document.jsx"></script>
+<script type="text/babel" src="prism/panels.jsx"></script>
+<script type="text/babel" src="prism/chrome.jsx"></script>
+<script type="text/babel" src="prism/views.jsx"></script>
+<script type="text/babel" src="prism/app.jsx"></script>
+</body>
+</html>

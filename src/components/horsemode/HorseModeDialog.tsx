@@ -33,6 +33,7 @@ export function HorseModeDialog({ open, onClose }: Props) {
   const [titleManual, setTitleManual] = useState(false)
   const [useDocContext, setUseDocContext] = useState(false)
   const [iterations, setIterations] = useState(1)
+  const [humanVoice, setHumanVoice] = useState(true)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const hasDocument = !!currentPageId
@@ -55,6 +56,7 @@ export function HorseModeDialog({ open, onClose }: Props) {
       setTitleManual(false)
       setUseDocContext(hasDocument)
       setIterations(1)
+      setHumanVoice(true)
     }
   }, [open, hasDocument])
 
@@ -72,7 +74,7 @@ export function HorseModeDialog({ open, onClose }: Props) {
     if (!task.trim() || !title.trim()) return
     onClose()
     const docCtx = useDocContext && documentContent ? documentContent : undefined
-    void start(task.trim(), title.trim(), iterations, docCtx)
+    void start(task.trim(), title.trim(), iterations, docCtx, humanVoice)
   }
 
   if (!open) return null
@@ -138,6 +140,30 @@ export function HorseModeDialog({ open, onClose }: Props) {
               </div>
             </label>
           )}
+
+          {/* Human voice toggle — make the draft read like a real person wrote it */}
+          <label
+            className="flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors"
+            style={{
+              borderColor: humanVoice ? 'var(--accent-color)' : 'var(--border-color)',
+              backgroundColor: humanVoice ? 'var(--color-info-bg)' : 'transparent',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={humanVoice}
+              onChange={(e) => setHumanVoice(e.target.checked)}
+              className="mt-0.5 accent-[var(--accent-color)]"
+            />
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+                {t('horseMode.humanVoice')}
+              </div>
+              <div className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                {t('horseMode.humanVoiceDesc')}
+              </div>
+            </div>
+          </label>
 
           {/* Task */}
           <div>
@@ -238,7 +264,7 @@ export function HorseModeDialog({ open, onClose }: Props) {
               onClick={handleStart}
               disabled={!task.trim() || !title.trim()}
               className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-40"
-              style={{ backgroundColor: 'var(--accent-color)', color: '#fff' }}
+              style={{ backgroundColor: 'var(--accent-color)', color: 'var(--accent-ink, #fff)' }}
             >
               <Zap size={13} />
               {t('horseMode.start')}

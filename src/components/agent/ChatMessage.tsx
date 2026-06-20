@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { Bot, User, AlertCircle, RotateCcw, Copy, Check } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { ChatMessage as ChatMessageType, CitationEvidence } from '../../store/agentStore'
 import { useAgentStore } from '../../store/agentStore'
 import { useWorkspaceStore } from '../../store/workspaceStore'
 import { useReaderDomStore } from '../../store/readerDomStore'
+import { ChatMarkdown, CitationSuperscript } from './ChatMarkdown'
 
 interface ChatMessageProps {
   message: ChatMessageType
@@ -57,34 +58,6 @@ export function renderWithCitations(
   return parts
 }
 
-function CitationSuperscript({
-  evidence,
-  onClick,
-}: {
-  evidence: CitationEvidence
-  onClick: () => void
-}) {
-  return (
-    <sup>
-      <button
-        type="button"
-        onClick={onClick}
-        title={evidence.text}
-        aria-label={`Citation ${evidence.index}`}
-        className="align-super mx-0.5 px-1 rounded text-[0.65em] font-semibold transition-colors"
-        style={{
-          color: 'var(--accent-color)',
-          backgroundColor: 'color-mix(in srgb, var(--accent-color) 12%, transparent)',
-          border: '1px solid color-mix(in srgb, var(--accent-color) 25%, transparent)',
-          lineHeight: 1,
-        }}
-      >
-        {evidence.index}
-      </button>
-    </sup>
-  )
-}
-
 export function ChatMessage({ message }: ChatMessageProps) {
   const { t } = useTranslation()
   const isUser = message.role === 'user'
@@ -95,12 +68,10 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const currentFilePath = useWorkspaceStore((s) => s.currentFilePath)
   const [copied, setCopied] = useState(false)
 
-  const body = useMemo(() => {
-    if (isUser) return message.content
-    return renderWithCitations(message.content, message.evidence, (ev) => {
-      scrollToEvidence(ev.text)
-    })
-  }, [message.content, message.evidence, isUser, scrollToEvidence])
+  const onCitationClick = useCallback(
+    (ev: CitationEvidence) => scrollToEvidence(ev.text),
+    [scrollToEvidence],
+  )
 
   const handleCopy = async () => {
     try {
@@ -137,7 +108,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
         {isError ? (
           <AlertCircle size={14} color="#fff" />
         ) : isUser ? (
-          <User size={14} color="#fff" />
+          <User size={14} style={{ color: 'var(--accent-ink, #fff)' }} />
         ) : (
           <Bot size={14} style={{ color: 'var(--accent-color)' }} />
         )}
@@ -177,10 +148,18 @@ export function ChatMessage({ message }: ChatMessageProps) {
           )}
         </div>
         <div
-          className="text-sm leading-relaxed whitespace-pre-wrap break-words"
+          className="text-sm leading-relaxed break-words"
           style={{ color: isError ? 'var(--color-error)' : 'var(--text-secondary)' }}
         >
-          {body}
+          {isUser || isError ? (
+            <div className="whitespace-pre-wrap">{message.content}</div>
+          ) : (
+            <ChatMarkdown
+              content={message.content}
+              evidence={message.evidence}
+              onCitationClick={onCitationClick}
+            />
+          )}
         </div>
 
         {isError && message.errorRetryPrompt && (

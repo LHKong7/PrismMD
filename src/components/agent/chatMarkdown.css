@@ -1,0 +1,87 @@
+/* Theme-aware markdown styling for assistant chat replies (.chat-md).
+ * Compact, reads against --bg in the agent sidebar, and follows the active
+ * theme via CSS variables rather than Tailwind `prose` so all presets match. */
+.chat-md {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.chat-md > :first-child { margin-top: 0; }
+.chat-md > :last-child { margin-bottom: 0; }
+
+.chat-md p { margin: 0 0 0.6em; }
+
+.chat-md h1, .chat-md h2, .chat-md h3,
+.chat-md h4, .chat-md h5, .chat-md h6 {
+  color: var(--text-primary);
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 1em 0 0.4em;
+}
+.chat-md h1 { font-size: 1.2em; }
+.chat-md h2 { font-size: 1.12em; }
+.chat-md h3 { font-size: 1.05em; }
+.chat-md h4, .chat-md h5, .chat-md h6 { font-size: 1em; }
+
+.chat-md ul, .chat-md ol { margin: 0.3em 0 0.6em; padding-left: 1.35em; }
+.chat-md ul { list-style: disc; }
+.chat-md ol { list-style: decimal; }
+.chat-md li { margin: 0.15em 0; }
+.chat-md li > ul, .chat-md li > ol { margin: 0.15em 0; }
+
+.chat-md a { color: var(--accent-color); text-decoration: none; }
+.chat-md a:hover { text-decoration: underline; }
+
+.chat-md strong { font-weight: 600; color: var(--text-primary); }
+.chat-md em { font-style: italic; }
+
+.chat-md code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--code-bg);
+  color: var(--text-primary);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+.chat-md pre {
+  background: var(--code-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.7em 0.85em;
+  overflow-x: auto;
+  margin: 0.5em 0 0.7em;
+}
+.chat-md pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.85em;
+  color: var(--text-primary);
+  display: block;
+}
+
+.chat-md blockquote {
+  margin: 0.5em 0;
+  padding-left: 0.85em;
+  border-left: 3px solid var(--border-color);
+  color: var(--text-muted);
+}
+.chat-md hr { border: none; border-top: 1px solid var(--border-color); margin: 0.8em 0; }
+
+.chat-md table {
+  border-collapse: collapse;
+  margin: 0.5em 0;
+  font-size: 0.92em;
+  display: block;
+  overflow-x: auto;
+}
+.chat-md th, .chat-md td { border: 1px solid var(--border-color); padding: 0.3em 0.6em; text-align: left; }
+.chat-md th { background: var(--bg-secondary); font-weight: 600; color: var(--text-primary); }
+
+.chat-md img { max-width: 100%; border-radius: 6px; }
+
+/* GFM task lists */
+.chat-md ul.contains-task-list { list-style: none; padding-left: 0.2em; }
+.chat-md li.task-list-item { list-style: none; }
+.chat-md input[type="checkbox"] { accent-color: var(--accent-color); margin-right: 0.4em; }

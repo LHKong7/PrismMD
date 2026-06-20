@@ -12,10 +12,14 @@
  *   testConnection() — quick connectivity test
  *   stopGeneration() — abort in-flight stream
  */
-import { app, BrowserWindow } from 'electron'
+import { BrowserWindow } from 'electron'
 import { getActiveProvider, loadSettings } from './settingsStore'
 import { discoverAll as discoverAllMcpTools } from './mcpService'
 import { agentWorker } from './agentWorkerManager'
+import { traceEvent } from './agentTrace'
+
+// Re-exported so IPC handlers can keep importing it from aiService.
+export { setTraceWindow } from './agentTrace'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -35,29 +39,6 @@ interface McpTool {
   name: string
   description: string
   inputSchema: Record<string, unknown>
-}
-
-// ─── Trace ─────────────────────────────────────────────────────────────────
-
-type TraceType = 'request' | 'system-prompt' | 'messages' | 'tools' | 'response' | 'tool-call' | 'error'
-
-let traceWindow: BrowserWindow | null = null
-
-export function setTraceWindow(win: BrowserWindow) {
-  traceWindow = win
-}
-
-function traceEvent(type: TraceType, label: string, data: unknown, durationMs?: number) {
-  if (app.isPackaged) return
-  if (!traceWindow || traceWindow.isDestroyed()) return
-  traceWindow.webContents.send('agent:trace', {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    timestamp: Date.now(),
-    type,
-    label,
-    data,
-    durationMs,
-  })
 }
 
 // ─── Abort ──────────────────────────────────────────────────────────────────
@@ -145,6 +126,12 @@ export async function sendMessage(
   // Trace
   traceEvent('request', `Stream → ${provider}/${model}`, { provider, model, type: 'stream' })
   traceEvent('system-prompt', 'System prompt', { text: systemPrompt })
+  if (toolDefs.length > 0) {
+    traceEvent('tools', `${toolDefs.length} MCP tool(s) attached`, {
+      count: toolDefs.length,
+      tools: toolDefs.map((tool) => ({ name: tool.name, description: tool.description })),
+    })
+  }
 
   const history = request.messages.slice(0, -1)
   const lastMessage = request.messages[request.messages.length - 1]
@@ -212,6 +199,15 @@ export async function sendOneShot(request: {
   const { toolDefs } = await discoverMcpToolDefs()
 
   traceEvent('request', `One-shot → ${provider}/${model}`, { provider, model, type: 'one-shot', hasJsonSchema: !!request.jsonSchema })
+  if (request.systemPrompt || request.jsonSchema) {
+    traceEvent('system-prompt', 'System prompt', { text: systemPrompt })
+  }
+  if (toolDefs.length > 0) {
+    traceEvent('tools', `${toolDefs.length} MCP tool(s) attached`, {
+      count: toolDefs.length,
+      tools: toolDefs.map((tool) => ({ name: tool.name, description: tool.description })),
+    })
+  }
   traceEvent('messages', 'Prompt sent', { messages: [{ role: 'user', content: request.prompt }] })
 
   const startMs = Date.now()
@@ -275,11 +271,23 @@ export async function runTask(
   const { provider, model } = active
   const systemPrompt = request.systemPrompt || 'You are a talented, creative writer. Format as markdown.'
 
+  // Attach MCP tools so the EXECUTE phase of the autonomous loop can actually
+  // act (gather information / perform actions via tools), not just generate
+  // text. The loop still plans first; tools are used during execution.
+  const { toolDefs, warning: mcpWarning } = await discoverMcpToolDefs()
+  if (mcpWarning) mainWindow.webContents.send('agent:mcp-warning', mcpWarning)
+
   traceEvent('request', `RunTask → ${provider}/${model}`, {
     provider, model, type: 'run-task',
     qualityThreshold: request.qualityThreshold ?? 7,
     maxIterations: request.maxIterations ?? 5,
   })
+  if (toolDefs.length > 0) {
+    traceEvent('tools', `${toolDefs.length} MCP tool(s) attached`, {
+      count: toolDefs.length,
+      tools: toolDefs.map((tool) => ({ name: tool.name, description: tool.description })),
+    })
+  }
 
   const startMs = Date.now()
 
@@ -291,6 +299,7 @@ export async function runTask(
         task: request.task,
         qualityThreshold: request.qualityThreshold ?? 7,
         maxIterations: request.maxIterations ?? 5,
+        toolDefs,
       },
       (progress) => {
         if (!mainWindow.isDestroyed()) {

@@ -24,7 +24,7 @@ import '../../styles/cjk.css'
  */
 export function MarkdownReader() {
   const { t } = useTranslation()
-  const { content: currentContent } = usePaneFileData()
+  const { content: currentContent, isActivePane } = usePaneFileData()
   const { content, codeMarkers, toc, isProcessing, error } = useMarkdown(currentContent)
   const scrollRef = useRef<HTMLDivElement>(null)
   const markdownBodyRef = useRef<HTMLDivElement>(null)
@@ -36,6 +36,9 @@ export function MarkdownReader() {
   // Cmd/Ctrl+F opens the in-file search bar. Scoped to when MarkdownReader
   // is mounted so it doesn't fight other views' shortcuts.
   useEffect(() => {
+    // Only the active pane grabs Cmd+F — otherwise an inactive read-only pane
+    // would pop its search bar while the active editor handles its own search.
+    if (!isActivePane) return
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
         e.preventDefault()
@@ -44,7 +47,7 @@ export function MarkdownReader() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [search])
+  }, [search, isActivePane])
 
   // Intercept link clicks in the rendered markdown and open external
   // URLs in the OS default browser instead of navigating the Electron window.

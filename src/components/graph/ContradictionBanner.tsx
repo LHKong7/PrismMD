@@ -115,7 +115,7 @@ export function ContradictionBanner() {
 
   return (
     <div
-      className="mx-auto mt-4 mb-2 max-w-[48rem] rounded-lg border flex items-start gap-2 p-3"
+      className="mx-auto mt-4 mb-2 max-w-[720px] rounded-lg border flex items-start gap-2 p-3"
       style={{
         borderColor: 'var(--color-warning-border)',
         backgroundColor: 'var(--color-warning-bg)',

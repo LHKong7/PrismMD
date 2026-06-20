@@ -9,6 +9,7 @@ import { registerUpdaterHandlers } from './updaterHandlers'
 import { registerExportHandlers } from './exportHandlers'
 import { registerKnowledgeBaseHandlers } from './knowledgeBaseHandlers'
 import { registerWorkspaceHandlers } from './workspaceHandlers'
+import { registerDataLocationHandlers } from './dataLocationHandlers'
 import { getMainWindow } from '../main'
 
 /**
@@ -31,4 +32,5 @@ export function registerIpcHandlers() {
   registerExportHandlers()
   registerKnowledgeBaseHandlers()
   registerWorkspaceHandlers()
+  registerDataLocationHandlers()
 }

@@ -129,7 +129,7 @@ function PromptItem({ config, expanded, onToggle, onSave, onReset }: {
             <button
               onClick={handleSave}
               className="px-3 py-1 rounded text-[11px] font-medium transition-colors"
-              style={{ backgroundColor: 'var(--accent-color)', color: '#fff' }}
+              style={{ backgroundColor: 'var(--accent-color)', color: 'var(--accent-ink, #fff)' }}
             >
               {t('settings.prompts.save', 'Save')}
             </button>

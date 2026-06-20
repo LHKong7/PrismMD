@@ -39,6 +39,14 @@ export function registerWorkspaceHandlers() {
     }
   })
 
+  ipcMain.handle('workspace:create-folder', async (_event, title?: string, parentId?: string) => {
+    try {
+      return { ok: true, page: createPage(title ?? 'New Folder', parentId, '', 'md', true) }
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) }
+    }
+  })
+
   ipcMain.handle('workspace:get-page', async (_event, pageId: string) => {
     return getPage(pageId)
   })

@@ -22,6 +22,8 @@ export interface Page {
   updatedAt: number
   isDeleted: boolean
   icon: string | null
+  /** Folders are pure containers (no document content) that group pages. */
+  isFolder: boolean
 }
 
 export interface PageTreeNode {
@@ -31,6 +33,7 @@ export interface PageTreeNode {
   format: string
   parentId: string | null
   position: number
+  isFolder: boolean
   children: PageTreeNode[]
 }
 
@@ -40,6 +43,7 @@ export interface PageSummary {
   icon: string | null
   format: string
   updatedAt: number
+  isFolder: boolean
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -56,6 +60,7 @@ function rowToPage(row: any): Page {
     updatedAt: row.updated_at,
     isDeleted: !!row.is_deleted,
     icon: row.icon ?? null,
+    isFolder: !!row.is_folder,
   }
 }
 
@@ -66,6 +71,7 @@ export function createPage(
   parentId?: string | null,
   content: string = '',
   format: string = 'md',
+  isFolder: boolean = false,
 ): Page {
   const db = getDb()
   const id = crypto.randomUUID()
@@ -78,11 +84,11 @@ export function createPage(
   const position = (siblings?.maxPos ?? -1) + 1
 
   db.prepare(`
-    INSERT INTO pages (id, title, content, format, parent_id, position, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, title, content, format, parentId ?? null, position, now, now)
+    INSERT INTO pages (id, title, content, format, parent_id, position, created_at, updated_at, is_folder)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(id, title, content, format, parentId ?? null, position, now, now, isFolder ? 1 : 0)
 
-  return { id, title, content, format, parentId: parentId ?? null, position, createdAt: now, updatedAt: now, isDeleted: false, icon: null }
+  return { id, title, content, format, parentId: parentId ?? null, position, createdAt: now, updatedAt: now, isDeleted: false, icon: null, isFolder }
 }
 
 export function getPage(id: string): Page | null {
@@ -93,7 +99,7 @@ export function getPage(id: string): Page | null {
 
 export function updatePage(
   id: string,
-  updates: Partial<Pick<Page, 'title' | 'content' | 'parentId' | 'position' | 'icon' | 'format'>>,
+  updates: Partial<Pick<Page, 'title' | 'content' | 'parentId' | 'position' | 'icon' | 'format' | 'isFolder'>>,
 ): void {
   const db = getDb()
   const sets: string[] = []
@@ -105,6 +111,7 @@ export function updatePage(
   if (updates.position !== undefined) { sets.push('position = ?'); values.push(updates.position) }
   if (updates.icon !== undefined) { sets.push('icon = ?'); values.push(updates.icon) }
   if (updates.format !== undefined) { sets.push('format = ?'); values.push(updates.format) }
+  if (updates.isFolder !== undefined) { sets.push('is_folder = ?'); values.push(updates.isFolder ? 1 : 0) }
 
   if (sets.length === 0) return
 
@@ -143,7 +150,7 @@ export function getChildren(parentId: string | null): Page[] {
 export function getPageTree(): PageTreeNode[] {
   const db = getDb()
   const rows = db.prepare(
-    'SELECT id, title, icon, format, parent_id, position FROM pages WHERE is_deleted = 0 ORDER BY position ASC, created_at ASC',
+    'SELECT id, title, icon, format, parent_id, position, is_folder FROM pages WHERE is_deleted = 0 ORDER BY position ASC, created_at ASC',
   ).all() as any[]
 
   // Build tree in memory
@@ -158,6 +165,7 @@ export function getPageTree(): PageTreeNode[] {
       format: row.format,
       parentId: row.parent_id ?? null,
       position: row.position,
+      isFolder: !!row.is_folder,
       children: [],
     })
   }
@@ -185,9 +193,9 @@ export function getAncestors(id: string): PageSummary[] {
   let currentId: string | null = id
 
   while (currentId) {
-    const row = db.prepare('SELECT id, title, icon, format, parent_id, updated_at FROM pages WHERE id = ?').get(currentId) as any
+    const row = db.prepare('SELECT id, title, icon, format, parent_id, updated_at, is_folder FROM pages WHERE id = ?').get(currentId) as any
     if (!row) break
-    ancestors.unshift({ id: row.id, title: row.title, icon: row.icon, format: row.format, updatedAt: row.updated_at })
+    ancestors.unshift({ id: row.id, title: row.title, icon: row.icon, format: row.format, updatedAt: row.updated_at, isFolder: !!row.is_folder })
     currentId = row.parent_id
   }
 
@@ -199,10 +207,11 @@ export function getAncestors(id: string): PageSummary[] {
 export function searchPages(query: string): PageSummary[] {
   const db = getDb()
   const pattern = `%${query}%`
+  // Folders are containers, not documents — keep them out of search results.
   const rows = db.prepare(
-    'SELECT id, title, icon, format, updated_at FROM pages WHERE is_deleted = 0 AND (title LIKE ? OR content LIKE ?) ORDER BY updated_at DESC LIMIT 50',
+    'SELECT id, title, icon, format, updated_at FROM pages WHERE is_deleted = 0 AND is_folder = 0 AND (title LIKE ? OR content LIKE ?) ORDER BY updated_at DESC LIMIT 50',
   ).all(pattern, pattern) as any[]
-  return rows.map((r) => ({ id: r.id, title: r.title, icon: r.icon, format: r.format, updatedAt: r.updated_at }))
+  return rows.map((r) => ({ id: r.id, title: r.title, icon: r.icon, format: r.format, updatedAt: r.updated_at, isFolder: false }))
 }
 
 // ─── Import / Export ────────────────────────────────────────────────────────
@@ -221,8 +230,8 @@ export function importFolder(folderPath: string, parentId?: string | null): Page
   for (const entry of entries) {
     const fullPath = path.join(folderPath, entry.name)
     if (entry.isDirectory()) {
-      // Create a parent page for the folder
-      const folderPage = createPage(entry.name, parentId, '', 'md')
+      // Mirror the directory as a real folder (container, not a document)
+      const folderPage = createPage(entry.name, parentId, '', 'md', true)
       imported.push(folderPage)
       imported.push(...importFolder(fullPath, folderPage.id))
     } else if (/\.(md|markdown|mdx)$/i.test(entry.name)) {
@@ -236,6 +245,7 @@ export function importFolder(folderPath: string, parentId?: string | null): Page
 export function exportMarkdown(pageId: string, targetPath: string): void {
   const page = getPage(pageId)
   if (!page) throw new Error(`Page not found: ${pageId}`)
+  if (page.isFolder) throw new Error('Cannot export a folder')
   fs.writeFileSync(targetPath, page.content, 'utf-8')
 }
 

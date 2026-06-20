@@ -81,7 +81,7 @@ export function StatusBar() {
           <button
             onClick={toggleDeepEditing}
             className="flex items-center gap-1 px-1.5 py-0.5 rounded transition-colors hover:opacity-80"
-            style={{ backgroundColor: 'var(--accent-color)', color: '#fff' }}
+            style={{ backgroundColor: 'var(--accent-color)', color: 'var(--accent-ink, #fff)' }}
             title={t('statusBar.deepEditing', 'Deep Editing — click to exit')}
           >
             <span className="text-[10px] font-medium">{t('statusBar.deepEditingLabel', 'Deep Editing')}</span>
@@ -248,7 +248,7 @@ export function StatusBar() {
           <button
             onClick={quitAndInstall}
             className="flex items-center gap-1 px-2 h-5 rounded text-[11px] font-medium"
-            style={{ backgroundColor: 'var(--accent-color)', color: '#fff' }}
+            style={{ backgroundColor: 'var(--accent-color)', color: 'var(--accent-ink, #fff)' }}
             title={
               updaterVersion
                 ? t('statusBar.updater.readyWithVersion', { version: updaterVersion })

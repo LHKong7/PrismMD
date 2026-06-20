@@ -3,6 +3,7 @@ import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightSpecialC
 import { Compartment, EditorState, type Extension } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
 import { bracketMatching, indentOnInput } from '@codemirror/language'
+import { search, searchKeymap } from '@codemirror/search'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useEditorStore } from '../../store/editorStore'
 import { editorAIExtension, type EditorSelectionInfo } from './editorAIPlugin'
@@ -100,6 +101,7 @@ export function CodeMirrorEditor({ content, onChange, language }: Props) {
       history(),
       bracketMatching(),
       indentOnInput(),
+      search({ top: true }),
       richStyleCompartment.of(richEditMode ? editorMarkdownStyleExtension : []),
       keymap.of([
         {
@@ -145,6 +147,7 @@ export function CodeMirrorEditor({ content, onChange, language }: Props) {
         },
         ...defaultKeymap,
         ...historyKeymap,
+        ...searchKeymap,
         indentWithTab,
         {
           key: 'Mod-=',

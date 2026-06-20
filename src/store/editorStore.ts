@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { useWorkspaceStore } from './workspaceStore'
 import { extractHeadingsFromSource, type EditorTocEntry } from '../lib/markdown/extractHeadings'
+import { kindOfFormat } from '../lib/fileFormat'
 import type { EditorView } from '@codemirror/view'
 
 interface EditorStore {
@@ -18,10 +19,14 @@ interface EditorStore {
   editorViewRef: EditorView | null
 
   setEditing: (on: boolean) => void
-  toggleEditing: () => void
   setEditorContent: (content: string) => void
   saveFile: () => Promise<void>
-  discardChanges: () => void
+  /** Mark the buffer as persisted (clears dirty) — called by the autosave path. */
+  markSaved: (content: string) => void
+  /** Replace the buffer with content written externally (e.g. an agent) into the open page. */
+  loadExternalContent: (content: string) => void
+  /** Re-sync the editor to the active tab: enable editing for text docs. */
+  syncForActiveTab: () => void
   /** Reset editor state (used when switching files). */
   reset: () => void
   /** Set the CodeMirror EditorView ref for scroll-to-line support. */
@@ -58,9 +63,31 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     }
   },
 
-  toggleEditing: () => {
-    const { editing } = get()
-    get().setEditing(!editing)
+  markSaved: (content: string) => {
+    // Clear dirty only if the buffer hasn't moved on since the save started.
+    const { editorContent } = get()
+    set({ savedContent: content, isDirty: editorContent !== content })
+  },
+
+  loadExternalContent: (content: string) => {
+    // A programmatic write (Horse Mode, weekly summary, template insert) landed
+    // in the currently-open page. Refresh the editor's own buffer so it shows the
+    // new text and a later keystroke doesn't clobber it with the stale buffer.
+    const editorToc = extractHeadingsFromSource(content)
+    set({ editorContent: content, savedContent: content, isDirty: false, editorToc })
+    useWorkspaceStore.getState().setToc(editorToc)
+  },
+
+  syncForActiveTab: () => {
+    const ws = useWorkspaceStore.getState()
+    const isText = ws.currentFormat ? kindOfFormat(ws.currentFormat) === 'text' : false
+    if (isText) {
+      // Single always-editable mode — load the active document into the buffer.
+      get().setEditing(true)
+    } else {
+      // Non-text formats (pdf/csv/xlsx) render their own viewers, no editor.
+      set({ editing: false, editorContent: null, isDirty: false, savedContent: null, editorToc: [] })
+    }
   },
 
   setEditorContent: (content: string) => {
@@ -69,6 +96,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       editorContent: content,
       isDirty: content !== savedContent,
     })
+    // Live-sync the active tab and schedule the debounced SQLite autosave.
+    useWorkspaceStore.getState().setContent(content)
     // Debounced heading extraction (300ms)
     if (tocUpdateTimer) clearTimeout(tocUpdateTimer)
     tocUpdateTimer = setTimeout(() => {
@@ -84,9 +113,8 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
     if (!pageId || editorContent == null) return
 
     try {
-      // setContent updates the in-memory tab and debounce-saves to SQLite;
-      // savePage forces an immediate persist for explicit Cmd+S.
-      useWorkspaceStore.getState().setContent(editorContent)
+      // Edits already stream into SQLite via the debounced autosave; an explicit
+      // Cmd+S just forces an immediate persist.
       await useWorkspaceStore.getState().savePage(pageId, editorContent)
       set({ savedContent: editorContent, isDirty: false })
       const { useToastStore } = await import('./toastStore')
@@ -96,14 +124,6 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
       const msg = err instanceof Error ? err.message : String(err)
       useToastStore.getState().show('error', `Save failed: ${msg}`, 5000)
     }
-  },
-
-  discardChanges: () => {
-    const { savedContent } = get()
-    set({
-      editorContent: savedContent,
-      isDirty: false,
-    })
   },
 
   reset: () => {

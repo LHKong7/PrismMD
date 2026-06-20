@@ -63,7 +63,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       )}
       style={
         isPrimary
-          ? { backgroundColor: 'var(--accent-color)', color: '#fff', ...style }
+          ? { backgroundColor: 'var(--accent-color)', color: 'var(--accent-ink, #fff)', ...style }
           : style
       }
       {...rest}

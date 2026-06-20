@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { X, Check, Globe, Palette, Bot, Eye, EyeOff, Shield, Trash2, Network, AlertTriangle, RefreshCw, Puzzle, FolderOpen, CircleAlert, Info, Download, Keyboard, Pencil, BookMarked, FileStack, MessageSquare, ChevronDown, ChevronRight } from 'lucide-react'
+import { X, Check, Globe, Palette, Bot, Eye, EyeOff, Shield, Trash2, Network, AlertTriangle, RefreshCw, Puzzle, FolderOpen, CircleAlert, Info, Download, Keyboard, Pencil, BookMarked, FileStack, MessageSquare, ChevronDown, ChevronRight, HardDrive } from 'lucide-react'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
 import { Button } from '../ui/Button'
 import { Spinner } from '../ui/Spinner'
@@ -15,6 +15,7 @@ import { TemplateSettings } from './TemplateSettings'
 import { PromptSettings } from './PromptSettings'
 import { AgentSessionsPanel } from './AgentSessionsPanel'
 import { PromptLibrary } from './PromptLibrary'
+import { AgentTracePanel } from '../dev/AgentTracePanel'
 import { themes } from '../../lib/theme/themes'
 import { LANGUAGES, changeLanguage, type SupportedLanguage } from '../../i18n'
 import { clsx } from 'clsx'
@@ -24,14 +25,17 @@ interface SettingsPanelProps {
   onClose: () => void
 }
 
-type Tab = 'language' | 'theme' | 'editor' | 'templates' | 'knowledge' | 'privacy' | 'insightgraph' | 'plugins' | 'mcp' | 'shortcuts' | 'agent' | 'about'
+type Tab = 'language' | 'theme' | 'editor' | 'templates' | 'knowledge' | 'privacy' | 'storage' | 'insightgraph' | 'plugins' | 'mcp' | 'shortcuts' | 'agent' | 'about'
 
 export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
   const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<Tab>('language')
   const consumePendingTab = useUIStore((s) => s.consumePendingSettingsTab)
+  const compareOpen = useUIStore((s) => s.compareOpen)
   const dialogRef = useRef<HTMLDivElement>(null)
-  useFocusTrap(dialogRef, open)
+  // Hand the focus trap over to the Compare gallery when it opens on top of us,
+  // so the two traps don't fight over focus in the now-hidden Settings panel.
+  useFocusTrap(dialogRef, open && !compareOpen)
 
   // Esc closes the dialog — companion to the focus trap so keyboard
   // users have an obvious exit.
@@ -97,6 +101,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
               { id: 'plugins' as Tab, icon: Puzzle, label: t('settings.plugins.title') },
               { id: 'mcp' as Tab, icon: Bot, label: t('settings.mcp.title') },
               { id: 'privacy' as Tab, icon: Shield, label: t('settings.privacy.title') },
+              { id: 'storage' as Tab, icon: HardDrive, label: t('settings.storage.title') },
               { id: 'shortcuts' as Tab, icon: Keyboard, label: t('settings.shortcuts.title') },
               { id: 'about' as Tab, icon: Info, label: t('settings.about.title') },
             ]).map(({ id, icon: Icon, label }) => (
@@ -129,6 +134,7 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             {activeTab === 'plugins' && <PluginsSettings />}
             {activeTab === 'mcp' && <McpSettingsSection />}
             {activeTab === 'privacy' && <PrivacySettings />}
+            {activeTab === 'storage' && <StorageSettings />}
             {activeTab === 'shortcuts' && <ShortcutsHelp />}
             {activeTab === 'about' && <AboutSettings />}
           </ScrollPaneWithFade>
@@ -247,6 +253,10 @@ function AgentCombinedSettings() {
       <CollapsibleSection title={t('settings.agentSessions.sessionsTitle', 'Sessions')} defaultOpen={false}>
         <AgentSessionsPanel />
       </CollapsibleSection>
+
+      <CollapsibleSection title={t('settings.developer.title')} defaultOpen={false}>
+        <AgentTracePanel />
+      </CollapsibleSection>
     </div>
   )
 }
@@ -294,6 +304,7 @@ function ThemeSettings() {
   const themeMode = useSettingsStore((s) => s.themeMode)
   const setThemeId = useSettingsStore((s) => s.setThemeId)
   const setThemeMode = useSettingsStore((s) => s.setThemeMode)
+  const openCompare = useUIStore((s) => s.openCompare)
 
   const pick = (id: string) => { setThemeId(id); if (themeMode === 'system') setThemeMode('manual') }
   // The three Prism "reading instrument" identities lead; the rest follow.
@@ -315,9 +326,19 @@ function ThemeSettings() {
       </label>
 
       {/* Reading identities — the design's featured cards with live preview + blurb */}
-      <p className="text-[10px] font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
-        {t('settings.theme.identities', 'Reading identities')}
-      </p>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+          {t('settings.theme.identities', 'Reading identities')}
+        </p>
+        <button
+          onClick={openCompare}
+          className="flex items-center gap-1.5 text-[11px] font-medium rounded-md px-2 py-1 transition-colors hover:bg-[var(--bg-secondary)]"
+          style={{ color: 'var(--accent-color)' }}
+        >
+          <Palette size={12} />
+          {t('settings.theme.compare', 'Compare')}
+        </button>
+      </div>
       <div className="grid grid-cols-3 gap-3 mb-6">
         {identities.map((theme) => {
           const on = themeId === theme.id
@@ -333,7 +354,7 @@ function ThemeSettings() {
                 <div className="h-2 w-3/5 rounded" style={{ backgroundColor: theme.colors['--text-primary'] }} />
                 <div className="flex gap-1">
                   {swatch.map((c, i) => (
-                    <span key={i} className="w-4 h-4 rounded-full" style={{ backgroundColor: c, border: '1px solid rgba(0,0,0,.12)' }} />
+                    <span key={i} className="w-4 h-4 rounded-full" style={{ backgroundColor: c, border: '1px solid var(--border-color)' }} />
                   ))}
                 </div>
               </div>
@@ -1370,7 +1391,7 @@ function McpSettingsSection() {
           <button
             onClick={handleSave}
             className="text-xs px-3 py-1 rounded font-medium"
-            style={{ backgroundColor: 'var(--accent-color)', color: '#fff' }}
+            style={{ backgroundColor: 'var(--accent-color)', color: 'var(--accent-ink, #fff)' }}
           >
             {t('settings.mcp.save')}
           </button>
@@ -1483,7 +1504,7 @@ function ShortcutsHelp() {
     {
       title: t('settings.shortcuts.editor'),
       shortcuts: [
-        { keys: `${mod}+E`, label: t('settings.shortcuts.toggleEdit') },
+        { keys: `${mod}+F`, label: t('settings.shortcuts.find') },
         { keys: `${mod}+S`, label: t('settings.shortcuts.save') },
       ],
     },
@@ -1551,6 +1572,108 @@ function ShortcutsHelp() {
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+function StorageSettings() {
+  const { t } = useTranslation()
+  const [info, setInfo] = useState<{ currentDir: string; defaultDir: string; isCustom: boolean } | null>(null)
+  const [pending, setPending] = useState<{ dir: string | null } | null>(null)
+  const [migrate, setMigrate] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    void window.electronAPI.dataLocationGet().then(setInfo)
+  }, [])
+
+  const choose = async () => {
+    const dir = await window.electronAPI.dataLocationChoose()
+    if (!dir) return
+    setError(null)
+    setMigrate(true)
+    setPending({ dir })
+  }
+
+  const apply = async () => {
+    if (!pending) return
+    setBusy(true)
+    setError(null)
+    const res = await window.electronAPI.dataLocationApply(pending.dir, migrate)
+    if (!res.ok) {
+      setBusy(false)
+      setError(res.error ?? 'Failed')
+      return
+    }
+    // Paths are resolved at boot — relaunch to apply.
+    void window.electronAPI.dataLocationRelaunch()
+  }
+
+  const btn = 'text-xs px-3 py-1.5 rounded-md border transition-colors'
+
+  return (
+    <div>
+      <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{t('settings.storage.title')}</h3>
+      <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>{t('settings.storage.description')}</p>
+
+      <div className="rounded-lg border p-3 mb-4" style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-secondary)' }}>
+        <div className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>
+          {t('settings.storage.current')}
+          {info?.isCustom && (
+            <span className="ml-1.5 normal-case font-medium" style={{ color: 'var(--accent-color)' }}>· {t('settings.storage.customBadge')}</span>
+          )}
+        </div>
+        <div className="text-xs font-mono break-all" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+          {info?.currentDir ?? '…'}
+        </div>
+        <button
+          onClick={() => void window.electronAPI.dataLocationReveal()}
+          className="mt-2 flex items-center gap-1.5 text-xs"
+          style={{ color: 'var(--accent-color)' }}
+        >
+          <FolderOpen size={13} />{t('settings.storage.openFolder')}
+        </button>
+      </div>
+
+      {!pending ? (
+        <div className="flex gap-2">
+          <button onClick={choose} className={btn} style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}>
+            {t('settings.storage.change')}
+          </button>
+          {info?.isCustom && (
+            <button onClick={() => { setError(null); setMigrate(true); setPending({ dir: null }) }} className={btn} style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}>
+              {t('settings.storage.reset')}
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="rounded-lg border p-3" style={{ borderColor: 'var(--accent-color)' }}>
+          <div className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ color: 'var(--text-muted)' }}>{t('settings.storage.newLocation')}</div>
+          <div className="text-xs font-mono break-all mb-3" style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>
+            {pending.dir ?? info?.defaultDir}
+          </div>
+          <label className="flex items-center gap-2 mb-3 text-sm cursor-pointer" style={{ color: 'var(--text-secondary)' }}>
+            <input type="checkbox" checked={migrate} onChange={(e) => setMigrate(e.target.checked)} className="accent-[var(--accent-color)]" />
+            {t('settings.storage.migrate')}
+          </label>
+          <p className="text-[11px] mb-3" style={{ color: 'var(--text-muted)' }}>{t('settings.storage.restartWarn')}</p>
+          {error && <p className="text-xs mb-2" style={{ color: 'var(--color-error)' }}>{error}</p>}
+          <div className="flex gap-2">
+            <button
+              onClick={() => void apply()}
+              disabled={busy}
+              className="text-xs px-3 py-1.5 rounded-md font-semibold disabled:opacity-50"
+              style={{ backgroundColor: 'var(--accent-color)', color: 'var(--accent-ink, #fff)' }}
+            >
+              {busy ? t('settings.storage.applying') : t('settings.storage.applyRestart')}
+            </button>
+            <button onClick={() => setPending(null)} disabled={busy} className={btn} style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}>
+              {t('settings.storage.cancel')}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -1638,7 +1761,7 @@ function AboutSettings() {
             <button
               onClick={quitAndInstall}
               className="flex items-center gap-1 text-xs px-3 py-1 rounded font-medium"
-              style={{ backgroundColor: 'var(--accent-color)', color: '#fff' }}
+              style={{ backgroundColor: 'var(--accent-color)', color: 'var(--accent-ink, #fff)' }}
             >
               <Download size={12} />
               {t('settings.about.restartNow')}

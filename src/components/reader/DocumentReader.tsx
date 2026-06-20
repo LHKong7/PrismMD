@@ -9,6 +9,8 @@ import { useEditorStore } from '../../store/editorStore'
 import { usePaneFileData } from '../../hooks/usePaneFileData'
 import { MarkdownReader } from './MarkdownReader'
 import { PageHeader } from './PageHeader'
+import { DocSummary } from './DocSummary'
+import { ContradictionBanner } from '../graph/ContradictionBanner'
 import { Dashboard } from '../workspace/Dashboard'
 import { JsonViewer } from './JsonViewer'
 import { CsvViewer } from './CsvViewer'
@@ -158,7 +160,15 @@ export function DocumentReader() {
           fullPage={false}
         />
       )}
-      {currentFormat === 'markdown' && isActivePane && <PageHeader />}
+      {currentFormat === 'markdown' && isActivePane && (
+        <>
+          {/* These used to live inside the read-only reader; in the single
+              always-editable mode they sit above the editor body. */}
+          <PageHeader />
+          <ContradictionBanner />
+          <DocSummary />
+        </>
+      )}
       <div className="flex-1 min-h-0">{body}</div>
     </div>
   )

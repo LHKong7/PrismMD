@@ -185,7 +185,7 @@ function SessionCard({
               </span>
             )}
             {isCurrent && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 font-medium" style={{ backgroundColor: 'var(--accent-color)', color: '#fff' }}>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 font-medium" style={{ backgroundColor: 'var(--accent-color)', color: 'var(--accent-ink, #fff)' }}>
                 {t('settings.agentSessions.current')}
               </span>
             )}

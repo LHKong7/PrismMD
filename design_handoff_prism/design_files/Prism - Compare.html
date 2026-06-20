@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Prism — Identity Compare</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body, #root { height: 100%; width: 100%; overflow: hidden; }
+  body { font-family: 'Hanken Grotesk', system-ui, sans-serif; background: #e8e3d8; }
+  .tile-frame { width: 100%; height: 100%; border: none; display: block; background: #e7ded0; }
+  .tile-hint {
+    position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%);
+    font: 500 12px 'Hanken Grotesk', sans-serif; color: #fff; background: rgba(30,24,18,.72);
+    padding: 6px 13px; border-radius: 20px; pointer-events: none; white-space: nowrap;
+    backdrop-filter: blur(4px); z-index: 4;
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<template id="__bundler_thumbnail">
+  <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+    <rect width="100" height="100" fill="#e7ded0"/>
+    <path d="M50 30 L70 66 L30 66 Z" fill="none" stroke="#2c2620" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M50 30 L50 66" stroke="#b06a2c" stroke-width="2"/>
+    <path d="M58 52 L78 46" stroke="#c2532f" stroke-width="2.5"/>
+    <path d="M58 56 L80 58" stroke="#5b8b4e" stroke-width="2.5"/>
+  </svg>
+</template>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="prism/design-canvas.jsx"></script>
+<script type="text/babel">
+const W = 1440, H = 900;
+const IDENTITIES = [
+  { id: 'parchment', label: 'Parchment · warm daylight', blurb: 'Warm sand, copper ink — bookish daylight reading.' },
+  { id: 'campfire', label: 'Campfire · espresso dark', blurb: 'Espresso dark, ember glow — cozy night reading.' },
+  { id: 'newsprint', label: 'Newsprint · editorial', blurb: 'High-contrast oxblood — drop caps & rules.' },
+];
+
+function Tile({ id }) {
+  return (
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <iframe className="tile-frame" src={`Prism.html?theme=${id}&compare`} title={id}
+        scrolling="no"></iframe>
+      <div className="tile-hint">Live — scroll &amp; click here, or ⤢ to open full-screen</div>
+    </div>
+  );
+}
+
+function Compare() {
+  return (
+    <window.DesignCanvas>
+      <window.DCSection id="identities" title="Prism — three identities"
+        subtitle="The same workspace, one document, three warm reading systems. Drag to compare · click any frame’s ⤢ to open it live.">
+        {IDENTITIES.map((it) => (
+          <window.DCArtboard key={it.id} id={it.id} label={it.label} width={W} height={H}>
+            <Tile id={it.id} />
+          </window.DCArtboard>
+        ))}
+      </window.DCSection>
+    </window.DesignCanvas>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<Compare />);
+</script>
+</body>
+</html>
