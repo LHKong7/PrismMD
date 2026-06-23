@@ -19,6 +19,8 @@
   <p>
     English | <a href="./README.zh-CN.md">简体中文</a>
   </p>
+
+  <img src="assets/main_scene.png" alt="烛笺阁 / Inkwell Keep — a pixel-art writing world" width="760" />
 </div>
 
 ---
@@ -27,10 +29,13 @@ PrismMD is a cross-platform desktop reader that treats Markdown as a first-class
 thinking medium. Render GFM, LaTeX and Mermaid side-by-side with an AI reading
 assistant that can chat over the current document, remember past conversations,
 and — optionally — pull context from a local knowledge graph built from every
-document you save.
+document you save. And when you want to *write*, step through the door into
+**烛笺阁 / Inkwell Keep** — a 2D pixel-art writing world where your articles are
+books on a shelf and a guild of AI *scribes* helps you draft, critique and polish.
 
 ## Table of Contents
 
+- [Inkwell Keep — a pixel writing world](#inkwell-keep--a-pixel-writing-world)
 - [Features](#features)
 - [Prerequisites](#prerequisites)
 - [Quick Start](#quick-start)
@@ -47,8 +52,47 @@ document you save.
 - [Acknowledgements](#acknowledgements)
 - [License](#license)
 
+## Inkwell Keep — a pixel writing world
+
+PrismMD has two faces. The quiet **workbench** — the reader, editor and AI
+assistant — sits *behind* a playful **front stage**: **烛笺阁 / Inkwell Keep**, a
+warm 2D pixel-art writing world you land in on launch. Walk a little scribe around
+with **WASD / arrow keys / click**, and the rooms become your writing workflow.
+
+<table>
+  <tr>
+    <td width="50%"><img src="assets/the_scribes.png" alt="The Guild Hall — eight AI scribe agents" /></td>
+    <td width="50%"><img src="assets/round_table.png" alt="The Round Table — multi-agent critique" /></td>
+  </tr>
+  <tr>
+    <td align="center"><em>阁中诸贤 / The Guild Hall — eight AI scribe agents</em></td>
+    <td align="center"><em>写作圆桌 / The Round Table — critique a draft together</em></td>
+  </tr>
+</table>
+
+- **典藏书柜 / The Stacks** — every article is a book on the shelf, and its spine
+  reflects real metadata: length → thickness, genre → colour & material, quality →
+  gold foil, status → faded *draft* / glowing *hot* / a red `!` for *needs revision*.
+  Click a book to read or edit it.
+- **阁中诸贤 / The Scribes** — eight NPC writing agents, each a distinct capability
+  *and* persona: structure, titles, argument, language polish (de-AI), reader's-eye,
+  SEO / distribution, technical review and style imitation. Walk up and chat — each
+  uses your configured AI provider with its own system prompt.
+- **写作圆桌 / The Round Table** — invite several scribes to critique the open
+  document *at once*; a "chair" agent merges their notes into a prioritised,
+  de-duplicated checklist you tick to generate a new version.
+- **档案柜 / The Archive** — full version history with a line-diff and one-click,
+  reversible rollback (round-table rewrites are snapshotted automatically).
+- **灵感墙 / The Muse Wall** — collect topics, golden lines, snippets and opening
+  candidates, by hand or AI-generated from the current draft.
+
+Everything is rendered with [Pixi.js](https://pixijs.com/) — procedural pixel art,
+no game assets. Prefer the plain workbench? The **Enter Workbench** button (top
+right) drops you straight into the classic reader.
+
 ## Features
 
+- **烛笺阁 / Inkwell Keep** — an optional pixel-art "writing world" front stage (see [above](#inkwell-keep--a-pixel-writing-world)): a walkable hub where your articles are books and a guild of AI *scribe* agents helps you draft, critique (round table), version (archive) and brainstorm (muse wall)
 - **Markdown rendering** — full GitHub-flavored Markdown with syntax highlighting, KaTeX math and Mermaid diagrams
 - **AI reading assistant** — chat with your documents using OpenAI, Anthropic, Google AI, local Ollama, or any OpenAI-compatible endpoint
 - **Conversation memory** — the assistant remembers past discussions per file for richer follow-up answers
@@ -185,6 +229,7 @@ PrismMD/
 ├── src/                           # Renderer (React 18 + Tailwind)
 │   ├── components/                # UI
 │   │   ├── agent/                 # AI chat sidebar
+│   │   ├── frontstage/            # 烛笺阁 pixel world (Pixi.js): rooms, scribes, round table, archive, shelf
 │   │   ├── reader/                # Markdown renderer + pipeline
 │   │   ├── filetree/              # Explorer with context menu
 │   │   ├── settings/              # Settings panel (AI, Graph, Privacy)
@@ -219,6 +264,7 @@ PrismMD/
 - **[React 18](https://react.dev/) + [Vite](https://vitejs.dev/)** — renderer
 - **[Tailwind CSS](https://tailwindcss.com/)** — styling
 - **[Zustand](https://github.com/pmndrs/zustand)** — state management
+- **[Pixi.js](https://pixijs.com/)** — WebGL renderer powering the 烛笺阁 / Inkwell Keep pixel-art front stage
 - **[unified](https://unifiedjs.com/) / remark / rehype** — Markdown processing pipeline
 - **[borderless-agent](https://www.npmjs.com/package/borderless-agent)** — agentic AI framework powering the chat
 - **[@insightgraph/sdk-embedded](https://www.npmjs.com/package/@insightgraph/sdk-embedded)** — embedded graph-RAG (optional)

@@ -102,6 +102,13 @@ interface UIStore {
   /** Theme "Compare identities" gallery overlay. */
   compareOpen: boolean
 
+  /**
+   * 烛笺阁 / Inkwell Keep — the pixel front-stage world. When true it overlays
+   * the whole app; it is the default landing on launch. Walking to the desk /
+   * bookshelf / door lowers it back to the backstage workbench.
+   */
+  frontStageActive: boolean
+
   toggleLeftSidebar: () => void
   toggleRightSidebar: () => void
   setLeftSidebarOpen: (open: boolean) => void
@@ -141,6 +148,9 @@ interface UIStore {
 
   openCompare: () => void
   closeCompare: () => void
+
+  setFrontStageActive: (active: boolean) => void
+  toggleFrontStage: () => void
 
   /** Load persisted layout from electron-store. */
   loadLayout: () => Promise<void>
@@ -187,9 +197,13 @@ export const useUIStore = create<UIStore>((set, get) => {
   settingsOpen: false,
   pendingSettingsTab: null,
   compareOpen: false,
+  frontStageActive: true,
 
   openCompare: () => set({ compareOpen: true }),
   closeCompare: () => set({ compareOpen: false }),
+
+  setFrontStageActive: (active) => set({ frontStageActive: active }),
+  toggleFrontStage: () => set((s) => ({ frontStageActive: !s.frontStageActive })),
 
   openSettings: (tab?: string) =>
     set({ settingsOpen: true, pendingSettingsTab: tab ?? null }),

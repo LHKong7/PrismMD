@@ -769,5 +769,118 @@
   "common": {
     "dismiss": "关闭",
     "close": "关闭"
+  },
+  "frontStage": {
+    "enter": "回到烛笺阁",
+    "backstage": "进入工作台",
+    "untitled": "无题",
+    "hotspot": {
+      "stacks": "典藏书柜 · 看书",
+      "desk": "写字桌 · 写作",
+      "npc": "与贤者交谈",
+      "door": "推门 · 去工作台",
+      "guild": "工位廊 · 见诸贤",
+      "atrium": "回中庭",
+      "toRoundtable": "圆桌厅 · 会诊",
+      "toGuild": "回工位廊",
+      "roundtable": "入座圆桌 · 会诊",
+      "archive": "档案柜 · 版本史",
+      "muse": "灵感墙 · 收集"
+    },
+    "hint": {
+      "move": "移动",
+      "click": "点击地面行走",
+      "interact": "交互"
+    },
+    "stacks": {
+      "title": "典藏书柜 · The Stacks",
+      "sub": "抽一本书翻开阅读，或在书桌上写下新的一本。",
+      "empty": "书柜还空着——去写字桌写下第一本书吧。",
+      "write": "写新书"
+    },
+    "desk": {
+      "title": "写字桌 · The Desk",
+      "sub": "摊开纸笔，开始一本新书；或继续手边那一篇。",
+      "new": "新建文章",
+      "newDesc": "空白一页，从头写起",
+      "continue": "继续手边这篇",
+      "none": "暂无打开的文章"
+    },
+    "npc": {
+      "noAI": "还没有配置 AI 模型，贤者暂时无法开口。",
+      "configure": "去配置 AI"
+    }
+  },
+  "roundTable": {
+    "title": "写作圆桌",
+    "docLabel": "会诊文章",
+    "noDoc": "圆桌需要一篇文章。先去书柜打开一本，或在写字桌新建。",
+    "goStacks": "去书柜挑一本",
+    "noAI": "还没有配置 AI 模型，贤者无法开口。",
+    "configure": "去配置 AI",
+    "pick": "选择参加会诊的贤者",
+    "start": "开始会诊",
+    "discussing": "贤者们正在各抒己见…",
+    "empty": "贤者们暂时没给出意见，稍后再试。",
+    "planTitle": "圆桌共识 · 修改清单",
+    "planHint": "勾选你想采纳的修改，生成新版本。",
+    "sources": "来自",
+    "redo": "重新会诊",
+    "apply": "应用所选",
+    "applying": "正在按清单改写文章…",
+    "tooLong": "这篇文章较长，圆桌暂不支持整篇自动改写（以免内容被截断）。",
+    "doneTitle": "已生成新版本",
+    "applied": "已应用",
+    "changes": "条修改",
+    "again": "再来一轮",
+    "read": "去阅读",
+    "priorityHigh": "重点",
+    "priorityMed": "其次",
+    "priorityLow": "可选"
+  },
+  "archive": {
+    "title": "档案柜 · 版本史",
+    "doc": "文章",
+    "noDoc": "先打开一篇文章，再来看它的版本史。",
+    "pickHint": "选择左侧一个版本，查看它与当前文章的差异，或恢复它。",
+    "snapshot": "快照",
+    "snapshotNow": "存档当前",
+    "manualLabel": "手动存档",
+    "snapped": "已存档当前版本",
+    "beforeRestore": "恢复前",
+    "restored": "已恢复该版本",
+    "restore": "恢复此版本",
+    "delete": "删除",
+    "diffNote": "（相对当前文章）",
+    "diffTooBig": "文档较大，略过逐行对比。",
+    "empty": "还没有存档。圆桌改写或手动存档后，会出现在这里。",
+    "chars": "字",
+    "justNow": "刚刚",
+    "minAgo": "分钟前",
+    "hrAgo": "小时前",
+    "dayAgo": "天前"
+  },
+  "bookSkin": {
+    "statusLabel": "状态",
+    "genreLabel": "类型",
+    "qualityLabel": "品质",
+    "read": "阅读",
+    "edit": "编辑",
+    "pickHint": "点一本书，给它定状态、类型与品质，或翻开它。",
+    "status": { "draft": "草稿", "done": "完成", "revise": "待修", "hot": "热门" },
+    "genre": { "tech": "技术", "biz": "商业", "essay": "随笔", "note": "笔记" }
+  },
+  "muse": {
+    "title": "灵感墙",
+    "sub": "收集选题、金句、素材与开头；也可以让 AI 替你想几个。",
+    "empty": "灵感墙还空着。手动写一条，或点「AI 灵感」让贤者帮你起个头。",
+    "placeholder": "写下一条灵感，回车添加…",
+    "add": "添加",
+    "ai": "AI 灵感",
+    "noAI": "未配置 AI",
+    "aiError": "AI 暂时没给出灵感，稍后再试。",
+    "copy": "复制",
+    "delete": "删除",
+    "kind": { "topic": "选题", "quote": "金句", "snippet": "素材", "opening": "开头" }
   }
 }

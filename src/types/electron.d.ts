@@ -53,6 +53,40 @@ export interface Annotation {
   updatedAt: string
 }
 
+export interface VersionMeta {
+  id: string
+  pageId: string
+  title: string | null
+  source: string
+  label: string | null
+  createdAt: number
+  length: number
+}
+
+export interface VersionFull extends VersionMeta {
+  content: string
+}
+
+export interface PageMeta {
+  status: string | null
+  genre: string | null
+  quality: number | null
+}
+
+export interface PageMetaListItem extends PageMeta {
+  pageId: string
+  length: number
+  updatedAt: number
+}
+
+export interface MuseCard {
+  id: string
+  kind: string
+  text: string
+  pageId: string | null
+  createdAt: number
+}
+
 export interface ElectronAPI {
   // File operations
   openFileDialog: () => Promise<{ path: string } | null>
@@ -200,6 +234,22 @@ export interface ElectronAPI {
   docSummaryGet: (pageId: string) => Promise<null | { tldr: string; questions: string[]; generatedAt: number; signature: string }>
   docSummarySet: (pageId: string, summary: { tldr: string; questions: string[]; generatedAt: number; signature: string }) => Promise<void>
   docSummaryClear: () => Promise<void>
+
+  // Page version history (Archive)
+  versionSave: (pageId: string, content: string, opts?: { title?: string | null; source?: string; label?: string | null }) => Promise<VersionMeta>
+  versionList: (pageId: string) => Promise<VersionMeta[]>
+  versionGet: (versionId: string) => Promise<VersionFull | null>
+  versionDelete: (versionId: string) => Promise<{ ok: boolean }>
+
+  // Book-skin metadata
+  pageMetaGet: (pageId: string) => Promise<PageMeta | null>
+  pageMetaSet: (pageId: string, partial: Partial<PageMeta>) => Promise<PageMeta>
+  pageMetaList: () => Promise<PageMetaListItem[]>
+
+  // Muse Wall
+  museList: () => Promise<MuseCard[]>
+  museAdd: (kind: string, text: string, pageId?: string | null) => Promise<MuseCard>
+  museDelete: (id: string) => Promise<{ ok: boolean }>
 
   // Memory
   memorySave: (filePath: string, summary: string, topics: string[]) => Promise<void>

@@ -769,5 +769,118 @@
   "common": {
     "dismiss": "Dismiss",
     "close": "Close"
+  },
+  "frontStage": {
+    "enter": "Return to Inkwell Keep",
+    "backstage": "Enter Workbench",
+    "untitled": "Untitled",
+    "hotspot": {
+      "stacks": "The Stacks · Read",
+      "desk": "The Desk · Write",
+      "npc": "Talk to a Scribe",
+      "door": "Door · To Workbench",
+      "guild": "Guild Hall · The Scribes",
+      "atrium": "Back to the Atrium",
+      "toRoundtable": "Round Table · Convene",
+      "toGuild": "Back to the Guild Hall",
+      "roundtable": "Take a seat · Convene",
+      "archive": "Archive · Version history",
+      "muse": "Muse Wall · Collect"
+    },
+    "hint": {
+      "move": "move",
+      "click": "click to walk",
+      "interact": "interact"
+    },
+    "stacks": {
+      "title": "The Stacks",
+      "sub": "Pull a book to read, or write a new one at the desk.",
+      "empty": "The shelves are empty — write your first book at the desk.",
+      "write": "Write a new book"
+    },
+    "desk": {
+      "title": "The Desk",
+      "sub": "Lay out paper and pen — start a new book, or pick up the last one.",
+      "new": "New article",
+      "newDesc": "A blank page to start from",
+      "continue": "Continue this one",
+      "none": "No open article"
+    },
+    "npc": {
+      "noAI": "No AI model configured yet — the scribes can't speak.",
+      "configure": "Configure AI"
+    }
+  },
+  "roundTable": {
+    "title": "Round Table",
+    "docLabel": "Document",
+    "noDoc": "The round table needs a document. Open one from the Stacks, or write one at the desk.",
+    "goStacks": "Pick a book",
+    "noAI": "No AI model configured yet — the scribes can't speak.",
+    "configure": "Configure AI",
+    "pick": "Pick the scribes to convene",
+    "start": "Convene",
+    "discussing": "The scribes are weighing in…",
+    "empty": "No notes came back — try again later.",
+    "planTitle": "Round-table consensus · revision checklist",
+    "planHint": "Check the changes you want, then generate a new version.",
+    "sources": "from",
+    "redo": "Reconvene",
+    "apply": "Apply selected",
+    "applying": "Rewriting the document to the checklist…",
+    "tooLong": "This document is long — the round table doesn't auto-rewrite whole long documents yet (to avoid truncating it).",
+    "doneTitle": "New version created",
+    "applied": "Applied",
+    "changes": "changes",
+    "again": "Another round",
+    "read": "Read it",
+    "priorityHigh": "Key",
+    "priorityMed": "Then",
+    "priorityLow": "Optional"
+  },
+  "archive": {
+    "title": "Archive · Version history",
+    "doc": "Document",
+    "noDoc": "Open a document first to see its version history.",
+    "pickHint": "Pick a version on the left to see how it differs from the current document, or restore it.",
+    "snapshot": "Snapshot",
+    "snapshotNow": "Snapshot now",
+    "manualLabel": "Manual snapshot",
+    "snapped": "Current version archived",
+    "beforeRestore": "Before restore",
+    "restored": "Version restored",
+    "restore": "Restore this version",
+    "delete": "Delete",
+    "diffNote": "(vs the current document)",
+    "diffTooBig": "Document is large — line-by-line diff skipped.",
+    "empty": "No snapshots yet. Round-table rewrites and manual snapshots will show up here.",
+    "chars": "chars",
+    "justNow": "just now",
+    "minAgo": "min ago",
+    "hrAgo": "h ago",
+    "dayAgo": "d ago"
+  },
+  "bookSkin": {
+    "statusLabel": "Status",
+    "genreLabel": "Genre",
+    "qualityLabel": "Quality",
+    "read": "Read",
+    "edit": "Edit",
+    "pickHint": "Pick a book to set its status, genre and quality, or open it.",
+    "status": { "draft": "Draft", "done": "Done", "revise": "Revise", "hot": "Hot" },
+    "genre": { "tech": "Tech", "biz": "Business", "essay": "Essay", "note": "Note" }
+  },
+  "muse": {
+    "title": "Muse Wall",
+    "sub": "Collect topics, golden lines, snippets and openings — or let AI suggest a few.",
+    "empty": "The wall is empty. Jot one down, or hit \"AI muse\" for a starting point.",
+    "placeholder": "Jot down an idea, Enter to add…",
+    "add": "Add",
+    "ai": "AI muse",
+    "noAI": "No AI configured",
+    "aiError": "The muse came up empty — try again.",
+    "copy": "Copy",
+    "delete": "Delete",
+    "kind": { "topic": "Topic", "quote": "Line", "snippet": "Snippet", "opening": "Opening" }
   }
 }

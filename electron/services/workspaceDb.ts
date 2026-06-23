@@ -64,9 +64,40 @@ export function getDb(): Database.Database {
       FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS page_versions (
+      id TEXT PRIMARY KEY,
+      page_id TEXT NOT NULL,
+      content TEXT NOT NULL,
+      title TEXT,
+      source TEXT,
+      label TEXT,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS page_meta (
+      page_id TEXT PRIMARY KEY,
+      status TEXT,
+      genre TEXT,
+      quality INTEGER,
+      updated_at INTEGER,
+      FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS muse_cards (
+      id TEXT PRIMARY KEY,
+      kind TEXT NOT NULL,
+      text TEXT NOT NULL,
+      page_id TEXT,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE SET NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_pages_parent ON pages(parent_id);
     CREATE INDEX IF NOT EXISTS idx_pages_deleted ON pages(is_deleted);
     CREATE INDEX IF NOT EXISTS idx_annotations_page ON annotations(page_id);
+    CREATE INDEX IF NOT EXISTS idx_versions_page ON page_versions(page_id);
+    CREATE INDEX IF NOT EXISTS idx_muse_created ON muse_cards(created_at);
   `)
 
   // ── Migrations for pre-existing databases ──

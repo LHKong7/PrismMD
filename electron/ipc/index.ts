@@ -10,6 +10,8 @@ import { registerExportHandlers } from './exportHandlers'
 import { registerKnowledgeBaseHandlers } from './knowledgeBaseHandlers'
 import { registerWorkspaceHandlers } from './workspaceHandlers'
 import { registerDataLocationHandlers } from './dataLocationHandlers'
+import { registerVersionHandlers } from './versionHandlers'
+import { registerFrontStageHandlers } from './frontStageHandlers'
 import { getMainWindow } from '../main'
 
 /**
@@ -33,4 +35,6 @@ export function registerIpcHandlers() {
   registerKnowledgeBaseHandlers()
   registerWorkspaceHandlers()
   registerDataLocationHandlers()
+  registerVersionHandlers()
+  registerFrontStageHandlers()
 }
