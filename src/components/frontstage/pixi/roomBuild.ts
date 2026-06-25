@@ -18,7 +18,8 @@ export interface RainDrop {
 }
 
 export interface Mote {
-  g: Graphics
+  /** A Graphics or Sprite — only x/y/alpha are driven by the ticker. */
+  g: Container
   x0: number
   y0: number
   ampX: number
@@ -32,7 +33,8 @@ export interface RoomBuild {
   container: Container
   flames: Graphics[]
   candleFlame: Graphics | null
-  glows: Graphics[]
+  /** Display objects whose alpha the ticker pulses (Graphics or additive glows). */
+  glows: Container[]
   rains: RainDrop[]
   motes: Mote[]
 }
@@ -66,6 +68,20 @@ export function makeGlow(cx: number, cy: number, r: number, color: number): Grap
   g.circle(cx, cy, r).fill({ color, alpha: 0.1 })
   g.circle(cx, cy, r * 0.66).fill({ color, alpha: 0.12 })
   g.circle(cx, cy, r * 0.36).fill({ color, alpha: 0.16 })
+  return g
+}
+
+/**
+ * Additive bloom glow — concentric rings with `blendMode: 'add'`, so it brightens
+ * whatever is beneath it (lamps, candles, the round table). The ticker pulses its
+ * overall alpha. Brighter and softer than `makeGlow`; used by the isometric room.
+ */
+export function makeGlowAdd(cx: number, cy: number, r: number, color: number): Graphics {
+  const g = new Graphics()
+  g.circle(cx, cy, r).fill({ color, alpha: 0.05 })
+  g.circle(cx, cy, r * 0.6).fill({ color, alpha: 0.07 })
+  g.circle(cx, cy, r * 0.3).fill({ color, alpha: 0.1 })
+  g.blendMode = 'add'
   return g
 }
 
@@ -120,6 +136,35 @@ export function makeMotes(area: Area, count: number, color: number): { container
     const x0 = area.x + Math.random() * area.w
     const y0 = area.y + Math.random() * area.h
     const dot = new Graphics().circle(0, 0, r).fill({ color, alpha: 0.6 })
+    dot.x = x0
+    dot.y = y0
+    container.addChild(dot)
+    motes.push({
+      g: dot,
+      x0,
+      y0,
+      ampX: 5 + Math.random() * 11,
+      span: area.h,
+      speed: 0.25 + Math.random() * 0.5,
+      rise: 5 + Math.random() * 11,
+      phase: Math.random() * Math.PI * 2,
+    })
+  }
+  return { container, motes }
+}
+
+/** Additive (glowing) drifting motes — soft embers/dust for the isometric room. */
+export function makeMotesAdd(area: Area, count: number, color: number): { container: Container; motes: Mote[] } {
+  const container = new Container()
+  const motes: Mote[] = []
+  for (let i = 0; i < count; i++) {
+    const r = 1.6 + Math.random() * 2.4
+    const x0 = area.x + Math.random() * area.w
+    const y0 = area.y + Math.random() * area.h
+    const dot = new Graphics()
+    dot.circle(0, 0, r).fill({ color, alpha: 0.5 })
+    dot.circle(0, 0, r * 0.5).fill({ color, alpha: 0.5 })
+    dot.blendMode = 'add'
     dot.x = x0
     dot.y = y0
     container.addChild(dot)

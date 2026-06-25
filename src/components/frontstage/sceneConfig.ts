@@ -64,6 +64,29 @@ export interface Bounds {
   maxY: number
 }
 
+/**
+ * Isometric projection for a room. When present, the room is rendered in a 2:1
+ * isometric grid and its coordinates (spawn, npc.at, hotspot.stand/prompt) are
+ * interpreted as GRID coordinates (0..N), not flat pixels. `bounds` is then the
+ * grid extent and `obstacles` is unused (the table keep-away replaces it).
+ */
+export interface IsoConfig {
+  /** Tiles per axis. */
+  N: number
+  /** Tile half-width / half-height in screen px (2:1 → hw = 2·hh). */
+  hw: number
+  hh: number
+  /** Wall height in screen px. */
+  wallH: number
+  /** Logical-px offset of the iso origin inside the 960×600 stage. */
+  ox: number
+  oy: number
+  /** Grid centre of the round table. */
+  table: Vec
+  /** Min grid distance the player is kept from the table centre. */
+  keepR: number
+}
+
 export interface RoomDef {
   id: string
   bounds: Bounds
@@ -71,6 +94,8 @@ export interface RoomDef {
   hotspots: Hotspot[]
   npcs: PlacedNpc[]
   spawn: Vec
+  /** Present → the room is isometric; coordinates above are grid coords. */
+  iso?: IsoConfig
 }
 
 export const STAGE_W = 960
@@ -177,7 +202,7 @@ const GUILD_HALL: RoomDef = {
       id: 'to-roundtable',
       kind: 'travel',
       target: 'roundtable',
-      arrive: { x: 120, y: 470 },
+      arrive: { x: 5, y: 8.4 }, // grid coords — the round table is isometric
       stand: { x: 870, y: 432 },
       prompt: { x: 916, y: 330 },
       radius: 50,
@@ -189,34 +214,51 @@ const GUILD_HALL: RoomDef = {
   npcs: HALL_IDS.map((id, i): PlacedNpc => ({ id, at: { x: HALL_XS[i], y: HALL_NPC_Y }, facing: 'down' })),
 }
 
-// ── Round Table (圆桌厅): invite scribes to critique a draft together ──
-const RT_PANEL = ['olive', 'vera', 'sela', 'manny', 'sage']
-const RT_SEAT_X = [330, 414, 498, 582, 480]
-const RT_SEAT_Y = [316, 300, 300, 316, 286]
+// ── Round Table (圆桌厅): isometric room — invite scribes to critique a draft.
+// All coordinates here are GRID coords (0..N); the world projects them via iso.
+const RT_ISO: IsoConfig = {
+  N: 10,
+  hw: 40,
+  hh: 20,
+  wallH: 200,
+  ox: 480,
+  oy: 200,
+  table: { x: 5, y: 5 },
+  keepR: 2.85,
+}
+const RT_PANEL = ['vera', 'sage', 'sela', 'olive', 'manny']
+const RT_SEATS: Vec[] = [
+  { x: 2.9, y: 2.9 }, // vera — far side
+  { x: 5.0, y: 2.0 }, // sage
+  { x: 7.1, y: 2.9 }, // sela
+  { x: 2.0, y: 5.2 }, // olive
+  { x: 8.0, y: 5.2 }, // manny — near side
+]
 
 const ROUND_TABLE: RoomDef = {
   id: 'roundtable',
-  bounds: STD_BOUNDS,
-  obstacles: [{ x: 350, y: 322, w: 260, h: 110 }],
-  spawn: { x: 120, y: 470 },
+  iso: RT_ISO,
+  bounds: { minX: 0.6, maxX: 9.4, minY: 0.6, maxY: 9.4 }, // grid extent
+  obstacles: [], // replaced by the table keep-away circle (RT_ISO.keepR)
+  spawn: { x: 5, y: 8.4 }, // grid — bottom-centre, at the table's near edge
   hotspots: [
     {
       id: 'table',
       kind: 'roundtable',
-      stand: { x: 480, y: 486 },
-      prompt: { x: 480, y: 232 },
-      radius: 120,
-      zone: { x: 350, y: 300, w: 260, h: 150 },
+      stand: { x: 5, y: 8.2 },
+      prompt: { x: 5, y: 5 }, // projects to the table; lifted above it by the world
+      radius: 2.6,
+      zone: { x: 0, y: 0, w: 0, h: 0 }, // unused in iso (no furniture-click)
       labelKey: 'frontStage.hotspot.roundtable',
       labelZh: '入座圆桌 · 会诊',
     },
     {
       id: 'archive',
       kind: 'archive',
-      stand: { x: 820, y: 360 },
-      prompt: { x: 860, y: 250 },
-      radius: 80,
-      zone: { x: 812, y: 110, w: 96, h: 200 },
+      stand: { x: 1.7, y: 3 }, // floor tile in front of the left-wall bookshelf
+      prompt: { x: 1.7, y: 3 },
+      radius: 1.7,
+      zone: { x: 0, y: 0, w: 0, h: 0 },
       labelKey: 'frontStage.hotspot.archive',
       labelZh: '档案柜 · 版本史',
     },
@@ -224,16 +266,16 @@ const ROUND_TABLE: RoomDef = {
       id: 'to-guild',
       kind: 'travel',
       target: 'guildhall',
-      arrive: { x: 870, y: 432 },
-      stand: { x: 120, y: 430 },
-      prompt: { x: 60, y: 332 },
-      radius: 60,
-      zone: { x: 0, y: 300, w: 66, h: 246 },
+      arrive: { x: 870, y: 432 }, // flat px — the guild hall is not isometric
+      stand: { x: 1.7, y: 7 }, // floor tile in front of the left-wall door
+      prompt: { x: 1.7, y: 7 },
+      radius: 1.7,
+      zone: { x: 0, y: 0, w: 0, h: 0 },
       labelKey: 'frontStage.hotspot.toGuild',
       labelZh: '回工位廊',
     },
   ],
-  npcs: RT_PANEL.map((id, i): PlacedNpc => ({ id, at: { x: RT_SEAT_X[i], y: RT_SEAT_Y[i] }, facing: 'down' })),
+  npcs: RT_PANEL.map((id, i): PlacedNpc => ({ id, at: { ...RT_SEATS[i] }, facing: 'down' })),
 }
 
 export const ROOMS: Record<string, RoomDef> = {
@@ -270,12 +312,7 @@ export function activeHotspotFor(room: RoomDef, feet: Vec): Hotspot | null {
 export function zoneAt(room: RoomDef, x: number, y: number): Hotspot | null {
   for (const h of room.hotspots) {
     const z = h.zone
-    if (x >= z.x && x <= z.x + z.w && y >= z.y && y <= z.y + z.h) return h
+    if (z.w > 0 && x >= z.x && x <= z.x + z.w && y >= z.y && y <= z.y + z.h) return h
   }
   return null
-}
-
-/** Whether (x, y) lands on a hotspot's floating prompt (for click activation). */
-export function promptHit(h: Hotspot, x: number, y: number): boolean {
-  return Math.abs(x - h.prompt.x) <= 80 && Math.abs(y - h.prompt.y) <= 20
 }
