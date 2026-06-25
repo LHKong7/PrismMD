@@ -18,7 +18,7 @@
  */
 
 import { Container, Graphics } from 'pixi.js'
-import { makeGlowAdd, makeMotesAdd, type Mote } from './roomBuild'
+import { makeGlowAdd, makeMotesAdd, nightWash, PALETTE, type Mote } from './roomBuild'
 import type { IsoConfig } from '../sceneConfig'
 
 export interface IsoRoundTableBuild {
@@ -165,7 +165,7 @@ export function drawRoundTableIso(cfg: IsoConfig): IsoRoundTableBuild {
   back.addChild(wg)
 
   // Warm pool under the table (kept modest so the room isn't washed out)
-  glows.push(makeGlowAdd(C.x, C.y - 30, 220, 0xffb24d))
+  glows.push(makeGlowAdd(C.x, C.y - 30, 180, 0xffb24d))
 
   // ── Round table (in the sortable entity layer) ──
   const cx = C.x
@@ -195,11 +195,11 @@ export function drawRoundTableIso(cfg: IsoConfig): IsoRoundTableBuild {
   glows.push(makeGlowAdd(cax, cay - 18, 60, 0xffc46a)) // candle bloom
 
   // ── FX: night wash (below glows), glows, motes (top) ──
-  const wash = new Graphics()
-  wash.rect(-1500, -800, 3000, 1700).fill({ color: 0x223a66, alpha: 0.22 })
-  fx.addChild(wash)
+  // Same cool moonlight hue as every other room — just a touch deeper here since
+  // this is the dark, night-meeting room.
+  fx.addChild(nightWash({ x: -1500, y: -800, w: 3000, h: 1700 }, 0.28))
   for (const g of glows) fx.addChild(g)
-  const { container: moteC, motes } = makeMotesAdd({ x: -380, y: -180, w: 760, h: 540 }, 46, 0xffd9a0)
+  const { container: moteC, motes } = makeMotesAdd({ x: -380, y: -180, w: 760, h: 540 }, 46, PALETTE.mote)
   fx.addChild(moteC)
 
   return { container, ent, ui, glows, motes }

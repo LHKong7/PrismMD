@@ -93,11 +93,25 @@ export function getDb(): Database.Database {
       FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE SET NULL
     );
 
+    CREATE TABLE IF NOT EXISTS note_embeddings (
+      id TEXT PRIMARY KEY,
+      page_id TEXT NOT NULL,
+      chunk_index INTEGER NOT NULL,
+      content TEXT NOT NULL,
+      embedding BLOB NOT NULL,
+      dim INTEGER NOT NULL,
+      model TEXT NOT NULL,
+      page_updated_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_pages_parent ON pages(parent_id);
     CREATE INDEX IF NOT EXISTS idx_pages_deleted ON pages(is_deleted);
     CREATE INDEX IF NOT EXISTS idx_annotations_page ON annotations(page_id);
     CREATE INDEX IF NOT EXISTS idx_versions_page ON page_versions(page_id);
     CREATE INDEX IF NOT EXISTS idx_muse_created ON muse_cards(created_at);
+    CREATE INDEX IF NOT EXISTS idx_note_emb_page ON note_embeddings(page_id);
   `)
 
   // ── Migrations for pre-existing databases ──

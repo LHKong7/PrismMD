@@ -5,6 +5,8 @@ import { registerAgentHandlers } from './agentHandlers'
 import { registerInsightGraphHandlers } from './insightGraphHandlers'
 import { registerPluginHandlers } from './pluginHandlers'
 import { registerMcpHandlers } from './mcpHandlers'
+import { registerMcpServerHandlers } from './mcpServerHandlers'
+import { registerRagHandlers } from './ragHandlers'
 import { registerUpdaterHandlers } from './updaterHandlers'
 import { registerExportHandlers } from './exportHandlers'
 import { registerKnowledgeBaseHandlers } from './knowledgeBaseHandlers'
@@ -30,6 +32,8 @@ export function registerIpcHandlers() {
   registerInsightGraphHandlers()
   registerPluginHandlers()
   registerMcpHandlers()
+  registerMcpServerHandlers()
+  registerRagHandlers()
   registerUpdaterHandlers()
   registerExportHandlers()
   registerKnowledgeBaseHandlers()

@@ -38,6 +38,34 @@ export interface McpSettings {
   toolTimeoutMs: number
 }
 
+/**
+ * MCP *server* exposure — the inverse direction of `McpSettings`. When enabled,
+ * PrismMD runs a localhost-only Streamable-HTTP MCP server so external agents
+ * (Claude Code / Desktop) can read the user's notes as tools. Bound to
+ * 127.0.0.1 and gated by a bearer `token`.
+ */
+export interface McpServerExposeSettings {
+  enabled: boolean
+  /** TCP port for the localhost server. */
+  port: number
+  /** Bearer token required on every request (generated on first enable). */
+  token: string
+}
+
+/**
+ * Semantic search (RAG) over the user's notes — chunk + embed document bodies
+ * into a local vector index so `search_notes` (and future agent retrieval) can
+ * rank by meaning rather than keyword. Embeddings come from an OpenAI-compatible
+ * endpoint resolved from one of the configured providers.
+ */
+export interface RagSettings {
+  enabled: boolean
+  /** Which configured provider supplies the OpenAI-compatible embeddings API. */
+  providerId: 'openai' | 'custom' | 'ollama'
+  /** Embedding model id (e.g. text-embedding-3-small, nomic-embed-text). */
+  model: string
+}
+
 interface AppSettings {
   language: string
   themeId: string
@@ -48,6 +76,8 @@ interface AppSettings {
   activeProvider: string | null
   insightGraph: InsightGraphSettings
   mcp: McpSettings
+  mcpServer: McpServerExposeSettings
+  rag: RagSettings
 }
 
 const DEFAULT_INSIGHT_GRAPH: InsightGraphSettings = {
@@ -65,6 +95,18 @@ const DEFAULT_MCP: McpSettings = {
   enabled: false,
   servers: {},
   toolTimeoutMs: 30_000,
+}
+
+const DEFAULT_MCP_SERVER: McpServerExposeSettings = {
+  enabled: false,
+  port: 3920,
+  token: '',
+}
+
+const DEFAULT_RAG: RagSettings = {
+  enabled: false,
+  providerId: 'openai',
+  model: 'text-embedding-3-small',
 }
 
 const store = new Store<{ settings: AppSettings }>({
@@ -86,6 +128,8 @@ const store = new Store<{ settings: AppSettings }>({
       activeProvider: null,
       insightGraph: DEFAULT_INSIGHT_GRAPH,
       mcp: DEFAULT_MCP,
+      mcpServer: DEFAULT_MCP_SERVER,
+      rag: DEFAULT_RAG,
     },
   },
 })
@@ -108,6 +152,14 @@ export function loadSettings(): AppSettings {
       ...(s.mcp ?? {}),
       servers: { ...(s.mcp?.servers ?? {}) },
     },
+    mcpServer: {
+      ...DEFAULT_MCP_SERVER,
+      ...(s.mcpServer ?? {}),
+    },
+    rag: {
+      ...DEFAULT_RAG,
+      ...(s.rag ?? {}),
+    },
   }
 }
 
@@ -117,6 +169,30 @@ export function getInsightGraphSettings(): InsightGraphSettings {
 
 export function getMcpSettings(): McpSettings {
   return loadSettings().mcp
+}
+
+export function getMcpServerSettings(): McpServerExposeSettings {
+  return loadSettings().mcpServer
+}
+
+/** Merge a partial update into the MCP-server settings and persist it. */
+export function saveMcpServerSettings(patch: Partial<McpServerExposeSettings>): McpServerExposeSettings {
+  const settings = loadSettings()
+  const next = { ...settings.mcpServer, ...patch }
+  saveSettings({ ...settings, mcpServer: next })
+  return next
+}
+
+export function getRagSettings(): RagSettings {
+  return loadSettings().rag
+}
+
+/** Merge a partial update into the RAG settings and persist it. */
+export function saveRagSettings(patch: Partial<RagSettings>): RagSettings {
+  const settings = loadSettings()
+  const next = { ...settings.rag, ...patch }
+  saveSettings({ ...settings, rag: next })
+  return next
 }
 
 export function saveSettings(settings: AppSettings): void {

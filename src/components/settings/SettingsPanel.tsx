@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { X, Check, Globe, Palette, Bot, Eye, EyeOff, Shield, Trash2, Network, AlertTriangle, RefreshCw, Puzzle, FolderOpen, CircleAlert, Info, Download, Keyboard, Pencil, BookMarked, FileStack, MessageSquare, ChevronDown, ChevronRight, HardDrive } from 'lucide-react'
+import { X, Check, Globe, Palette, Bot, Eye, EyeOff, Shield, Trash2, Network, AlertTriangle, RefreshCw, Puzzle, FolderOpen, CircleAlert, Info, Download, Keyboard, Pencil, BookMarked, FileStack, MessageSquare, ChevronDown, ChevronRight, HardDrive, Copy } from 'lucide-react'
 import { useFocusTrap } from '../../hooks/useFocusTrap'
 import { Button } from '../ui/Button'
 import { Spinner } from '../ui/Spinner'
 import { useTranslation } from 'react-i18next'
 import { useSettingsStore, DEFAULT_MODELS, type AIProvider, type InsightGraphDomain } from '../../store/settingsStore'
+import type { RagStatus } from '../../types/electron'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
 import { useUIStore } from '../../store/uiStore'
 import { usePluginManager } from '../../lib/plugins/host'
@@ -132,7 +133,13 @@ export function SettingsPanel({ open, onClose }: SettingsPanelProps) {
             {activeTab === 'knowledge' && <KnowledgeSettings />}
             {activeTab === 'insightgraph' && <InsightGraphSettings />}
             {activeTab === 'plugins' && <PluginsSettings />}
-            {activeTab === 'mcp' && <McpSettingsSection />}
+            {activeTab === 'mcp' && (
+              <div className="space-y-8">
+                <McpSettingsSection />
+                <McpServerSection />
+                <RagSection />
+              </div>
+            )}
             {activeTab === 'privacy' && <PrivacySettings />}
             {activeTab === 'storage' && <StorageSettings />}
             {activeTab === 'shortcuts' && <ShortcutsHelp />}
@@ -1440,6 +1447,396 @@ function McpSettingsSection() {
             ))}
           </ul>
         </div>
+      )}
+    </div>
+  )
+}
+
+type McpServerStatus = { running: boolean; port: number; url: string | null; sessions: number }
+type McpServerView = { enabled: boolean; port: number; token: string; status: McpServerStatus; ok?: boolean; error?: string }
+
+/**
+ * MCP *server* exposure — the inverse of McpSettingsSection. Lets the user run a
+ * localhost-only MCP server so external agents (Claude Code / Desktop) can read
+ * their notes. Self-contained: reads/writes config straight over IPC and shows
+ * the connection URL, bearer token and a ready-to-paste Claude Code command.
+ */
+function McpServerSection() {
+  const { t } = useTranslation()
+  const [enabled, setEnabled] = useState(false)
+  const [port, setPort] = useState(3920)
+  const [portDraft, setPortDraft] = useState('3920')
+  const [token, setToken] = useState('')
+  const [status, setStatus] = useState<McpServerStatus | null>(null)
+  const [showToken, setShowToken] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [copied, setCopied] = useState<string | null>(null)
+
+  const apply = (r: McpServerView) => {
+    setEnabled(r.enabled)
+    setPort(r.port)
+    setPortDraft(String(r.port))
+    setToken(r.token)
+    setStatus(r.status)
+    setError(r.ok === false ? r.error ?? 'Failed to start' : null)
+  }
+
+  useEffect(() => {
+    void window.electronAPI.mcpServerGetConfig().then(apply)
+  }, [])
+
+  const update = async (patch: { enabled?: boolean; port?: number }) => {
+    setBusy(true)
+    try {
+      apply(await window.electronAPI.mcpServerSetConfig(patch))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const regenerate = async () => {
+    setBusy(true)
+    try {
+      apply(await window.electronAPI.mcpServerRegenerateToken())
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const commitPort = () => {
+    const p = parseInt(portDraft, 10)
+    if (!Number.isNaN(p) && p >= 1024 && p <= 65535 && p !== port) void update({ port: p })
+    else setPortDraft(String(port))
+  }
+
+  const url = status?.url ?? `http://127.0.0.1:${port}/mcp`
+  const claudeCmd = `claude mcp add --transport http prismmd ${url} --header "Authorization: Bearer ${token}"`
+
+  const copy = async (text: string, key: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(key)
+      setTimeout(() => setCopied((c) => (c === key ? null : c)), 1500)
+    } catch {
+      /* clipboard unavailable */
+    }
+  }
+
+  const copyBtn = (text: string, key: string) => (
+    <button
+      onClick={() => void copy(text, key)}
+      className="shrink-0 p-1.5 rounded border hover:bg-black/5 dark:hover:bg-white/5"
+      style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+      title={t('settings.mcpServer.copy')}
+    >
+      {copied === key ? <Check size={13} /> : <Copy size={13} />}
+    </button>
+  )
+
+  const running = !!status?.running
+
+  return (
+    <div className="space-y-5 pt-6 border-t" style={{ borderColor: 'var(--border-color)' }}>
+      <div>
+        <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+          {t('settings.mcpServer.title')}
+        </h3>
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          {t('settings.mcpServer.subtitle')}
+        </p>
+      </div>
+
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={enabled}
+          disabled={busy}
+          onChange={(e) => void update({ enabled: e.target.checked })}
+        />
+        <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
+          {t('settings.mcpServer.enable')}
+        </span>
+        {busy && <Spinner size={12} />}
+        <span
+          className={`ml-1 inline-flex items-center gap-1 text-[11px] ${running ? '' : 'opacity-70'}`}
+          style={{ color: running ? 'var(--accent-color)' : 'var(--text-muted)' }}
+        >
+          <span className={`w-2 h-2 rounded-full ${running ? 'bg-success' : 'bg-[var(--text-muted)]'}`} />
+          {running ? t('settings.mcpServer.running') : t('settings.mcpServer.stopped')}
+        </span>
+      </label>
+
+      <p className="text-[11px] -mt-2" style={{ color: 'var(--text-muted)' }}>
+        {t('settings.mcpServer.readOnlyNote')}
+      </p>
+
+      {error && (
+        <p className="text-xs" style={{ color: 'var(--color-error)' }}>
+          {error}
+        </p>
+      )}
+
+      {/* Port */}
+      <div className="flex items-center gap-2">
+        <label className="text-sm w-20" style={{ color: 'var(--text-primary)' }}>
+          {t('settings.mcpServer.port')}
+        </label>
+        <input
+          type="number"
+          value={portDraft}
+          disabled={busy}
+          onChange={(e) => setPortDraft(e.target.value)}
+          onBlur={commitPort}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+          }}
+          className="w-28 text-sm px-2 py-1 rounded border outline-none"
+          style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+        />
+      </div>
+
+      {/* Connection URL */}
+      <div>
+        <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+          {t('settings.mcpServer.urlLabel')}
+        </label>
+        <div className="flex items-center gap-2 mt-1">
+          <code
+            className="flex-1 text-xs font-mono px-2 py-1.5 rounded border truncate"
+            style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+          >
+            {url}
+          </code>
+          {copyBtn(url, 'url')}
+        </div>
+      </div>
+
+      {/* Access token */}
+      <div>
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+            {t('settings.mcpServer.tokenLabel')}
+          </label>
+          <button
+            onClick={() => void regenerate()}
+            disabled={busy}
+            className="flex items-center gap-1 text-[11px] hover:underline disabled:opacity-50"
+            style={{ color: 'var(--accent-color)' }}
+          >
+            <RefreshCw size={11} />
+            {t('settings.mcpServer.regenerate')}
+          </button>
+        </div>
+        <div className="flex items-center gap-2 mt-1">
+          <code
+            className="flex-1 text-xs font-mono px-2 py-1.5 rounded border truncate"
+            style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+          >
+            {token ? (showToken ? token : '•'.repeat(Math.min(32, token.length))) : t('settings.mcpServer.tokenEmpty')}
+          </code>
+          <button
+            onClick={() => setShowToken((v) => !v)}
+            className="shrink-0 p-1.5 rounded border hover:bg-black/5 dark:hover:bg-white/5"
+            style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+            title={showToken ? t('settings.mcpServer.hide') : t('settings.mcpServer.show')}
+          >
+            {showToken ? <EyeOff size={13} /> : <Eye size={13} />}
+          </button>
+          {copyBtn(token, 'token')}
+        </div>
+      </div>
+
+      {/* Claude Code one-liner */}
+      <div>
+        <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+          {t('settings.mcpServer.claudeCmdLabel')}
+        </label>
+        <div className="flex items-start gap-2 mt-1">
+          <code
+            className="flex-1 text-[11px] font-mono px-2 py-1.5 rounded border break-all"
+            style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+          >
+            {claudeCmd}
+          </code>
+          {copyBtn(claudeCmd, 'cmd')}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Semantic search (RAG). Lets the user enable embedding-based search over their
+ * notes: pick an OpenAI-compatible embeddings provider/model, build the vector
+ * index, and watch progress. Once built + enabled, the MCP `search_notes` tool
+ * ranks by meaning instead of keywords. Self-contained over IPC.
+ */
+function RagSection() {
+  const { t } = useTranslation()
+  const [enabled, setEnabled] = useState(false)
+  const [providerId, setProviderId] = useState<'openai' | 'custom' | 'ollama'>('openai')
+  const [model, setModel] = useState('text-embedding-3-small')
+  const [status, setStatus] = useState<RagStatus | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+  const [msg, setMsg] = useState<string | null>(null)
+
+  const apply = (r: { enabled: boolean; providerId: string; model: string; status: RagStatus }) => {
+    setEnabled(r.enabled)
+    setProviderId(r.providerId as 'openai' | 'custom' | 'ollama')
+    setModel(r.model)
+    setStatus(r.status)
+  }
+
+  useEffect(() => {
+    void window.electronAPI.ragGetConfig().then(apply)
+    const off = window.electronAPI.onRagProgress((p) => setProgress({ done: p.done, total: p.total }))
+    return off
+  }, [])
+
+  const save = async (patch: { enabled?: boolean; providerId?: string; model?: string }) => {
+    apply(await window.electronAPI.ragSetConfig(patch))
+  }
+
+  const reindex = async () => {
+    setBusy(true)
+    setMsg(null)
+    setProgress({ done: 0, total: 0 })
+    try {
+      const r = await window.electronAPI.ragReindex()
+      setStatus(r.status)
+      setMsg(
+        r.ok
+          ? t('settings.rag.indexedMsg', { pages: r.embeddedPages, chunks: r.chunks })
+          : r.error ?? t('settings.rag.failed'),
+      )
+    } finally {
+      setBusy(false)
+      setProgress(null)
+    }
+  }
+
+  const clearIndex = async () => {
+    setBusy(true)
+    try {
+      const r = await window.electronAPI.ragClear()
+      setStatus(r.status)
+      setMsg(null)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const configured = status?.configured ?? false
+
+  return (
+    <div className="space-y-5 pt-6 border-t" style={{ borderColor: 'var(--border-color)' }}>
+      <div>
+        <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+          {t('settings.rag.title')}
+        </h3>
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          {t('settings.rag.subtitle')}
+        </p>
+      </div>
+
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={enabled}
+          disabled={busy}
+          onChange={(e) => void save({ enabled: e.target.checked })}
+        />
+        <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
+          {t('settings.rag.enable')}
+        </span>
+      </label>
+
+      {/* Provider + model */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+            {t('settings.rag.provider')}
+          </label>
+          <select
+            value={providerId}
+            disabled={busy}
+            onChange={(e) => void save({ providerId: e.target.value })}
+            className="w-full mt-1 text-sm px-2 py-1.5 rounded border outline-none"
+            style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+          >
+            <option value="openai">OpenAI</option>
+            <option value="custom">{t('settings.rag.providerCustom')}</option>
+            <option value="ollama">Ollama</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+            {t('settings.rag.model')}
+          </label>
+          <input
+            value={model}
+            disabled={busy}
+            onChange={(e) => setModel(e.target.value)}
+            onBlur={() => model.trim() !== status?.model && void save({ model })}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+            }}
+            className="w-full mt-1 text-sm px-2 py-1.5 rounded border outline-none font-mono"
+            style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-color)', color: 'var(--text-primary)' }}
+          />
+        </div>
+      </div>
+
+      {!configured && (
+        <p className="text-xs" style={{ color: 'var(--color-error)' }}>
+          {t('settings.rag.notConfigured')}
+        </p>
+      )}
+
+      {/* Status line */}
+      {status && (
+        <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          {t('settings.rag.statusLine', {
+            indexed: status.indexedPages,
+            total: status.totalPages,
+            stale: status.stalePages,
+            chunks: status.chunks,
+          })}
+        </p>
+      )}
+
+      {/* Actions */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => void reindex()}
+          disabled={busy || !configured}
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded font-medium disabled:opacity-50"
+          style={{ backgroundColor: 'var(--accent-color)', color: 'var(--accent-ink, #fff)' }}
+        >
+          {busy ? <Spinner size={12} /> : <RefreshCw size={12} />}
+          {t('settings.rag.buildIndex')}
+        </button>
+        <button
+          onClick={() => void clearIndex()}
+          disabled={busy || (status?.chunks ?? 0) === 0}
+          className="text-xs px-3 py-1.5 rounded border hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-50"
+          style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+        >
+          {t('settings.rag.clear')}
+        </button>
+        {busy && progress && progress.total > 0 && (
+          <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            {t('settings.rag.indexing', { done: progress.done, total: progress.total })}
+          </span>
+        )}
+      </div>
+
+      {msg && (
+        <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+          {msg}
+        </p>
       )}
     </div>
   )

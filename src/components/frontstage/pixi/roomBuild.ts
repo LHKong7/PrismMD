@@ -46,6 +46,32 @@ export interface Area {
   h: number
 }
 
+/**
+ * Shared 烛笺阁 palette — every room is the same building on the same night:
+ * warm candlelit wood, amber light, deep-brown shadows, with a faint cool
+ * moonlight wash over the top. All three scenes pull their base tones from here
+ * (and apply `nightWash`) so they read as one place rather than three.
+ */
+export const PALETTE = {
+  wall: 0x2f231b,
+  wallSeam: 0x281d16,
+  wainscot: 0x4a3527,
+  floor: 0x5e3e25,
+  baseboard: 0x2e2014,
+  rug: 0x8a3a32,
+  rugTrim: 0xc49a5a,
+  amber: 0xffc46a,
+  amberSoft: 0xffcaa0,
+  mote: 0xffd9a0,
+  vignette: 0x140c06,
+  night: 0x1b2f55,
+}
+
+/** Cool moonlight wash — the shared atmospheric overlay tying every room to night. */
+export function nightWash(area: Area, alpha: number): Graphics {
+  return new Graphics().rect(area.x, area.y, area.w, area.h).fill({ color: PALETTE.night, alpha })
+}
+
 const clamp8 = (v: number) => Math.max(0, Math.min(255, Math.round(v)))
 
 /** Lighten/darken a 0xRRGGBB colour by `amt` (−1..1). */
@@ -78,9 +104,9 @@ export function makeGlow(cx: number, cy: number, r: number, color: number): Grap
  */
 export function makeGlowAdd(cx: number, cy: number, r: number, color: number): Graphics {
   const g = new Graphics()
-  g.circle(cx, cy, r).fill({ color, alpha: 0.05 })
-  g.circle(cx, cy, r * 0.6).fill({ color, alpha: 0.07 })
-  g.circle(cx, cy, r * 0.3).fill({ color, alpha: 0.1 })
+  g.circle(cx, cy, r).fill({ color, alpha: 0.028 })
+  g.circle(cx, cy, r * 0.6).fill({ color, alpha: 0.04 })
+  g.circle(cx, cy, r * 0.3).fill({ color, alpha: 0.055 })
   g.blendMode = 'add'
   return g
 }
@@ -162,8 +188,8 @@ export function makeMotesAdd(area: Area, count: number, color: number): { contai
     const x0 = area.x + Math.random() * area.w
     const y0 = area.y + Math.random() * area.h
     const dot = new Graphics()
-    dot.circle(0, 0, r).fill({ color, alpha: 0.5 })
-    dot.circle(0, 0, r * 0.5).fill({ color, alpha: 0.5 })
+    dot.circle(0, 0, r).fill({ color, alpha: 0.3 })
+    dot.circle(0, 0, r * 0.5).fill({ color, alpha: 0.3 })
     dot.blendMode = 'add'
     dot.x = x0
     dot.y = y0

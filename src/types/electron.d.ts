@@ -87,6 +87,17 @@ export interface MuseCard {
   createdAt: number
 }
 
+export interface RagStatus {
+  enabled: boolean
+  configured: boolean
+  providerId: string
+  model: string
+  indexedPages: number
+  totalPages: number
+  stalePages: number
+  chunks: number
+}
+
 export interface ElectronAPI {
   // File operations
   openFileDialog: () => Promise<{ path: string } | null>
@@ -319,6 +330,69 @@ export interface ElectronAPI {
   ) => Promise<{ ok: true; result: unknown } | { ok: false; error: string }>
   mcpRestart: () => Promise<{ ok: true } | { ok: false; error: string }>
   mcpStop: (serverId: string) => Promise<{ ok: true } | { ok: false; error: string }>
+
+  // MCP server (expose notes to external agents)
+  mcpServerGetConfig: () => Promise<{
+    ok: true
+    enabled: boolean
+    port: number
+    token: string
+    status: { running: boolean; port: number; url: string | null; sessions: number }
+  }>
+  mcpServerSetConfig: (patch: { enabled?: boolean; port?: number }) => Promise<{
+    ok: boolean
+    error?: string
+    enabled: boolean
+    port: number
+    token: string
+    status: { running: boolean; port: number; url: string | null; sessions: number }
+  }>
+  mcpServerRegenerateToken: () => Promise<{
+    ok: boolean
+    error?: string
+    enabled: boolean
+    port: number
+    token: string
+    status: { running: boolean; port: number; url: string | null; sessions: number }
+  }>
+  mcpServerStatus: () => Promise<{
+    ok: true
+    status: { running: boolean; port: number; url: string | null; sessions: number }
+  }>
+
+  // Semantic search (RAG)
+  ragGetConfig: () => Promise<{
+    ok: true
+    enabled: boolean
+    providerId: string
+    model: string
+    status: RagStatus
+  }>
+  ragSetConfig: (patch: { enabled?: boolean; providerId?: string; model?: string }) => Promise<{
+    ok: true
+    enabled: boolean
+    providerId: string
+    model: string
+    status: RagStatus
+  }>
+  ragStatus: () => Promise<{ ok: true; status: RagStatus }>
+  ragReindex: () => Promise<{
+    ok: boolean
+    error?: string
+    embeddedPages: number
+    removedPages: number
+    chunks: number
+    status: RagStatus
+  }>
+  ragClear: () => Promise<{ ok: true; status: RagStatus }>
+  ragSearch: (
+    query: string,
+    limit?: number,
+  ) => Promise<
+    | { ok: true; hits: Array<{ pageId: string; title: string; score: number; snippet: string }> }
+    | { ok: false; error: string }
+  >
+  onRagProgress: (callback: (p: { done: number; total: number; title: string }) => void) => () => void
 
   // Plugins
   pluginsDiscover: () => Promise<

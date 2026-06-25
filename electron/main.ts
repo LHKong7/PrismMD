@@ -7,6 +7,7 @@ import { registerIpcHandlers } from './ipc'
 import { appConfig } from '../app.config'
 import { shutdown as shutdownInsightGraph } from './services/insightGraphService'
 import { startAll as startMcpServers, shutdownAll as shutdownMcpServers } from './services/mcpService'
+import { initMcpServerFromSettings, stopMcpServer } from './services/mcpServerService'
 import { initAutoUpdater } from './services/updaterService'
 import { loadSettings, saveSettings } from './services/settingsStore'
 
@@ -102,6 +103,8 @@ app.whenReady().then(async () => {
   // Fire MCP servers in the background — failures don't block window
   // creation, and individual server errors are logged inside the service.
   startMcpServers().catch((err) => console.warn('[mcp] startAll failed:', err))
+  // Outbound MCP server: expose notes to external agents if the user left it on.
+  initMcpServerFromSettings().catch((err) => console.warn('[mcpServer] init failed:', err))
   // Auto-updater: only active in packaged builds on mac/win; dev runs
   // and linux packages are skipped internally.
   initAutoUpdater()
@@ -153,6 +156,7 @@ app.on('before-quit', (event) => {
     const shutdown = Promise.all([
       shutdownInsightGraph().catch(() => {}),
       shutdownMcpServers().catch(() => {}),
+      stopMcpServer().catch(() => {}),
     ])
     const timeout = new Promise<void>((resolve) =>
       setTimeout(() => {

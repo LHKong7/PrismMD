@@ -467,6 +467,38 @@
       "toolCount": "{{count}} 个工具",
       "stopped": "已停止"
     },
+    "mcpServer": {
+      "title": "MCP 服务器（暴露你的笔记）",
+      "subtitle": "在本机启动一个仅监听 127.0.0.1 的 MCP 服务器，让外部 agent（Claude Code / Desktop）能读取本工作区。绑定到 127.0.0.1，并用 bearer token 保护。",
+      "enable": "启用 MCP 服务器",
+      "running": "运行中",
+      "stopped": "已停止",
+      "readOnlyNote": "只读：agent 可以搜索、阅读、列出你的笔记，但不能修改。",
+      "port": "端口",
+      "urlLabel": "服务器地址",
+      "tokenLabel": "访问令牌",
+      "tokenEmpty": "（启用时自动生成）",
+      "regenerate": "重新生成",
+      "claudeCmdLabel": "添加到 Claude Code",
+      "copy": "复制",
+      "show": "显示",
+      "hide": "隐藏"
+    },
+    "rag": {
+      "title": "语义检索（RAG）",
+      "subtitle": "把笔记切块嵌入到本地向量索引，让检索按语义而非关键词排序。启用后为 MCP 的 search_notes 工具提供语义检索。",
+      "enable": "启用语义检索",
+      "provider": "嵌入服务商",
+      "providerCustom": "自定义（OpenAI 兼容）",
+      "model": "嵌入模型",
+      "notConfigured": "所选服务商尚未配置 API Key / Base URL，请先在 AI 服务商设置里配置。",
+      "buildIndex": "构建 / 刷新索引",
+      "clear": "清空索引",
+      "indexing": "嵌入中 {{done}}/{{total}}…",
+      "statusLine": "已索引 {{indexed}}/{{total}} 篇 · {{stale}} 篇待更新 · {{chunks}} 块",
+      "indexedMsg": "已嵌入 {{pages}} 篇笔记，共 {{chunks}} 块。",
+      "failed": "索引失败。"
+    },
     "about": {
       "title": "关于与更新",
       "subtitle": "检查新版本，一键安装。",

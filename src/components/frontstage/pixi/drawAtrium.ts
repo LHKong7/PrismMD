@@ -7,7 +7,7 @@
  */
 
 import { Container, Graphics } from 'pixi.js'
-import { makeGlow, lightPool, plankFloor, shadedBox, makeMotes, shade, type RainDrop, type RoomBuild } from './roomBuild'
+import { makeGlow, lightPool, plankFloor, shadedBox, makeMotes, shade, PALETTE, nightWash, type RainDrop, type RoomBuild } from './roomBuild'
 import { SHELF_ROWS } from './shelfBooks'
 
 export function drawAtrium(): RoomBuild {
@@ -181,15 +181,18 @@ export function drawAtrium(): RoomBuild {
   candleFlame.y = 390
   container.addChild(candleFlame)
 
+  // Cool moonlight wash (shared across all rooms — ties them to one night)
+  container.addChild(nightWash({ x: 0, y: 0, w: 960, h: 600 }, 0.12))
+
   // Warm vignette
   const vignette = new Graphics()
-  vignette.rect(0, 0, 960, 40).fill({ color: 0x140c06, alpha: 0.32 })
-  vignette.rect(0, 560, 960, 40).fill({ color: 0x140c06, alpha: 0.34 })
-  vignette.rect(0, 0, 34, 600).fill({ color: 0x140c06, alpha: 0.24 })
-  vignette.rect(926, 0, 34, 600).fill({ color: 0x140c06, alpha: 0.24 })
+  vignette.rect(0, 0, 960, 40).fill({ color: PALETTE.vignette, alpha: 0.32 })
+  vignette.rect(0, 560, 960, 40).fill({ color: PALETTE.vignette, alpha: 0.34 })
+  vignette.rect(0, 0, 34, 600).fill({ color: PALETTE.vignette, alpha: 0.24 })
+  vignette.rect(926, 0, 34, 600).fill({ color: PALETTE.vignette, alpha: 0.24 })
   container.addChild(vignette)
 
-  const { container: moteC, motes } = makeMotes({ x: 60, y: 130, w: 840, h: 430 }, 26, 0xffd9a0)
+  const { container: moteC, motes } = makeMotes({ x: 60, y: 130, w: 840, h: 430 }, 26, PALETTE.mote)
   container.addChild(moteC)
 
   return { container, flames, candleFlame, glows, rains, motes }

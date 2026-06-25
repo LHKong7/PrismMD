@@ -467,6 +467,38 @@
       "toolCount": "{{count}} tools",
       "stopped": "Stopped"
     },
+    "mcpServer": {
+      "title": "MCP Server (expose your notes)",
+      "subtitle": "Run a localhost-only MCP server so external agents (Claude Code / Desktop) can read this workspace. Bound to 127.0.0.1 and protected by a bearer token.",
+      "enable": "Enable MCP server",
+      "running": "Running",
+      "stopped": "Stopped",
+      "readOnlyNote": "Read-only: agents can search, read and list your notes — never modify them.",
+      "port": "Port",
+      "urlLabel": "Server URL",
+      "tokenLabel": "Access token",
+      "tokenEmpty": "(generated when enabled)",
+      "regenerate": "Regenerate",
+      "claudeCmdLabel": "Add to Claude Code",
+      "copy": "Copy",
+      "show": "Show",
+      "hide": "Hide"
+    },
+    "rag": {
+      "title": "Semantic search (RAG)",
+      "subtitle": "Embed your notes into a local vector index so search ranks by meaning, not keywords. Powers the MCP search_notes tool when enabled.",
+      "enable": "Enable semantic search",
+      "provider": "Embeddings provider",
+      "providerCustom": "Custom (OpenAI-compatible)",
+      "model": "Embedding model",
+      "notConfigured": "The selected provider has no API key / base URL configured. Set it up under the AI provider settings first.",
+      "buildIndex": "Build / refresh index",
+      "clear": "Clear index",
+      "indexing": "Embedding {{done}}/{{total}}…",
+      "statusLine": "{{indexed}}/{{total}} notes indexed · {{stale}} stale · {{chunks}} chunks",
+      "indexedMsg": "Embedded {{pages}} note(s), {{chunks}} chunks total.",
+      "failed": "Indexing failed."
+    },
     "about": {
       "title": "About & Updates",
       "subtitle": "Check for new releases and apply them with one click.",

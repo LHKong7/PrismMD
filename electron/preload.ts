@@ -7,6 +7,17 @@ export interface FileTreeNode {
   children?: FileTreeNode[]
 }
 
+export interface RagStatus {
+  enabled: boolean
+  configured: boolean
+  providerId: string
+  model: string
+  indexedPages: number
+  totalPages: number
+  stalePages: number
+  chunks: number
+}
+
 export interface Annotation {
   id: string
   filePath: string
@@ -511,6 +522,76 @@ const electronAPI = {
     ipcRenderer.invoke('mcp:restart'),
   mcpStop: (serverId: string): Promise<{ ok: true } | { ok: false; error: string }> =>
     ipcRenderer.invoke('mcp:stop', serverId),
+
+  // MCP server — expose the user's notes TO external agents (read-only).
+  // Configured in settings.mcpServer; bound to 127.0.0.1 + bearer token.
+  mcpServerGetConfig: (): Promise<{
+    ok: true
+    enabled: boolean
+    port: number
+    token: string
+    status: { running: boolean; port: number; url: string | null; sessions: number }
+  }> => ipcRenderer.invoke('mcpserver:get-config'),
+  mcpServerSetConfig: (patch: {
+    enabled?: boolean
+    port?: number
+  }): Promise<{
+    ok: boolean
+    error?: string
+    enabled: boolean
+    port: number
+    token: string
+    status: { running: boolean; port: number; url: string | null; sessions: number }
+  }> => ipcRenderer.invoke('mcpserver:set-config', patch),
+  mcpServerRegenerateToken: (): Promise<{
+    ok: boolean
+    error?: string
+    enabled: boolean
+    port: number
+    token: string
+    status: { running: boolean; port: number; url: string | null; sessions: number }
+  }> => ipcRenderer.invoke('mcpserver:regenerate-token'),
+  mcpServerStatus: (): Promise<{
+    ok: true
+    status: { running: boolean; port: number; url: string | null; sessions: number }
+  }> => ipcRenderer.invoke('mcpserver:status'),
+
+  // Semantic search (RAG) over notes. Config in settings.rag.
+  ragGetConfig: (): Promise<{
+    ok: true
+    enabled: boolean
+    providerId: string
+    model: string
+    status: RagStatus
+  }> => ipcRenderer.invoke('rag:get-config'),
+  ragSetConfig: (patch: {
+    enabled?: boolean
+    providerId?: string
+    model?: string
+  }): Promise<{ ok: true; enabled: boolean; providerId: string; model: string; status: RagStatus }> =>
+    ipcRenderer.invoke('rag:set-config', patch),
+  ragStatus: (): Promise<{ ok: true; status: RagStatus }> => ipcRenderer.invoke('rag:status'),
+  ragReindex: (): Promise<{
+    ok: boolean
+    error?: string
+    embeddedPages: number
+    removedPages: number
+    chunks: number
+    status: RagStatus
+  }> => ipcRenderer.invoke('rag:reindex'),
+  ragClear: (): Promise<{ ok: true; status: RagStatus }> => ipcRenderer.invoke('rag:clear'),
+  ragSearch: (
+    query: string,
+    limit?: number,
+  ): Promise<
+    | { ok: true; hits: Array<{ pageId: string; title: string; score: number; snippet: string }> }
+    | { ok: false; error: string }
+  > => ipcRenderer.invoke('rag:search', query, limit),
+  onRagProgress: (callback: (p: { done: number; total: number; title: string }) => void) => {
+    const handler = (_e: unknown, p: { done: number; total: number; title: string }) => callback(p)
+    ipcRenderer.on('rag:progress', handler)
+    return () => ipcRenderer.removeListener('rag:progress', handler)
+  },
 
   pluginsDiscover: (): Promise<
     | { ok: true; plugins: Array<{

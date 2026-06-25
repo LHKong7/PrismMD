@@ -6,7 +6,7 @@
  */
 
 import { Container, Graphics, Text, TextStyle } from 'pixi.js'
-import { makeGlow, lightPool, plankFloor, shadedBox, makeMotes, shade, hexNum, type RoomBuild } from './roomBuild'
+import { makeGlow, lightPool, plankFloor, shadedBox, makeMotes, shade, hexNum, PALETTE, nightWash, type RoomBuild } from './roomBuild'
 import { ROOMS } from '../sceneConfig'
 import { NPCS } from '../npcs'
 
@@ -14,27 +14,27 @@ export function drawGuildHall(): RoomBuild {
   const container = new Container()
   const glows: Graphics[] = []
 
-  // ── Shell (cooler, library-hall tones) ──
+  // ── Shell (warm candlelit wood — shared palette with the atrium) ──
   const shell = new Graphics()
-  shell.rect(0, 0, 960, 300).fill(0x2b2933)
-  for (let x = 0; x < 960; x += 40) shell.rect(x + 38, 0, 2, 256).fill(0x231f29)
-  shell.rect(0, 256, 960, 44).fill(0x3a3744)
-  shell.rect(0, 256, 960, 3).fill(0x4d4757)
-  shell.rect(0, 296, 960, 4).fill(0x221f29)
+  shell.rect(0, 0, 960, 300).fill(PALETTE.wall)
+  for (let x = 0; x < 960; x += 40) shell.rect(x + 38, 0, 2, 256).fill(PALETTE.wallSeam)
+  shell.rect(0, 256, 960, 44).fill(PALETTE.wainscot)
+  shell.rect(0, 256, 960, 3).fill(shade(PALETTE.wainscot, 0.14))
+  shell.rect(0, 296, 960, 4).fill(PALETTE.baseboard)
   for (let x = 24; x < 960; x += 96) {
-    shell.roundRect(x, 244, 72, 46, 3).fill(shade(0x3a3744, -0.08)).stroke({ width: 2, color: shade(0x3a3744, 0.12) })
+    shell.roundRect(x, 244, 72, 46, 3).fill(shade(PALETTE.wainscot, -0.08)).stroke({ width: 2, color: shade(PALETTE.wainscot, 0.12) })
   }
   container.addChild(shell)
   const floor = new Graphics()
-  plankFloor(floor, { x: 0, y: 300, w: 960, h: 300 }, 0x53492f, 58)
+  plankFloor(floor, { x: 0, y: 300, w: 960, h: 300 }, PALETTE.floor, 58)
   container.addChild(floor)
 
   // Central runner rug
   const rug = new Graphics()
-  rug.rect(70, 470, 820, 70).fill(0x6a3f52)
-  rug.rect(70, 470, 820, 70).stroke({ width: 5, color: 0xc49a5a })
-  rug.rect(78, 478, 804, 4).fill(0xc49a5a)
-  rug.rect(78, 528, 804, 4).fill(0xc49a5a)
+  rug.rect(70, 470, 820, 70).fill(PALETTE.rug)
+  rug.rect(70, 470, 820, 70).stroke({ width: 5, color: PALETTE.rugTrim })
+  rug.rect(78, 478, 804, 4).fill(PALETTE.rugTrim)
+  rug.rect(78, 528, 804, 4).fill(PALETTE.rugTrim)
   container.addChild(rug)
 
   // Return door (left wall)
@@ -101,15 +101,18 @@ export function drawGuildHall(): RoomBuild {
   banner.y = 24
   container.addChild(banner)
 
+  // Cool moonlight wash (shared across all rooms — ties them to one night)
+  container.addChild(nightWash({ x: 0, y: 0, w: 960, h: 600 }, 0.14))
+
   // Vignette
   const vignette = new Graphics()
-  vignette.rect(0, 0, 960, 30).fill({ color: 0x100a14, alpha: 0.3 })
-  vignette.rect(0, 566, 960, 34).fill({ color: 0x100a14, alpha: 0.32 })
-  vignette.rect(0, 0, 26, 600).fill({ color: 0x100a14, alpha: 0.24 })
-  vignette.rect(934, 0, 26, 600).fill({ color: 0x100a14, alpha: 0.24 })
+  vignette.rect(0, 0, 960, 30).fill({ color: PALETTE.vignette, alpha: 0.3 })
+  vignette.rect(0, 566, 960, 34).fill({ color: PALETTE.vignette, alpha: 0.32 })
+  vignette.rect(0, 0, 26, 600).fill({ color: PALETTE.vignette, alpha: 0.24 })
+  vignette.rect(934, 0, 26, 600).fill({ color: PALETTE.vignette, alpha: 0.24 })
   container.addChild(vignette)
 
-  const { container: moteC, motes } = makeMotes({ x: 60, y: 120, w: 840, h: 440 }, 22, 0xbfd0e8)
+  const { container: moteC, motes } = makeMotes({ x: 60, y: 120, w: 840, h: 440 }, 22, PALETTE.mote)
   container.addChild(moteC)
 
   return { container, flames: [], candleFlame: null, glows, rains: [], motes }

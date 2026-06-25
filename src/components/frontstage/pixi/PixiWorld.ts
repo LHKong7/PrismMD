@@ -561,7 +561,7 @@ export class PixiWorld {
     }
     if (this.candleFlame) this.candleFlame.scale.set(1, 0.8 + 0.22 * Math.sin(this.time * 11))
     for (let i = 0; i < this.glows.length; i++) {
-      this.glows[i].alpha = 0.7 + 0.3 * Math.sin(this.time * 2.2 + i)
+      this.glows[i].alpha = 0.46 + 0.18 * Math.sin(this.time * 2.2 + i)
     }
     for (const r of this.rains) {
       const span = r.botY - r.topY
