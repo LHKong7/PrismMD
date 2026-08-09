@@ -116,6 +116,53 @@ function compatibleProvider(
     })
 }
 
+/** 供设置界面展示的一条模型条目。 */
+export interface ModelChoice {
+    id: string
+    name: string
+    /** 上下文窗口（token）。 */
+    contextWindow: number
+    /** 每百万 input token 的美元价；0 表示免费或未知。 */
+    inputCostPerMTok: number
+    /** 是否支持推理/思考模式。 */
+    reasoning: boolean
+}
+
+/**
+ * 列出某个 provider 的可选模型 —— 取自 pi-ai 自带的目录，不需要 API key。
+ *
+ * 取代渲染层里手写的 `DEFAULT_MODELS` 常量表（那张表要人工跟着模型发布更新，
+ * 且没有上下文窗口和价格信息）。
+ *
+ * ollama / custom 返回空数组：它们是「任意 OpenAI 兼容端点」，模型名由用户
+ * 自己填，上游没有目录可查。
+ */
+export function listModels(provider: ProviderName): ModelChoice[] {
+    if (provider === 'ollama' || provider === 'custom') return []
+
+    const models = createModels()
+    switch (provider) {
+        case 'anthropic':
+            models.setProvider(anthropicProvider())
+            break
+        case 'google':
+            models.setProvider(googleProvider())
+            break
+        default:
+            models.setProvider(openaiProvider())
+            break
+    }
+
+    return models.getModels(provider).map((m) => ({
+        id: m.id,
+        name: m.name,
+        contextWindow: m.contextWindow,
+        // pi 的 cost 单位是「每百万 token 美元」。
+        inputCostPerMTok: m.cost?.input ?? 0,
+        reasoning: m.reasoning,
+    }))
+}
+
 /** 一次解析的产物：模型集合 + 选中的那个模型。 */
 export interface ResolvedModel {
     models: MutableModels

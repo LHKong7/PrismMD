@@ -49,7 +49,15 @@ function legacyUsage(msg: AssistantMessage | null): Record<string, number> {
     };
 }
 
-/** 渲染层传来的 `{role, content}[]` → pi 的 `Message[]`。 */
+/**
+ * 渲染层传来的 `{role, content}[]` → pi 的 `Message[]`。
+ *
+ * user 消息**必须**用 `[{type:'text'}]` 块数组，而不是裸字符串 —— pi 的
+ * `Agent.normalizePromptInput()` 就是这么包当前提问的（`agent.js:263`）。
+ * 两种形状在 wire 上不同：同一句话第一轮作为提问发出去、第二轮作为历史再发，
+ * 字节不一致就会**打断 provider 的 prompt 缓存前缀**，而且不报任何错，
+ * 只有账单和首 token 延迟会变差。`promptCache.test.ts` 钉住了这一点。
+ */
 function historyToPiMessages(history: Record<string, any>[]): Message[] {
     const out: Message[] = [];
     for (const m of history) {
@@ -73,7 +81,11 @@ function historyToPiMessages(history: Record<string, any>[]): Message[] {
                 timestamp: Date.now(),
             });
         } else {
-            out.push({ role: 'user', content, timestamp: Date.now() });
+            out.push({
+                role: 'user',
+                content: [{ type: 'text', text: content }],
+                timestamp: Date.now(),
+            });
         }
     }
     return out;

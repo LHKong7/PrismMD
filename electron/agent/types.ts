@@ -48,28 +48,24 @@ export interface ToolDefinition {
      */
     execute: (args: Record<string, any>) => Promise<string> | string;
     /**
-     * If true, the tool is mutating and requires user approval before
-     * execution (only relevant when approval callbacks are set).
-     */
-    requiresApproval?: boolean;
-    /**
-     * Permission level for sandbox classification.
-     * 'safe' = read-only, 'moderate' = file mods, 'dangerous' = execution, 'critical' = unrestricted.
-     */
-    permissionLevel?: 'safe' | 'moderate' | 'dangerous' | 'critical';
-    /**
-     * Per-tool execution timeout in ms. Falls back to the executor default
-     * (60s) when omitted. Capped at 10 minutes by the executor.
-     */
-    timeout?: number;
-    /**
      * Whether this tool can be safely executed in parallel with sibling
      * tool calls in the same round. Defaults to `true`. Set to `false`
-     * for tools with shared mutable state (e.g. an interactive REPL).
-     * Tools with `requiresApproval: true` are always serialized regardless.
+     * for tools with shared mutable state (e.g. an interactive REPL) —
+     * 映射到 pi 的 `AgentTool.executionMode: 'sequential'`。
      */
     concurrencySafe?: boolean;
 }
+
+/*
+ * 迁到 pi 之前这里还有 `requiresApproval` / `permissionLevel` / `timeout`
+ * 三个字段，分别服务于旧 ToolExecutor 的审批链路、sandbox 的权限分级、
+ * 以及 per-tool 超时。三个消费方都随 pi 迁移删除了，字段本身**无人读取** ——
+ * 留着会让人以为设了就生效，所以一并去掉。
+ *
+ * 真要把「工具执行前弹确认」做回来，落点是 pi 的 `beforeToolCall` 钩子
+ * （返回 `{ block: true, reason }` 即可拦下），而不是恢复这几个字段。
+ * 超时方面：代理工具在 `agentWorker.ts` 侧有 30s 上限，不依赖这里。
+ */
 
 // ---------------------------------------------------------------------------
 // Skill definition (user-facing)

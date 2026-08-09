@@ -16,6 +16,7 @@ import {
   clearDocSummaries,
   type DocSummary,
 } from '../services/docSummaryService'
+import { listModels, type ProviderName } from '../agent/pi/models'
 import { getMainWindow } from '../main'
 
 export function registerAgentHandlers() {
@@ -36,6 +37,19 @@ export function registerAgentHandlers() {
 
   ipcMain.handle('agent:test-connection', async (_event, provider: string, apiKey: string, baseUrl?: string, model?: string) => {
     return testConnection(provider, apiKey, baseUrl, model)
+  })
+
+  /**
+   * 某个 provider 的可选模型 —— 读 pi-ai 自带的目录，不需要 API key，
+   * 也不发网络请求。ollama / custom 返回空数组（模型名由用户自己填）。
+   */
+  ipcMain.handle('agent:list-models', (_event, provider: string) => {
+    try {
+      return listModels(provider as ProviderName)
+    } catch {
+      // 目录读不出来不该让设置界面挂掉 —— 渲染层会退回内置的兜底列表。
+      return []
+    }
   })
 
   ipcMain.handle(
