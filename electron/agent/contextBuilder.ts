@@ -162,9 +162,26 @@ function renderBlock(src: ContextSource, content: string): string {
 // ContextBuilder
 // ---------------------------------------------------------------------------
 
+import * as fs from 'fs';
+import * as path from 'path';
 import type { Telemetry } from './telemetry';
-import { retrieve } from './memoryCore';
-import { loadProjectKnowledge } from './memoryCore';
+import { WORKDIR } from './config';
+
+/**
+ * 项目级知识：工作目录下的 `CLAUDE.md`。
+ *
+ * 原先在 `memoryCore.ts`，随 pi 迁移把 memoryCore 删掉后并到这里 —— 它是
+ * memoryCore 里唯一被实际调用的读取函数（`includeProjectKnowledge` 默认开）。
+ */
+function loadProjectKnowledge(): string | null {
+    const claudeMd = path.join(WORKDIR, 'CLAUDE.md');
+    if (!fs.existsSync(claudeMd)) return null;
+    try {
+        return fs.readFileSync(claudeMd, 'utf-8').trim();
+    } catch {
+        return null;
+    }
+}
 
 export interface ContextBuilderOptions {
     /** Base system prompt — always included at top priority. */
@@ -234,30 +251,10 @@ export class ContextBuilder {
             }
         }
 
-        // 4) RAG memories.
-        if (this._options.includeMemory) {
-            const k = this._options.memoryK ?? 5;
-            const tel = this._options.telemetry;
-            const span = tel?.startSpan('memory.retrieve');
-            try {
-                const memories = await retrieve(userInput, k, { autoEnableEmbeddings: true });
-                if (memories.length) {
-                    const lines = memories.map((m, i) => `[${i + 1}] ${m[0]}`).join('\n');
-                    registry.register({
-                        name: 'rag_memories',
-                        content: lines,
-                        priority: 0.6,
-                        category: 'rag',
-                    });
-                    tel?.recordMemoryRetrieval(span!, memories.length, memories.map((m) => m[1]));
-                }
-            } catch (e: any) {
-                span?.setStatus('error', e?.message ?? String(e));
-                tel?.warn('context', 'memory retrieval failed', { error: e?.message ?? String(e) });
-            } finally {
-                span?.end();
-            }
-        }
+        // 迁移前这里还有第 4 段「RAG memories」，从 memoryCore 检索向量记忆。
+        // PrismMD 从未开启过它（agentWorker 一直是 enableMemory(false)），
+        // memoryCore 已随 pi 迁移删除。`includeMemory` 选项保留但不再有作用 ——
+        // 真正要做笔记 RAG 的话，主进程的 workspaceDb 里已经有 note_embeddings 表。
 
         const result = registry.assemble(budgetTokens);
         return { ...result, registry };

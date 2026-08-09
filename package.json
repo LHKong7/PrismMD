@@ -28,6 +28,7 @@
     "@codemirror/search": "^6.7.1",
     "@codemirror/state": "^6.6.0",
     "@codemirror/view": "^6.41.1",
+    "@earendil-works/pi-agent-core": "0.84.1",
     "@earendil-works/pi-ai": "0.84.1",
     "@lezer/highlight": "^1.2.3",
     "@modelcontextprotocol/sdk": "^1.0.4",

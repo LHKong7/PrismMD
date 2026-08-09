@@ -4,9 +4,6 @@
  * Users import these to define tools, skills, and configure agents.
  */
 
-import type { LLMProvider } from './llmProtocol';
-import type { SandboxConfig } from './sandbox';
-import type { EmbeddingProvider } from './providers/embeddings';
 import type { ProviderName } from './pi/models';
 import type { TokenUsage } from './pricing';
 
@@ -140,61 +137,32 @@ export interface LLMConfig {
 }
 
 export interface StorageConfig {
-    backend: 'file' | 'cloud' | 'memory';
+    backend: 'file' | 'memory';
     /** Inject a pre-built StorageBackend directly (overrides backend selection). */
     custom?: import('./storage/protocols').StorageBackend;
     /** For file backend: root directory for all data. */
     dir?: string;
-    /** For cloud backend: S3 bucket name. */
-    bucket?: string;
-    /** For cloud backend: S3 endpoint URL. */
-    endpoint?: string;
-    /** For cloud backend: AWS region. */
-    region?: string;
 }
 
 export interface AgentConfig {
-    /** LLM provider instance (takes precedence over llmConfig). */
-    llm?: LLMProvider;
-    /** LLM connection config (used if llm is not provided). */
+    /** LLM connection config. */
     llmConfig?: LLMConfig;
     /** Base system prompt. */
     systemPrompt?: string;
     /** User-defined tools. */
     tools?: ToolDefinition[];
-    /** User-defined skills. */
-    skills?: SkillDefinition[];
-    /** Include built-in tools (bash, read_file, etc.). Default: true. */
-    includeBuiltinTools?: boolean;
-    /** Storage config. */
-    storage?: StorageConfig;
-    /** Enable long-term memory. Default: false. */
-    enableMemory?: boolean;
-    /** Enable streaming by default. Default: false. */
-    enableStreaming?: boolean;
     /** Enable context management (history trimming, budgeting). Default: true. */
     enableContext?: boolean;
     /** Max tool rounds per turn. Default: 20. */
     maxToolRounds?: number;
     /** Max output tokens per LLM call. Default: 8000. */
     maxTokens?: number;
-    /** Callback for executor approval. Return true to approve. */
-    approvalCallback?: (toolName: string, args: Record<string, any>) => Promise<boolean> | boolean;
     /**
      * Callback for human-in-the-loop interaction.
      * Called when the agent uses the `ask_user` tool to ask the user a question mid-task.
      * Receives the question string and should return the user's answer.
      */
     humanInputCallback?: (question: string) => Promise<string> | string;
-    /** Sandbox configuration for isolating tool execution. */
-    sandbox?: SandboxConfig;
-    /** MCP server configurations to connect to. */
-    mcpServers?: import('./mcpClient').MCPServerConfig[];
-    /**
-     * Optional embedding provider for vector-based memory retrieval.
-     * When not set, memory retrieval uses keyword-based scoring only.
-     */
-    embeddingProvider?: EmbeddingProvider;
     /**
      * Optional telemetry instance. If omitted, a no-op telemetry is used
      * (zero overhead). Construct with `new Telemetry({ exporter: ... })`
