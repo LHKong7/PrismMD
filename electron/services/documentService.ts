@@ -8,6 +8,8 @@ import * as crypto from 'crypto'
 import * as fs from 'fs'
 import * as path from 'path'
 import { getDb } from './workspaceDb'
+import { detectFormat, isSupported, kindOfFormat, defaultExtFor } from './fileFormats'
+import { copyAssetTo, getAsset, saveAssetFromBytes, saveAssetFromFile } from './assetService'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -216,10 +218,53 @@ export function searchPages(query: string): PageSummary[] {
 
 // ─── Import / Export ────────────────────────────────────────────────────────
 
-export function importMarkdown(filePath: string, parentId?: string | null): Page {
-  const content = fs.readFileSync(filePath, 'utf-8')
+/**
+ * Import any supported document as a page.
+ *
+ * Text formats (markdown, txt, csv, json) land in `pages.content` directly.
+ * Binary formats (pdf, xlsx) create a page with empty content plus an entry
+ * in the asset store; the renderer backfills `content` with extracted text
+ * once it can parse the file (see `pdfText.ts`), which is what makes a PDF
+ * searchable and readable by the agent.
+ */
+export function importFile(filePath: string, parentId?: string | null): Page {
+  const format = detectFormat(filePath)
+  if (!format) throw new Error(`Unsupported file type: ${path.basename(filePath)}`)
+
   const title = path.basename(filePath, path.extname(filePath))
-  return createPage(title, parentId, content, 'md')
+
+  if (kindOfFormat(format) === 'binary') {
+    const page = createPage(title, parentId, '', format)
+    saveAssetFromFile(page.id, filePath)
+    return page
+  }
+
+  const content = fs.readFileSync(filePath, 'utf-8')
+  return createPage(title, parentId, content, format)
+}
+
+/**
+ * Import bytes handed over from the renderer (drag-and-drop gives us a
+ * File object, not a readable path). `text` is passed through for text
+ * formats so we don't re-decode the bytes here.
+ */
+export function importDroppedFile(
+  fileName: string,
+  data: Uint8Array,
+  parentId?: string | null,
+): Page {
+  const format = detectFormat(fileName)
+  if (!format) throw new Error(`Unsupported file type: ${fileName}`)
+
+  const title = fileName.replace(/\.[^.]+$/, '')
+
+  if (kindOfFormat(format) === 'binary') {
+    const page = createPage(title, parentId, '', format)
+    saveAssetFromBytes(page.id, fileName, data)
+    return page
+  }
+
+  return createPage(title, parentId, Buffer.from(data).toString('utf-8'), format)
 }
 
 export function importFolder(folderPath: string, parentId?: string | null): Page[] {
@@ -234,19 +279,41 @@ export function importFolder(folderPath: string, parentId?: string | null): Page
       const folderPage = createPage(entry.name, parentId, '', 'md', true)
       imported.push(folderPage)
       imported.push(...importFolder(fullPath, folderPage.id))
-    } else if (/\.(md|markdown|mdx)$/i.test(entry.name)) {
-      imported.push(importMarkdown(fullPath, parentId))
+    } else if (isSupported(entry.name)) {
+      try {
+        imported.push(importFile(fullPath, parentId))
+      } catch (err) {
+        // One unreadable file shouldn't abort a whole folder import.
+        console.warn('[workspace] skipped during folder import:', fullPath, err)
+      }
     }
   }
 
   return imported
 }
 
-export function exportMarkdown(pageId: string, targetPath: string): void {
+/**
+ * Write a page back out to disk. Asset-backed pages export the *original*
+ * document (a PDF exported as its extracted text would be a lossy surprise);
+ * text pages write their content.
+ */
+export function exportPageToFile(pageId: string, targetPath: string): void {
   const page = getPage(pageId)
   if (!page) throw new Error(`Page not found: ${pageId}`)
   if (page.isFolder) throw new Error('Cannot export a folder')
+
+  if (getAsset(pageId)) {
+    copyAssetTo(pageId, targetPath)
+    return
+  }
   fs.writeFileSync(targetPath, page.content, 'utf-8')
+}
+
+/** Suggested filename for the save dialog, matching the page's real format. */
+export function exportFileNameFor(page: Page): string {
+  const asset = getAsset(page.id)
+  const ext = asset?.ext || defaultExtFor(page.format)
+  return `${page.title}${ext}`
 }
 
 // ─── Stats ──────────────────────────────────────────────────────────────────

@@ -39,9 +39,9 @@ export function PaneView({ paneId }: PaneViewProps) {
     title: tab?.title ?? null,
     content: tab?.content ?? null,
     format: tab?.format ?? null,
-    bytes: null,
+    bytes: tab?.bytes ?? null,
     isActivePane: isActive,
-  }), [paneId, tab?.pageId, tab?.title, tab?.content, tab?.format, isActive])
+  }), [paneId, tab?.pageId, tab?.title, tab?.content, tab?.format, tab?.bytes, isActive])
 
   return (
     <div

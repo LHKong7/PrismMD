@@ -17,7 +17,7 @@
   "reader": {
     "unsupported": {
       "title": "Unsupported file format",
-      "body": "PrismMD's Library currently supports Markdown, PDF, CSV, JSON and XLSX. Try opening one of those."
+      "body": "PrismMD's Library currently supports Markdown, PDF, CSV, JSON, XLSX and plain text. Try opening one of those."
     },
     "json": {
       "parseError": "This JSON file isn't valid"
@@ -43,6 +43,9 @@
       "emptySheet": "This sheet is empty."
     },
     "pdf": {
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "zoomReset": "Fit width",
       "errorTitle": "Couldn't render this PDF",
       "prev": "Previous page",
       "next": "Next page",
@@ -50,7 +53,16 @@
       "loading": "Rendering PDF…"
     },
     "loading": "Loading…",
-    "parsing": "Parsing {{size}}…"
+    "parsing": "Parsing {{size}}…",
+    "viewMode": {
+      "table": "Table",
+      "tree": "Tree",
+      "raw": "Raw"
+    },
+    "asset": {
+      "missingTitle": "Original file is missing",
+      "missingBody": "This document's bytes aren't in the asset store — that happens when workspace.db is copied without the assets folder. Re-import the file to restore it."
+    }
   },
   "sidebar": {
     "explorer": "Explorer",
@@ -72,7 +84,7 @@
     "workspace": "Workspace",
     "newPage": "New page",
     "newFolder": "New folder",
-    "importFile": "Import Markdown",
+    "importFile": "Import file",
     "importFolder": "Import folder",
     "searchPages": "Search pages…",
     "noPages": "No pages yet",
@@ -882,5 +894,25 @@
     "copy": "Copy",
     "delete": "Delete",
     "kind": { "topic": "Topic", "quote": "Line", "snippet": "Snippet", "opening": "Opening" }
+  },
+  "library": {
+    "collect": "Save a copy to notes",
+    "collected": "Saved to notes",
+    "collectFailed": "Could not save to notes",
+    "openReader": "Open reader window",
+    "readerMode": "Reader",
+    "welcomeTitle": "Read a folder",
+    "welcomeBody": "Reader mode opens documents where they already live. Nothing is copied, nothing is written back.",
+    "openFolder": "Open folder\u2026",
+    "openFile": "Open file\u2026",
+    "openWorkspace": "Open note mode",
+    "toggleSidebar": "Toggle folder",
+    "refresh": "Refresh",
+    "recent": "Recent",
+    "emptyFolder": "Nothing readable here",
+    "truncated": "Too many files to list them all",
+    "pickAFile": "Pick a file from the folder to start reading.",
+    "loading": "Opening\u2026",
+    "openError": "Could not open this file"
   }
 }

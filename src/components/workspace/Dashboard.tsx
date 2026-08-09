@@ -43,7 +43,7 @@ export function Dashboard() {
   const actions: { icon: typeof FilePlus; label: string; sub: string; onClick: () => void }[] = [
     { icon: FilePlus, label: t('sidebar.newPage', 'New page'), sub: t('workspace.dashboard.blankDoc', 'Blank document'), onClick: () => void createPage('Untitled', null) },
     { icon: Calendar, label: t('workspace.dashboard.dailyJournal', 'Daily journal'), sub: t('workspace.dashboard.journalSub', "Today's entry"), onClick: () => void openTodayDiary() },
-    { icon: Upload, label: t('sidebar.importFile', 'Import Markdown'), sub: t('workspace.dashboard.importSub', 'Bring a file in'), onClick: () => void importFile(null) },
+    { icon: Upload, label: t('sidebar.importFile', 'Import file'), sub: t('workspace.dashboard.importSub', 'Bring a file in'), onClick: () => void importFile(null) },
     { icon: Search, label: t('commandPalette.title', 'Search'), sub: '⌘P', onClick: () => setCommandPaletteOpen(true) },
   ]
 

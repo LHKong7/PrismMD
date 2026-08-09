@@ -1,22 +1,11 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X, FileText, FileSpreadsheet, FileJson, File as FileIcon } from 'lucide-react'
+import { X } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useWorkspaceStore, type WorkspaceTab } from '../../store/workspaceStore'
 import { useToastStore } from '../../store/toastStore'
 import { ContextMenu, type ContextMenuItem } from '../ui/ContextMenu'
-import type { FileFormat } from '../../lib/fileFormat'
-
-function iconForFormat(format: FileFormat | null) {
-  switch (format) {
-    case 'markdown': return FileText
-    case 'pdf':      return FileIcon
-    case 'csv':      return FileSpreadsheet
-    case 'xlsx':     return FileSpreadsheet
-    case 'json':     return FileJson
-    default:         return FileText
-  }
-}
+import { iconForFormat } from '../../lib/formatIcons'
 
 export function TabBar() {
   const { t } = useTranslation()

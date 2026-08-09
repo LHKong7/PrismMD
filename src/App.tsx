@@ -80,6 +80,14 @@ function AppContent() {
     void bootstrapExternalPlugins()
   }, [])
 
+  // A reader window can add a page to the workspace while this window is
+  // open; refresh the tree so the new note shows up without a manual poke.
+  useEffect(() => {
+    return window.electronAPI.onWorkspaceTreeChanged(() => {
+      void useWorkspaceStore.getState().loadTree()
+    })
+  }, [])
+
   // Subscribe to agent trace IPC events for the developer debug panel (dev-only).
   useEffect(() => {
     if (!import.meta.env.DEV) return

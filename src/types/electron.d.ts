@@ -13,6 +13,21 @@ export interface WorkspacePage {
   isFolder: boolean
 }
 
+/**
+ * Metadata for a page whose real payload is a binary file (PDF, XLSX)
+ * stored under {userData}/assets rather than in `pages.content`.
+ */
+export interface PageAsset {
+  pageId: string
+  fileName: string
+  ext: string
+  mime: string | null
+  size: number
+  sourcePath: string | null
+  storageName: string
+  createdAt: number
+}
+
 export interface PageTreeNode {
   id: string
   title: string
@@ -34,12 +49,36 @@ export interface KBEntry {
   addedAt: number
 }
 
-export interface FileTreeNode {
+/** One row of a reader-mode folder listing. */
+export interface LibraryEntry {
   name: string
   path: string
   type: 'file' | 'directory'
-  children?: FileTreeNode[]
+  /** Stored-format id ('md' | 'pdf' | …); null for directories. */
+  format: string | null
+  size: number
+  modifiedAt: number
 }
+
+export interface LibraryListing {
+  path: string
+  entries: LibraryEntry[]
+  /** The directory held more entries than a single listing returns. */
+  truncated: boolean
+}
+
+export interface LibraryFileInfo {
+  path: string
+  name: string
+  format: string
+  size: number
+  modifiedAt: number
+}
+
+/** What a reader window was asked to show when it was created. */
+export type LaunchTarget = { kind: 'folder' | 'file'; path: string }
+
+export type LibraryResult<T> = ({ ok: true } & T) | { ok: false; error: string }
 
 export interface Annotation {
   id: string
@@ -87,261 +126,39 @@ export interface MuseCard {
   createdAt: number
 }
 
-export interface ElectronAPI {
-  // File operations
-  openFileDialog: () => Promise<{ path: string } | null>
-  openFolderDialog: () => Promise<string | null>
-  readFile: (filePath: string) => Promise<string>
-  readFileBytes: (filePath: string) => Promise<ArrayBuffer>
-  readDirectory: (dirPath: string) => Promise<FileTreeNode[]>
-  readDirectoryChildren: (dirPath: string) => Promise<FileTreeNode[]>
-  writeFile: (filePath: string, content: string) => Promise<void>
-  newFileDialog: (defaultDir?: string) => Promise<{ cancelled: boolean; filePath?: string }>
-  createDirectory: (dirPath: string) => Promise<void>
-  rename: (oldPath: string, newPath: string) => Promise<void>
-  trash: (itemPath: string) => Promise<void>
-  duplicateFile: (srcPath: string, destPath: string) => Promise<void>
-  showInFolder: (itemPath: string) => Promise<void>
-  exists: (itemPath: string) => Promise<boolean>
+/**
+ * The renderer's view of the preload bridge.
+ *
+ * **Derived, not mirrored.** This used to be a hand-copied duplicate of
+ * `electron/preload.ts`, and it drifted: ~20 `insightGraph*` channels the
+ * preload really exposed were missing here, so every call site was a type
+ * error that `npm run typecheck` silently swallowed. Deriving the shape means
+ * a channel added to preload is available here the moment it exists.
+ *
+ * `Overrides` is the escape hatch for the handful of channels preload types
+ * loosely (`any`, `unknown`) that the renderer wants precisely. The `Assert`
+ * below fails the build if an override names a channel preload doesn't have —
+ * the drift guard the old hand-written mirror lacked.
+ */
+import type { ElectronAPI as PreloadAPI } from '../../electron/preload'
 
-  // File watching
-  watchFile: (filePath: string) => void
-  unwatchFile: (filePath: string) => void
-  watchDirectory: (dirPath: string) => void
-  unwatchDirectory: (dirPath: string) => void
-  onFileChanged: (callback: (filePath: string) => void) => () => void
-  onDirectoryChanged: (callback: (dirPath: string) => void) => () => void
+type Assert<T extends true> = T
 
-  // Annotations
-  loadAnnotations: (filePath: string) => Promise<Annotation[]>
-  saveAnnotations: (filePath: string, annotations: Annotation[]) => Promise<void>
-
-  // Theme
-  getSystemTheme: () => Promise<'light' | 'dark'>
-  onThemeChanged: (callback: (theme: 'light' | 'dark') => void) => () => void
-
-  // Window controls
-  minimizeWindow: () => void
-  maximizeWindow: () => void
-  closeWindow: () => void
-  isMaximized: () => Promise<boolean>
-  onMaximizeChange: (callback: (isMaximized: boolean) => void) => () => void
-  /** Main asks the renderer to flush pending autosaves before the DB closes on quit. */
-  onFlushBeforeQuit: (callback: () => void) => () => void
-  /** Renderer tells main the flush is done so it can proceed to close the DB. */
-  notifyFlushComplete: () => void
-
-  // Shell
-  openExternal: (url: string) => Promise<void>
-
-  // Data storage location
-  dataLocationGet: () => Promise<{ currentDir: string; defaultDir: string; isCustom: boolean }>
-  dataLocationChoose: () => Promise<string | null>
-  dataLocationApply: (dir: string | null, migrate: boolean) => Promise<{ ok: boolean; error?: string }>
-  dataLocationReveal: () => Promise<void>
-  dataLocationRelaunch: () => Promise<void>
-
-  // Export
-  exportHtml: (html: string, title: string) => Promise<{ cancelled: boolean; filePath?: string }>
-  exportPdf: (html: string, title: string) => Promise<{ cancelled: boolean; filePath?: string }>
-  exportDocx: (buffer: ArrayBuffer, title: string) => Promise<{ cancelled: boolean; filePath?: string }>
-  printDocument: (html: string) => Promise<void>
-
-  // Knowledge Base
-  kbAdd: (filePath: string, title?: string, tags?: string[]) => Promise<{ ok: boolean; entry?: KBEntry; error?: string }>
-  kbAddPage: (pageId: string, tags?: string[]) => Promise<{ ok: boolean; entry?: KBEntry; error?: string }>
-  kbRemove: (id: string) => Promise<{ ok: boolean; error?: string }>
-  kbList: () => Promise<{ ok: boolean; entries?: KBEntry[]; error?: string }>
-  kbSearch: (query: string) => Promise<{ ok: boolean; entries?: KBEntry[]; error?: string }>
-  kbGetContext: (query: string, maxDocs?: number) => Promise<{ ok: boolean; context?: string; error?: string }>
-
-  // Settings
-  loadSettings: () => Promise<Record<string, unknown>>
-  saveSettings: (settings: Record<string, unknown>) => Promise<void>
-
-  // Agent / AI
-  sendAgentMessage: (request: {
-    messages: Array<{ role: string; content: string }>
-    documentContext?: string
-    memoryContext?: string
-  }) => Promise<{ provider: string; model: string }>
-  onAgentStream: (callback: (chunk: string) => void) => () => void
-  onAgentStreamError: (callback: (error: string) => void) => () => void
-  onAgentMcpWarning: (callback: (message: string) => void) => () => void
-  onAgentTrace: (callback: (entry: {
-    id: string
-    timestamp: number
-    type: 'request' | 'system-prompt' | 'messages' | 'tools' | 'response' | 'tool-call' | 'error'
-    label: string
-    data: unknown
-    durationMs?: number
-  }) => void) => () => void
-  stopAgentGeneration: () => void
-  testAgentConnection: (provider: string, apiKey: string, baseUrl?: string, model?: string) => Promise<boolean>
-
-  sendAgentOneShot: (request: {
-    prompt: string
-    systemPrompt?: string
-    jsonSchema?: Record<string, unknown>
-  }) => Promise<
-    | { ok: true; result: { provider: string; model: string; reply: string; json?: unknown } }
-    | { ok: false; error: string }
-  >
-
-  // Autonomous task (Horse Mode)
-  sendAgentTask: (request: {
-    task: string
-    systemPrompt?: string
-    qualityThreshold?: number
-    maxIterations?: number
-  }) => Promise<
-    | { ok: true; result: { provider: string; model: string; result: string; iterations: number; qualityScore: number; thresholdMet: boolean } }
-    | { ok: false; error: string }
-  >
-  onAgentTaskProgress: (callback: (progress: {
-    iteration: number
-    phase: 'plan' | 'execute' | 'review' | 'evaluate'
-    qualityScore?: number
-  }) => void) => () => void
-
-  // Sessions
-  sessionGetDir: () => Promise<string>
-  sessionCreate: () => Promise<string>
-  sessionRestore: (sessionId: string) => Promise<{
-    id: string
-    messages: Array<{ role: string; content: string }>
-  } | null>
-  sessionList: (limit?: number) => Promise<Array<{
-    id: string
-    updatedAt: number
-    turns: number
-    state: string
-    preview: string
-    source: 'chat' | 'horse-mode'
-  }>>
-  sessionDelete: (sessionId: string) => Promise<boolean>
-  sessionSaveHistory: (
-    sessionId: string,
-    messages: Array<{ role: string; content: string }>,
-    metadata?: { source?: 'chat' | 'horse-mode' },
-  ) => Promise<void>
-  sessionGetHistory: (sessionId: string) => Promise<Array<{
-    role: string
-    content: string
-  }> | null>
-
-  // Per-page TL;DR cache
-  docSummaryGet: (pageId: string) => Promise<null | { tldr: string; questions: string[]; generatedAt: number; signature: string }>
-  docSummarySet: (pageId: string, summary: { tldr: string; questions: string[]; generatedAt: number; signature: string }) => Promise<void>
-  docSummaryClear: () => Promise<void>
-
-  // Page version history (Archive)
-  versionSave: (pageId: string, content: string, opts?: { title?: string | null; source?: string; label?: string | null }) => Promise<VersionMeta>
-  versionList: (pageId: string) => Promise<VersionMeta[]>
-  versionGet: (versionId: string) => Promise<VersionFull | null>
-  versionDelete: (versionId: string) => Promise<{ ok: boolean }>
-
-  // Book-skin metadata
-  pageMetaGet: (pageId: string) => Promise<PageMeta | null>
-  pageMetaSet: (pageId: string, partial: Partial<PageMeta>) => Promise<PageMeta>
-  pageMetaList: () => Promise<PageMetaListItem[]>
-
-  // Muse Wall
-  museList: () => Promise<MuseCard[]>
-  museAdd: (kind: string, text: string, pageId?: string | null) => Promise<MuseCard>
-  museDelete: (id: string) => Promise<{ ok: boolean }>
-
-  // Memory
-  memorySave: (filePath: string, summary: string, topics: string[]) => Promise<void>
-  memoryGetContext: (filePath?: string, query?: string) => Promise<string>
-  memoryExtractSummary: (messages: Array<{ role: string; content: string }>) => Promise<{ summary: string; topics: string[] }>
-  memoryClear: () => Promise<void>
-
-  // Workspace
-  workspaceCreatePage: (title?: string, parentId?: string, content?: string) => Promise<{ ok: boolean; page?: WorkspacePage; error?: string }>
-  workspaceCreateFolder: (title?: string, parentId?: string) => Promise<{ ok: boolean; page?: WorkspacePage; error?: string }>
+interface Overrides {
   workspaceGetPage: (pageId: string) => Promise<WorkspacePage | null>
-  workspaceUpdatePage: (pageId: string, updates: Partial<Pick<WorkspacePage, 'title' | 'content' | 'parentId' | 'position' | 'icon' | 'format' | 'isFolder'>>) => Promise<{ ok: boolean; error?: string }>
-  workspaceDeletePage: (pageId: string) => Promise<{ ok: boolean; error?: string }>
-  workspaceRestorePage: (pageId: string) => Promise<{ ok: boolean; error?: string }>
   workspaceGetChildren: (parentId: string | null) => Promise<WorkspacePage[]>
   workspaceGetTree: () => Promise<PageTreeNode[]>
-  workspaceMovePage: (pageId: string, newParentId: string | null, position: number) => Promise<{ ok: boolean; error?: string }>
-  workspaceGetAncestors: (pageId: string) => Promise<Array<{ id: string; title: string; icon: string | null; format: string; updatedAt: number; isFolder: boolean }>>
-  workspaceSearch: (query: string) => Promise<Array<{ id: string; title: string; icon: string | null; format: string; updatedAt: number; isFolder: boolean }>>
-  workspaceGetPageCount: () => Promise<number>
-  workspaceImportFile: (parentId?: string) => Promise<{ ok: boolean; pages?: WorkspacePage[]; canceled?: boolean; error?: string }>
-  workspaceImportFolder: (parentId?: string) => Promise<{ ok: boolean; count?: number; canceled?: boolean; error?: string }>
-  workspaceExportPage: (pageId: string) => Promise<{ ok: boolean; filePath?: string; canceled?: boolean; error?: string }>
-
-  // Platform
-  platform: string
-
-  // Auto-updater
-  updaterCurrentVersion: () => Promise<string>
-  updaterLastError: () => Promise<string | null>
-  updaterCheckNow: () => Promise<void>
-  updaterQuitAndInstall: () => void
-  onUpdaterEvent: (
-    callback: (ev: {
-      kind: 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'
-      version?: string
-      releaseNotes?: string
-      releaseName?: string
-      releaseDate?: string
-      error?: string
-    }) => void,
-  ) => () => void
-
-  // MCP
-  mcpStatusAll: () => Promise<
-    | {
-        ok: true
-        servers: Array<{ id: string; running: boolean; error?: string; toolCount: number }>
-      }
-    | { ok: false; error: string }
-  >
-  mcpListTools: (serverId: string) => Promise<
-    | {
-        ok: true
-        tools: Array<{
-          name: string
-          description?: string
-          inputSchema: Record<string, unknown>
-        }>
-      }
-    | { ok: false; error: string }
-  >
-  mcpCallTool: (
-    serverId: string,
-    toolName: string,
-    args: Record<string, unknown>,
-  ) => Promise<{ ok: true; result: unknown } | { ok: false; error: string }>
-  mcpRestart: () => Promise<{ ok: true } | { ok: false; error: string }>
-  mcpStop: (serverId: string) => Promise<{ ok: true } | { ok: false; error: string }>
-
-  // Plugins
-  pluginsDiscover: () => Promise<
-    | {
-        ok: true
-        plugins: Array<{
-          manifest: {
-            id: string
-            name: string
-            version: string
-            description?: string
-            main?: string
-          }
-          source: string
-          dir: string
-        }>
-        errors: Array<{ dir: string; error: string }>
-      }
-    | { ok: false; error: string }
-  >
-  pluginsGetDir: () => Promise<string>
-  pluginsOpenDir: () => Promise<{ ok: true } | { ok: false; error: string }>
+  workspaceGetAncestors: (pageId: string) => Promise<PageTreeNode[]>
+  workspaceSearch: (query: string) => Promise<WorkspacePage[]>
+  kbList: () => Promise<{ ok: boolean; entries?: KBEntry[]; error?: string }>
+  kbSearch: (query: string) => Promise<{ ok: boolean; entries?: KBEntry[]; error?: string }>
 }
+
+// Every override must name a channel preload actually exposes.
+type _OverridesAreReal = Assert<keyof Overrides extends keyof PreloadAPI ? true : false>
+
+export type ElectronAPI = Omit<PreloadAPI, keyof Overrides> & Overrides
+
 
 declare global {
   interface Window {

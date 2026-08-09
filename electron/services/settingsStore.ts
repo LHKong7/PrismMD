@@ -38,7 +38,15 @@ export interface McpSettings {
   toolTimeoutMs: number
 }
 
-interface AppSettings {
+/** Window geometry, persisted alongside preferences but not a preference. */
+export interface WindowBounds {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+export interface AppSettings {
   language: string
   themeId: string
   themeMode: string
@@ -48,6 +56,11 @@ interface AppSettings {
   activeProvider: string | null
   insightGraph: InsightGraphSettings
   mcp: McpSettings
+  /** Not user preferences — where each kind of window was last placed. */
+  session?: {
+    windowBounds?: WindowBounds
+    readerWindowBounds?: WindowBounds
+  }
 }
 
 const DEFAULT_INSIGHT_GRAPH: InsightGraphSettings = {

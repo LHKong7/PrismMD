@@ -1,10 +1,6 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { FileText, FolderOpen, Upload, Bot, FilePlus } from 'lucide-react'
 import { useWorkspaceStore } from '../../store/workspaceStore'
-import { useSettingsStore } from '../../store/settingsStore'
-import { useUIStore } from '../../store/uiStore'
-import { kindOfFormat } from '../../lib/fileFormat'
 import { useEditorStore } from '../../store/editorStore'
 import { usePaneFileData } from '../../hooks/usePaneFileData'
 import { MarkdownReader } from './MarkdownReader'
@@ -16,11 +12,12 @@ import { JsonViewer } from './JsonViewer'
 import { CsvViewer } from './CsvViewer'
 import { XlsxViewer } from './XlsxViewer'
 import { PdfViewer } from './PdfViewer'
+import { PlainTextViewer } from './PlainTextViewer'
 import { MarkdownEditor } from '../editor/MarkdownEditor'
 import { CodeMirrorEditor } from '../editor/CodeMirrorEditor'
 import { json as jsonLang } from '@codemirror/lang-json'
 import { ErrorBanner } from './components/ErrorBanner'
-import { Button } from '../ui/Button'
+import { ViewModeToggle } from './components/ViewModeToggle'
 
 /**
  * DocumentReader — the main content pane's format-aware router.
@@ -36,42 +33,33 @@ export function DocumentReader() {
   const { t } = useTranslation()
   const { filePath: currentFilePath, format: currentFormat, isActivePane } = usePaneFileData()
   const openError = useWorkspaceStore((s) => s.openError)
-  const activeProvider = useSettingsStore((s) => s.activeProvider)
-  const openSettings = useUIStore((s) => s.openSettings)
-  // First-run users have no provider configured — surface a fast path
-  // to the AI tab so they don't need to discover Settings on their own.
-  const aiNotConfigured = !activeProvider
 
   const editing = useEditorStore((s) => s.editing)
   const editorContent = useEditorStore((s) => s.editorContent)
   const setEditorContent = useEditorStore((s) => s.setEditorContent)
+
+  // CSV/JSON open in their rendered view; `raw` flips to the source editor.
+  // Pane-local on purpose — the two panes of a split can show the same
+  // document as table and as source side by side.
+  const [raw, setRaw] = useState(false)
+  useEffect(() => {
+    setRaw(false)
+  }, [currentFilePath, currentFormat])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
   }, [])
 
+  // Dropping files imports them as workspace pages — every supported format,
+  // binary included (the store reads the bytes and hands them to main).
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
     e.stopPropagation()
 
-    // Dropping Markdown files imports them as new workspace pages.
-    const files = Array.from(e.dataTransfer.files).filter((f) =>
-      /\.(md|markdown|mdx)$/i.test(f.name),
-    )
+    const files = Array.from(e.dataTransfer.files)
     if (files.length === 0) return
-
-    for (const file of files) {
-      const reader = new FileReader()
-      reader.onload = async () => {
-        const title = file.name.replace(/\.(md|markdown|mdx)$/i, '')
-        const store = useWorkspaceStore.getState()
-        const id = await store.createPage(title, null)
-        if (id) await store.savePage(id, reader.result as string)
-        await store.loadTree()
-      }
-      reader.readAsText(file)
-    }
+    void useWorkspaceStore.getState().importDroppedFiles(files, null)
   }, [])
 
   // Welcome screen — unified entry point shared by every format.
@@ -99,33 +87,35 @@ export function DocumentReader() {
     )
   }
 
-  const isTextFormat = currentFormat ? kindOfFormat(currentFormat) === 'text' : false
+  // Only the active pane can host an editor — the editor buffer is global
+  // state keyed to the active tab, so an inactive pane always previews.
+  const canEdit = editing && isActivePane
 
-  // Format-specific viewer. Markdown keeps the existing feature-rich
-  // reader (TOC, annotations, entity-linking). New formats get their
-  // own lean viewers.
+  const sourceEditor = (
+    <CodeMirrorEditor
+      content={editorContent ?? ''}
+      onChange={setEditorContent}
+      language={currentFormat === 'json' ? jsonLang() : undefined}
+    />
+  )
+
+  // Format-specific viewer. Markdown keeps the feature-rich always-editable
+  // reader (TOC, annotations, entity-linking); structured text formats open
+  // rendered with a Raw escape hatch; binary formats get their own viewers.
   const body = (() => {
-    // When in editing mode for text formats, render the editor instead
-    // of the read-only viewer.
-    if (editing && isTextFormat && isActivePane) {
-      if (currentFormat === 'markdown') {
-        return <MarkdownEditor />
-      }
-      return (
-        <CodeMirrorEditor
-          content={editorContent ?? ''}
-          onChange={setEditorContent}
-          language={currentFormat === 'json' ? jsonLang() : undefined}
-        />
-      )
-    }
-
     switch (currentFormat) {
-      case 'markdown': return <MarkdownReader />
-      case 'json':     return <JsonViewer />
-      case 'csv':      return <CsvViewer />
-      case 'xlsx':     return <XlsxViewer />
-      case 'pdf':      return <PdfViewer />
+      case 'markdown':
+        return canEdit ? <MarkdownEditor /> : <MarkdownReader />
+      case 'plaintext':
+        return canEdit ? sourceEditor : <PlainTextViewer />
+      case 'json':
+        return raw && canEdit ? sourceEditor : <JsonViewer />
+      case 'csv':
+        return raw && canEdit ? sourceEditor : <CsvViewer />
+      case 'xlsx':
+        return <XlsxViewer />
+      case 'pdf':
+        return <PdfViewer />
       default:
         return (
           <div
@@ -144,6 +134,9 @@ export function DocumentReader() {
         )
     }
   })()
+
+  const showViewToggle =
+    canEdit && (currentFormat === 'csv' || currentFormat === 'json')
 
   return (
     <div
@@ -168,6 +161,17 @@ export function DocumentReader() {
           <ContradictionBanner />
           <DocSummary />
         </>
+      )}
+      {showViewToggle && (
+        <ViewModeToggle
+          raw={raw}
+          onChange={setRaw}
+          previewLabel={
+            currentFormat === 'json'
+              ? t('reader.viewMode.tree', 'Tree')
+              : t('reader.viewMode.table', 'Table')
+          }
+        />
       )}
       <div className="flex-1 min-h-0">{body}</div>
     </div>

@@ -1,11 +1,35 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
-export interface FileTreeNode {
+/** One row of a reader-mode folder listing. */
+export interface LibraryEntry {
   name: string
   path: string
   type: 'file' | 'directory'
-  children?: FileTreeNode[]
+  /** Stored-format id ('md' | 'pdf' | …); null for directories. */
+  format: string | null
+  size: number
+  modifiedAt: number
 }
+
+export interface LibraryListing {
+  path: string
+  entries: LibraryEntry[]
+  /** The directory held more entries than a single listing returns. */
+  truncated: boolean
+}
+
+export interface LibraryFileInfo {
+  path: string
+  name: string
+  format: string
+  size: number
+  modifiedAt: number
+}
+
+/** What a reader window was asked to show when it was created. */
+export type LaunchTarget = { kind: 'folder' | 'file'; path: string }
+
+type LibraryResult<T> = ({ ok: true } & T) | { ok: false; error: string }
 
 export interface Annotation {
   id: string
@@ -20,51 +44,65 @@ export interface Annotation {
 }
 
 const electronAPI = {
-  // File operations
-  openFileDialog: (): Promise<{ path: string } | null> =>
-    ipcRenderer.invoke('dialog:open-file'),
-  openFolderDialog: (): Promise<string | null> =>
-    ipcRenderer.invoke('dialog:open-folder'),
-  readFile: (filePath: string): Promise<string> =>
-    ipcRenderer.invoke('fs:read-file', filePath),
-  readFileBytes: (filePath: string): Promise<ArrayBuffer> =>
-    ipcRenderer.invoke('fs:read-file-bytes', filePath),
-  readDirectory: (dirPath: string): Promise<FileTreeNode[]> =>
-    ipcRenderer.invoke('fs:read-directory', dirPath),
-  readDirectoryChildren: (dirPath: string): Promise<FileTreeNode[]> =>
-    ipcRenderer.invoke('fs:read-directory-children', dirPath),
-  writeFile: (filePath: string, content: string): Promise<void> =>
-    ipcRenderer.invoke('fs:write-file', filePath, content),
-  newFileDialog: (defaultDir?: string): Promise<{ cancelled: boolean; filePath?: string }> =>
-    ipcRenderer.invoke('dialog:new-file', defaultDir),
-  createDirectory: (dirPath: string): Promise<void> =>
-    ipcRenderer.invoke('fs:create-directory', dirPath),
-  rename: (oldPath: string, newPath: string): Promise<void> =>
-    ipcRenderer.invoke('fs:rename', oldPath, newPath),
-  trash: (itemPath: string): Promise<void> =>
-    ipcRenderer.invoke('fs:trash', itemPath),
-  duplicateFile: (srcPath: string, destPath: string): Promise<void> =>
-    ipcRenderer.invoke('fs:duplicate-file', srcPath, destPath),
-  showInFolder: (itemPath: string): Promise<void> =>
-    ipcRenderer.invoke('fs:show-in-folder', itemPath),
-  exists: (itemPath: string): Promise<boolean> =>
-    ipcRenderer.invoke('fs:exists', itemPath),
+  // ── Library (reader mode) ──
+  // Read-only browsing of a folder on disk. There is no library write
+  // channel here because the main process has none to bind to — see the
+  // invariants at the top of `electron/services/libraryService.ts`.
+  libraryPickFolder: (): Promise<
+    LibraryResult<{ canceled: boolean; root: string | null; listing: LibraryListing | null }>
+  > => ipcRenderer.invoke('library:pick-folder'),
+  libraryPickFile: (): Promise<
+    LibraryResult<{ canceled: boolean; file: LibraryFileInfo | null; root: string | null }>
+  > => ipcRenderer.invoke('library:pick-file'),
+  libraryMount: (
+    target: string,
+    kind: 'folder' | 'file',
+  ): Promise<
+    LibraryResult<{ root: string; listing: LibraryListing; file: LibraryFileInfo | null }>
+  > => ipcRenderer.invoke('library:mount', target, kind),
+  libraryMountedRoots: (): Promise<string[]> => ipcRenderer.invoke('library:mounted-roots'),
+  libraryListDir: (dirPath: string): Promise<LibraryResult<{ listing: LibraryListing }>> =>
+    ipcRenderer.invoke('library:list-dir', dirPath),
+  libraryReadText: (filePath: string): Promise<LibraryResult<{ content: string }>> =>
+    ipcRenderer.invoke('library:read-text', filePath),
+  libraryReadBytes: (filePath: string): Promise<LibraryResult<{ bytes: Uint8Array }>> =>
+    ipcRenderer.invoke('library:read-bytes', filePath),
+  libraryStat: (filePath: string): Promise<LibraryResult<{ file: LibraryFileInfo }>> =>
+    ipcRenderer.invoke('library:stat', filePath),
+  libraryRecents: (): Promise<{ roots: string[]; files: string[] }> =>
+    ipcRenderer.invoke('library:recents'),
+  libraryClearRecents: (): Promise<{ ok: boolean }> => ipcRenderer.invoke('library:clear-recents'),
+  libraryReveal: (itemPath: string): Promise<LibraryResult<object>> =>
+    ipcRenderer.invoke('library:reveal', itemPath),
+  libraryOpenWindow: (target?: LaunchTarget): Promise<LibraryResult<object>> =>
+    ipcRenderer.invoke('library:open-window', target),
+  libraryOpenWorkspace: (): Promise<LibraryResult<object>> =>
+    ipcRenderer.invoke('library:open-workspace'),
+  /** Copy a document being read into the workspace. The original is untouched. */
+  libraryImportToWorkspace: (filePath: string): Promise<LibraryResult<{ page: unknown }>> =>
+    ipcRenderer.invoke('library:import-to-workspace', filePath),
+  /** The workbench's page tree changed underneath it (e.g. a reader import). */
+  onWorkspaceTreeChanged: (callback: () => void): (() => void) => {
+    const handler = () => callback()
+    ipcRenderer.on('workspace:tree-changed', handler)
+    return () => ipcRenderer.removeListener('workspace:tree-changed', handler)
+  },
+  /** What this window was launched with; null on a plain launch. */
+  libraryLaunchTarget: (): Promise<LaunchTarget | null> =>
+    ipcRenderer.invoke('library:launch-target'),
+  /** The watched folder changed on disk; the payload is the changed paths. */
+  onLibraryChanged: (callback: (paths: string[]) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, paths: string[]) => callback(paths)
+    ipcRenderer.on('library:changed', handler)
+    return () => ipcRenderer.removeListener('library:changed', handler)
+  },
+  /** The OS handed an already-open reader window another document. */
+  onLibraryOpenTarget: (callback: (target: LaunchTarget) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, target: LaunchTarget) => callback(target)
+    ipcRenderer.on('library:open-target', handler)
+    return () => ipcRenderer.removeListener('library:open-target', handler)
+  },
 
-  // File watching
-  watchFile: (filePath: string): void => { ipcRenderer.send('fs:watch-file', filePath) },
-  unwatchFile: (filePath: string): void => { ipcRenderer.send('fs:unwatch-file', filePath) },
-  watchDirectory: (dirPath: string): void => { ipcRenderer.send('fs:watch-directory', dirPath) },
-  unwatchDirectory: (dirPath: string): void => { ipcRenderer.send('fs:unwatch-directory', dirPath) },
-  onFileChanged: (callback: (filePath: string) => void): (() => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, filePath: string) => callback(filePath)
-    ipcRenderer.on('fs:file-changed', handler)
-    return () => ipcRenderer.removeListener('fs:file-changed', handler)
-  },
-  onDirectoryChanged: (callback: (dirPath: string) => void): (() => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, dirPath: string) => callback(dirPath)
-    ipcRenderer.on('fs:directory-changed', handler)
-    return () => ipcRenderer.removeListener('fs:directory-changed', handler)
-  },
   onFlushBeforeQuit: (callback: () => void): (() => void) => {
     const handler = () => callback()
     ipcRenderer.on('app:flush-before-quit', handler)
@@ -555,8 +593,15 @@ const electronAPI = {
     ipcRenderer.invoke('workspace:import-file', parentId),
   workspaceImportFolder: (parentId?: string): Promise<{ ok: boolean; count?: number; canceled?: boolean; error?: string }> =>
     ipcRenderer.invoke('workspace:import-folder', parentId),
+  workspaceImportDroppedFile: (fileName: string, data: Uint8Array, parentId?: string): Promise<{ ok: boolean; page?: any; error?: string }> =>
+    ipcRenderer.invoke('workspace:import-dropped-file', fileName, data, parentId),
   workspaceExportPage: (pageId: string): Promise<{ ok: boolean; filePath?: string; canceled?: boolean; error?: string }> =>
     ipcRenderer.invoke('workspace:export-page', pageId),
+  /** Raw bytes of an asset-backed page (PDF/XLSX); null for text pages. */
+  workspaceGetPageBytes: (pageId: string): Promise<Uint8Array | null> =>
+    ipcRenderer.invoke('workspace:get-page-bytes', pageId),
+  workspaceGetPageAsset: (pageId: string): Promise<any | null> =>
+    ipcRenderer.invoke('workspace:get-page-asset', pageId),
 
   // Platform info
   platform: process.platform,

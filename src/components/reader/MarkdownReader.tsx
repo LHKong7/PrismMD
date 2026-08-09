@@ -14,6 +14,17 @@ import { useInFileSearch } from '../../hooks/useInFileSearch'
 import '../../styles/markdown.css'
 import '../../styles/cjk.css'
 
+interface MarkdownReaderProps {
+  /**
+   * Rendering a file on disk in a reader window rather than a workspace
+   * page. Drops the parts that only mean something for a page: the AI doc
+   * summary and the contradiction banner are keyed to a page id, and entity
+   * linking resolves against the knowledge graph. The markdown pipeline,
+   * TOC, minimap and in-file search all still apply.
+   */
+  standalone?: boolean
+}
+
 /**
  * MarkdownReader — renders the currently-open markdown file with the
  * full-featured reading pipeline (remark/rehype, TOC, entity-linking,
@@ -22,7 +33,7 @@ import '../../styles/cjk.css'
  * The welcome screen and drag-drop live in `DocumentReader` — this
  * component only runs when `currentFormat === 'markdown'`.
  */
-export function MarkdownReader() {
+export function MarkdownReader({ standalone = false }: MarkdownReaderProps = {}) {
   const { t } = useTranslation()
   const { content: currentContent, isActivePane } = usePaneFileData()
   const { content, codeMarkers, toc, isProcessing, error } = useMarkdown(currentContent)
@@ -30,7 +41,7 @@ export function MarkdownReader() {
   const markdownBodyRef = useRef<HTMLDivElement>(null)
 
   useReadingProgress(scrollRef)
-  useEntityLinking(markdownBodyRef)
+  useEntityLinking(markdownBodyRef, !standalone)
   const search = useInFileSearch(markdownBodyRef, currentContent)
 
   // Cmd/Ctrl+F opens the in-file search bar. Scoped to when MarkdownReader
@@ -119,8 +130,12 @@ export function MarkdownReader() {
           </div>
         </div>
       )}
-      <ContradictionBanner />
-      <DocSummary />
+      {!standalone && (
+        <>
+          <ContradictionBanner />
+          <DocSummary />
+        </>
+      )}
       <div className="markdown-body" ref={markdownBodyRef}>
         {content}
       </div>

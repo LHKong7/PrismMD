@@ -1,12 +1,16 @@
 /**
- * Single source of truth for "which formats are supported by the Library".
- * Mirrors `SUPPORTED_EXTENSIONS` in `electron/services/fileTree.ts` — keep
- * the two in sync when adding a format.
+ * Single source of truth for "which formats the reader can open" — renderer side.
+ * Mirrors `electron/services/fileFormats.ts` (which owns the ids persisted in
+ * `pages.format`) — keep the two in sync when adding a format, along with
+ * `formatFromString()` in `src/store/workspaceStore.ts`.
  */
 
-export type FileFormat = 'markdown' | 'pdf' | 'csv' | 'json' | 'xlsx'
+export type FileFormat = 'markdown' | 'plaintext' | 'pdf' | 'csv' | 'json' | 'xlsx'
 
-/** File-reader dispatch: 'text' → `readFile`, 'binary' → `readFileBytes`. */
+/**
+ * Where a page's payload lives: 'text' → `pages.content` in SQLite,
+ * 'binary' → a file in the asset store, fetched as bytes on open.
+ */
 export type FileKind = 'text' | 'binary'
 
 interface FormatDef {
@@ -16,11 +20,12 @@ interface FormatDef {
 }
 
 const FORMATS: readonly FormatDef[] = [
-  { format: 'markdown', kind: 'text',   extensions: ['.md', '.markdown', '.mdx'] },
-  { format: 'pdf',      kind: 'binary', extensions: ['.pdf'] },
-  { format: 'csv',      kind: 'text',   extensions: ['.csv'] },
-  { format: 'json',     kind: 'text',   extensions: ['.json'] },
-  { format: 'xlsx',     kind: 'binary', extensions: ['.xlsx', '.xls'] },
+  { format: 'markdown',  kind: 'text',   extensions: ['.md', '.markdown', '.mdx'] },
+  { format: 'plaintext', kind: 'text',   extensions: ['.txt', '.log'] },
+  { format: 'pdf',       kind: 'binary', extensions: ['.pdf'] },
+  { format: 'csv',       kind: 'text',   extensions: ['.csv'] },
+  { format: 'json',      kind: 'text',   extensions: ['.json'] },
+  { format: 'xlsx',      kind: 'binary', extensions: ['.xlsx', '.xls'] },
 ] as const
 
 /** Extract the lowercased extension (including the leading dot). */
@@ -42,6 +47,33 @@ export function detectFormat(filePath: string): FileFormat | null {
 
 export function kindOfFormat(format: FileFormat): FileKind {
   return FORMATS.find((f) => f.format === format)?.kind ?? 'text'
+}
+
+/**
+ * Map a `pages.format` value as persisted by the main process onto a
+ * renderer `FileFormat`. Markdown is stored under several aliases (`md`,
+ * `mdx`), and anything unrecognized is treated as markdown — an old row
+ * with a stale format id should still open as a note rather than as
+ * "unsupported".
+ */
+export function normalizeFormat(stored: string): FileFormat {
+  switch (stored) {
+    case 'md':
+    case 'mdx':
+    case 'markdown':
+      return 'markdown'
+    case 'txt':
+    case 'log':
+    case 'plaintext':
+      return 'plaintext'
+    case 'pdf':
+    case 'csv':
+    case 'json':
+    case 'xlsx':
+      return stored
+    default:
+      return 'markdown'
+  }
 }
 
 export function isSupported(filePath: string): boolean {

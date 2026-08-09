@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
 import type { DragEvent } from 'react'
-import { ChevronRight, FileText, Folder, FolderOpen, Plus, MoreHorizontal } from 'lucide-react'
+import { ChevronRight, Folder, FolderOpen, Plus, MoreHorizontal } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useTranslation } from 'react-i18next'
 import { useWorkspaceStore } from '../../store/workspaceStore'
 import { useKnowledgeBaseStore } from '../../store/knowledgeBaseStore'
 import { ContextMenu, type ContextMenuItem } from '../ui/ContextMenu'
+import { iconForStoredFormat } from '../../lib/formatIcons'
 import type { PageTreeNode } from '../../types/electron'
 
 /**
@@ -93,6 +94,8 @@ function PageNode({ node, depth }: { node: PageTreeNode; depth: number }) {
   // Folders always show a chevron (so empty containers read as folders); pages
   // only show one when they actually have subpages.
   const showChevron = isFolder || hasChildren
+  // Pages carry their format's icon so a PDF is recognizable in the tree.
+  const FormatIcon = iconForStoredFormat(node.format)
 
   useEffect(() => {
     if (isRenaming) {
@@ -226,7 +229,7 @@ function PageNode({ node, depth }: { node: PageTreeNode; depth: number }) {
               <Folder size={13} className="inline" style={{ color: 'var(--text-muted)' }} />
             )
           ) : (
-            <FileText size={13} className="inline" style={{ color: 'var(--text-muted)' }} />
+            <FormatIcon size={13} className="inline" style={{ color: 'var(--text-muted)' }} />
           )}
         </span>
 

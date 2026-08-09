@@ -100,7 +100,7 @@ export const remarkCodeAnalysis: Plugin<[RemarkCodeAnalysisOptions], Root> = (op
       if (!node.data) node.data = {}
       const hProps = (node.data.hProperties ?? {}) as Record<string, unknown>
       hProps['data-code-block-index'] = String(currentIndex)
-      node.data.hProperties = hProps
+      node.data.hProperties = hProps as NonNullable<typeof node.data.hProperties>
     })
 
     options.onExtract(markers)

@@ -99,18 +99,19 @@ export function GraphView() {
       setStatus('loading')
       setError(null)
       try {
-        let result:
-          | { ok: true; data: GraphData }
-          | { ok: false; error: string }
-          | null = null
+        // Named rather than `typeof result`: inside this block TS has
+        // already narrowed `result` to `null` from its initializer, so
+        // `as GraphResult` was asserting "this is null".
+        type GraphResult = { ok: true; data: GraphData } | { ok: false; error: string }
+        let result: GraphResult | null = null
 
         if (scope === 'global') {
-          result = (await window.electronAPI.insightGraphGlobalGraph(120)) as typeof result
+          result = (await window.electronAPI.insightGraphGlobalGraph(120)) as GraphResult
         } else if (scope === 'entity' && focusedEntity) {
           result = (await window.electronAPI.insightGraphEntityEgoGraph(
             focusedEntity,
             2,
-          )) as typeof result
+          )) as GraphResult
         } else if (scope === 'document') {
           // Resolve the Neo4j report matching the currently-open file (by
           // filename — Neo4j stores `Report.source_filename`, and the SDK
@@ -133,7 +134,7 @@ export function GraphView() {
               const sub = (await window.electronAPI.insightGraphBuildSubgraphFromEntities(
                 entitiesRes.data,
                 { maxEntities: 120 },
-              )) as typeof result
+              )) as GraphResult
               // Only accept the subgraph if it actually has nodes; a matched
               // report with zero returned entity-nodes (e.g. stale Cypher
               // names, SDK dedup edge-cases) shouldn't blank out the canvas
@@ -142,7 +143,7 @@ export function GraphView() {
                 result = sub
               }
             } else if (!entitiesRes.ok) {
-              result = entitiesRes as typeof result
+              result = entitiesRes as GraphResult
             }
           }
           // No fallback to global — document scope shows only this

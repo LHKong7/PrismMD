@@ -1,6 +1,7 @@
 import { Pin, PinOff, List, User, Network } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { clsx } from 'clsx'
+import type { LucideIcon } from 'lucide-react'
 import { useUIStore, type RightSidebarTab } from '../../store/uiStore'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useWindowBreakpoint } from '../../lib/hooks/useWindowBreakpoint'
@@ -36,7 +37,7 @@ export function RightSidebar({ toc }: RightSidebarProps) {
 
   const tabs: {
     id: RightSidebarTab
-    icon: React.ComponentType<{ size?: number }>
+    icon: LucideIcon
     label: string
     hidden?: boolean
   }[] = [

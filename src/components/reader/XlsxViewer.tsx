@@ -116,7 +116,19 @@ export function XlsxViewer() {
     )
   }
 
-  if (!bytes || !workbook) {
+  // No bytes at all is a storage problem, not a parse problem — the two
+  // deserve different advice.
+  if (!bytes) {
+    return (
+      <ErrorBanner
+        severity="error"
+        title={t('reader.asset.missingTitle')}
+        message={t('reader.asset.missingBody')}
+      />
+    )
+  }
+
+  if (!workbook) {
     return (
       <ErrorBanner
         severity="error"

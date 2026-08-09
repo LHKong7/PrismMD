@@ -28,6 +28,7 @@ export function usePaneFileData(): PaneFileData {
   const globalTitle = useWorkspaceStore((s) => s.currentTitle)
   const globalFormat = useWorkspaceStore((s) => s.currentFormat)
   const globalContent = useWorkspaceStore((s) => s.currentContent)
+  const globalBytes = useWorkspaceStore((s) => s.currentBytes)
 
   if (pane) {
     return {
@@ -46,7 +47,7 @@ export function usePaneFileData(): PaneFileData {
     title: globalTitle,
     format: globalFormat,
     content: globalContent,
-    bytes: null,
+    bytes: globalBytes,
     paneId: null,
     isActivePane: true,
   }

@@ -24,6 +24,7 @@ const DATA_ENTRIES = [
   'workspace.db-shm',
   'prismmd-settings.json',
   'sessions',
+  'assets',
   'memory',
   'knowledge',
   'plugins',

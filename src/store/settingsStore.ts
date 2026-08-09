@@ -109,7 +109,9 @@ interface SettingsStore {
   setProviderConfig: (provider: AIProvider, config: Partial<AIProviderConfig>) => void
   setActiveProvider: (provider: AIProvider | null) => void
   setFocusMode: (enabled: boolean) => void
-  setInsightGraphConfig: (config: Partial<InsightGraphConfig> & { neo4j?: Partial<InsightGraphConfig['neo4j']> }) => void
+  setInsightGraphConfig: (
+    config: Omit<Partial<InsightGraphConfig>, 'neo4j'> & { neo4j?: Partial<InsightGraphConfig['neo4j']> },
+  ) => void
   setMcpConfig: (config: Partial<McpConfig>) => void
   setMcpServer: (id: string, config: McpServerConfig | null) => void
 

@@ -9,11 +9,11 @@ import { registerUpdaterHandlers } from './updaterHandlers'
 import { registerExportHandlers } from './exportHandlers'
 import { registerKnowledgeBaseHandlers } from './knowledgeBaseHandlers'
 import { registerWorkspaceHandlers } from './workspaceHandlers'
+import { registerLibraryHandlers } from './libraryHandlers'
 import { registerDataLocationHandlers } from './dataLocationHandlers'
 import { registerVersionHandlers } from './versionHandlers'
 import { registerFrontStageHandlers } from './frontStageHandlers'
 import { getMainWindow } from '../main'
-
 /**
  * Lazily resolve the current main window. Handlers that send events to the
  * renderer should call this each time rather than capturing the window
@@ -34,6 +34,7 @@ export function registerIpcHandlers() {
   registerExportHandlers()
   registerKnowledgeBaseHandlers()
   registerWorkspaceHandlers()
+  registerLibraryHandlers()
   registerDataLocationHandlers()
   registerVersionHandlers()
   registerFrontStageHandlers()

@@ -5,6 +5,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { appConfig } from './app.config'
 import { resolveProfile } from './build-config/profiles'
+import { PACKAGED_MODULE_SEEDS } from './build-config/externals'
 
 /**
  * Electron Forge configuration.
@@ -25,11 +26,10 @@ const profile = resolveProfile()
 // By providing our own `ignore` we whitelist these externals AND their full
 // transitive dependency tree so they get copied into the package.
 // ---------------------------------------------------------------------------
-const externalSeeds = [
-  'neo4j-driver',
-  'chokidar',
-  'fsevents',
-]
+// Shared with vite.main.config.ts — a module that is `external` there but
+// missing here packages cleanly and then dies on launch with an unlogged
+// MODULE_NOT_FOUND. See build-config/externals.ts.
+const externalSeeds = [...PACKAGED_MODULE_SEEDS]
 
 /**
  * Walk the full transitive dependency tree of seed modules by reading
@@ -56,6 +56,23 @@ function collectAllDeps(seeds: string[]): Set<string> {
 }
 
 const allowedModules = collectAllDeps(externalSeeds)
+
+/**
+ * Fail the build if a seed isn't installed. Without this the packager happily
+ * produces an app whose `main.js` requires a module that isn't in the bundle —
+ * which surfaces only as a launched process with no window and no error.
+ * `fsevents` is macOS-only, so it's allowed to be absent elsewhere.
+ */
+const missingSeeds = externalSeeds.filter((mod) => {
+  if (mod === 'fsevents' && process.platform !== 'darwin') return false
+  return !fs.existsSync(path.join('node_modules', mod, 'package.json'))
+})
+if (missingSeeds.length > 0) {
+  throw new Error(
+    `[forge] external module(s) not installed: ${missingSeeds.join(', ')}. ` +
+      `main.js will require them at runtime — run npm install before packaging.`,
+  )
+}
 
 // Collect scoped package prefixes (e.g. '@insightgraph', '@redis') that need
 // their parent scope directory to be allowed through the ignore filter.
@@ -119,12 +136,48 @@ const config: ForgeConfig = {
     // node_modules. The plugin skips its own ignore when one is already set.
     ignore: packageIgnore,
     extendInfo: {
+      // Documents macOS may hand us. Each one arrives as an `open-file`
+      // event and opens a reader window — see `electron/main.ts`.
+      // Keep in sync with `electron/services/fileFormats.ts`.
       CFBundleDocumentTypes: [
         {
           CFBundleTypeName: 'Markdown',
           CFBundleTypeRole: 'Viewer',
           LSItemContentTypes: ['net.daringfireball.markdown'],
-          CFBundleTypeExtensions: ['md', 'markdown'],
+          CFBundleTypeExtensions: ['md', 'markdown', 'mdx'],
+        },
+        {
+          CFBundleTypeName: 'Plain Text',
+          CFBundleTypeRole: 'Viewer',
+          LSItemContentTypes: ['public.plain-text', 'public.log'],
+          CFBundleTypeExtensions: ['txt', 'log'],
+        },
+        {
+          CFBundleTypeName: 'PDF',
+          CFBundleTypeRole: 'Viewer',
+          LSItemContentTypes: ['com.adobe.pdf'],
+          CFBundleTypeExtensions: ['pdf'],
+        },
+        {
+          CFBundleTypeName: 'Comma-Separated Values',
+          CFBundleTypeRole: 'Viewer',
+          LSItemContentTypes: ['public.comma-separated-values-text'],
+          CFBundleTypeExtensions: ['csv'],
+        },
+        {
+          CFBundleTypeName: 'JSON',
+          CFBundleTypeRole: 'Viewer',
+          LSItemContentTypes: ['public.json'],
+          CFBundleTypeExtensions: ['json'],
+        },
+        {
+          CFBundleTypeName: 'Spreadsheet',
+          CFBundleTypeRole: 'Viewer',
+          LSItemContentTypes: [
+            'org.openxmlformats.spreadsheetml.sheet',
+            'com.microsoft.excel.xls',
+          ],
+          CFBundleTypeExtensions: ['xlsx', 'xls'],
         },
       ],
     },

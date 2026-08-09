@@ -9,7 +9,7 @@
  */
 import { BrowserWindow } from 'electron'
 import crypto from 'crypto'
-import neo4j, { type Driver, type Session } from 'neo4j-driver'
+import neo4j, { type Driver, type Session, type Record as Neo4jRecord } from 'neo4j-driver'
 import { getActiveProvider, getInsightGraphSettings, loadSettings, type InsightGraphSettings } from './settingsStore'
 import { agentWorker } from './agentWorkerManager'
 import { getPage } from './documentService'
@@ -77,7 +77,7 @@ export interface RelatedReport {
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function recordToObject(rec: neo4j.Record, key: string): Record<string, unknown> {
+function recordToObject(rec: Neo4jRecord, key: string): Record<string, unknown> {
   const node = rec.get(key)
   if (!node) return {}
   return node.properties ? { ...node.properties, _elementId: node.elementId, _labels: node.labels } : {}

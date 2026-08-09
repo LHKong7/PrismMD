@@ -33,10 +33,12 @@ export function GhostText() {
     const range = selection.getRangeAt(0)
     const rect = range.getBoundingClientRect()
 
-    // Only activate within markdown-body
+    // Only activate inside a document body. `.pdf-text-layer` counts now that
+    // the PDF viewer renders selectable text over the canvas — before that,
+    // a PDF had nothing to select.
     const container = range.commonAncestorContainer
     const el = container instanceof HTMLElement ? container : container.parentElement
-    if (!el?.closest('.markdown-body')) return
+    if (!el?.closest('.markdown-body, .pdf-text-layer')) return
 
     setSelectedText(text)
     setPosition({

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type CSSProperties } from 'react'
-import { Minus, Square, X, PanelLeft, PanelRight, Settings, Network, BookOpen, Columns2, Rows2, XCircle, Download, FileText, FileType, Printer, Zap, Castle } from 'lucide-react'
+import { Minus, Square, X, PanelLeft, PanelRight, Settings, Network, BookOpen, BookOpenText, Columns2, Rows2, XCircle, Download, FileText, FileType, Printer, Zap, Castle } from 'lucide-react'
 import { Tooltip } from '../ui/Tooltip'
 import { useTranslation } from 'react-i18next'
 import { useUIStore } from '../../store/uiStore'
@@ -231,6 +231,19 @@ export function TitleBar({ onOpenSettings, onOpenHorseMode }: TitleBarProps) {
             aria-label={t('frontStage.enter', '回到烛笺阁')}
           >
             <Castle size={16} style={{ color: 'var(--color-warning)' }} />
+          </Button>
+        </Tooltip>
+        <Tooltip label={t('library.openReader', '打开只读阅读器')} side="bottom">
+          <Button
+            variant="ghost"
+            size="icon"
+            /* No argument: the reader window opens on its recents screen and
+               the user picks a folder there. */
+            onClick={() => void window.electronAPI.libraryOpenWindow()}
+            className="p-1.5"
+            aria-label={t('library.openReader', '打开只读阅读器')}
+          >
+            <BookOpenText size={16} style={{ color: 'var(--text-secondary)' }} />
           </Button>
         </Tooltip>
         <Tooltip label={`${t('titlebar.settings')} (${isMac ? '⌘' : 'Ctrl'}+,)`} side="bottom">

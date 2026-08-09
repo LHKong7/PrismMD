@@ -77,7 +77,7 @@ export function LeftSidebar() {
           <button
             onClick={() => void importFile(null)}
             className="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
-            title={t('sidebar.importFile', 'Import Markdown')}
+            title={t('sidebar.importFile', 'Import file')}
           >
             <Upload size={14} style={{ color: 'var(--text-muted)' }} />
           </button>

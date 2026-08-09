@@ -17,7 +17,7 @@
   "reader": {
     "unsupported": {
       "title": "暂不支持的文件格式",
-      "body": "资料库目前支持 Markdown / PDF / CSV / JSON / XLSX，请换一个文件试试。"
+      "body": "资料库目前支持 Markdown / PDF / CSV / JSON / XLSX / 纯文本，请换一个文件试试。"
     },
     "json": {
       "parseError": "这个 JSON 文件解析失败"
@@ -43,6 +43,9 @@
       "emptySheet": "这张工作表是空的。"
     },
     "pdf": {
+      "zoomIn": "放大",
+      "zoomOut": "缩小",
+      "zoomReset": "适应宽度",
       "errorTitle": "无法渲染该 PDF",
       "prev": "上一页",
       "next": "下一页",
@@ -50,7 +53,16 @@
       "loading": "渲染 PDF 中…"
     },
     "loading": "加载中…",
-    "parsing": "正在解析 {{size}}…"
+    "parsing": "正在解析 {{size}}…",
+    "viewMode": {
+      "table": "表格",
+      "tree": "树形",
+      "raw": "源码"
+    },
+    "asset": {
+      "missingTitle": "找不到原始文件",
+      "missingBody": "资源库里没有这份文档的字节数据 —— 通常是复制 workspace.db 时漏掉了 assets 目录。重新导入该文件即可恢复。"
+    }
   },
   "sidebar": {
     "explorer": "资源管理器",
@@ -72,7 +84,7 @@
     "workspace": "工作区",
     "newPage": "新建页面",
     "newFolder": "新建文件夹",
-    "importFile": "导入 Markdown",
+    "importFile": "导入文件",
     "importFolder": "导入文件夹",
     "searchPages": "搜索页面…",
     "noPages": "暂无页面",
@@ -882,5 +894,25 @@
     "copy": "复制",
     "delete": "删除",
     "kind": { "topic": "选题", "quote": "金句", "snippet": "素材", "opening": "开头" }
+  },
+  "library": {
+    "collect": "收进笔记",
+    "collected": "已收进笔记",
+    "collectFailed": "收进笔记失败",
+    "openReader": "打开只读阅读器",
+    "readerMode": "阅读器",
+    "welcomeTitle": "阅读一个文件夹",
+    "welcomeBody": "只读模式在文件原本的位置打开它们：不拷贝，也不回写。",
+    "openFolder": "打开文件夹\u2026",
+    "openFile": "打开文件\u2026",
+    "openWorkspace": "进入笔记模式",
+    "toggleSidebar": "显示/隐藏目录",
+    "refresh": "刷新",
+    "recent": "最近",
+    "emptyFolder": "这里没有可读的文件",
+    "truncated": "文件太多，未全部列出",
+    "pickAFile": "从左侧选一个文件开始阅读。",
+    "loading": "正在打开\u2026",
+    "openError": "无法打开这个文件"
   }
 }

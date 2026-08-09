@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { useSettingsStore, DEFAULT_MODELS, type AIProvider, type InsightGraphDomain } from '../../store/settingsStore'
 import { useInsightGraphStore } from '../../store/insightGraphStore'
 import { useUIStore } from '../../store/uiStore'
-import { usePluginManager } from '../../lib/plugins/host'
+import { usePluginManager, type PluginManagerStore } from '../../lib/plugins/host'
 import { reloadExternalPlugins } from '../../lib/plugins/externalLoader'
 import { useUpdaterStore } from '../../store/updaterStore'
 import { useKnowledgeBaseStore } from '../../store/knowledgeBaseStore'
@@ -1214,7 +1214,7 @@ function PluginList({
   emptyMessage,
 }: {
   title: string
-  entries: ReturnType<typeof usePluginManager>['loaded'][string][]
+  entries: PluginManagerStore['loaded'][string][]
   emptyMessage?: string
 }) {
   return (

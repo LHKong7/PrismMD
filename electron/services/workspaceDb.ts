@@ -93,6 +93,35 @@ export function getDb(): Database.Database {
       FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE SET NULL
     );
 
+    -- Binary payload for non-text pages (PDF, XLSX). The bytes live on
+    -- disk under {userData}/assets/ rather than in a BLOB column so that
+    -- a SELECT * over pages stays cheap no matter how big the document is;
+    -- this table only carries the metadata needed to find and describe them.
+    CREATE TABLE IF NOT EXISTS page_assets (
+      page_id TEXT PRIMARY KEY,
+      file_name TEXT NOT NULL,
+      ext TEXT NOT NULL,
+      mime TEXT,
+      size INTEGER NOT NULL,
+      source_path TEXT,
+      storage_name TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS note_embeddings (
+      id TEXT PRIMARY KEY,
+      page_id TEXT NOT NULL,
+      chunk_index INTEGER NOT NULL,
+      content TEXT NOT NULL,
+      embedding BLOB NOT NULL,
+      dim INTEGER NOT NULL,
+      model TEXT NOT NULL,
+      page_updated_at INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_pages_parent ON pages(parent_id);
     CREATE INDEX IF NOT EXISTS idx_pages_deleted ON pages(is_deleted);
     CREATE INDEX IF NOT EXISTS idx_annotations_page ON annotations(page_id);

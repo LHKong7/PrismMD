@@ -74,7 +74,7 @@ export function evalExternalPlugin(source: string, pluginDir: string): EvalResul
     // `module.exports = <Plugin>` directly.
     const exported =
       (moduleObj.exports as { default?: Plugin }).default ??
-      (moduleObj.exports as Plugin)
+      (moduleObj.exports as unknown as Plugin)
 
     if (!exported || typeof exported.activate !== 'function' || !exported.id) {
       return {

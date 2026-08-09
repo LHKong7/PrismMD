@@ -13,12 +13,16 @@ import {
   movePage,
   getAncestors,
   searchPages,
-  importMarkdown,
+  importFile,
+  importDroppedFile,
   importFolder,
-  exportMarkdown,
+  exportPageToFile,
+  exportFileNameFor,
   getPageCount,
   ensureWelcomePage,
 } from '../services/documentService'
+import { getAsset, readAssetBytes } from '../services/assetService'
+import { openDialogFilters } from '../services/fileFormats'
 import { getMainWindow } from '../main'
 
 export function registerWorkspaceHandlers() {
@@ -115,16 +119,42 @@ export function registerWorkspaceHandlers() {
     const win = getMainWindow()
     const result = await dialog.showOpenDialog(win!, {
       properties: ['openFile', 'multiSelections'],
-      filters: [{ name: 'Markdown', extensions: ['md', 'markdown', 'mdx'] }],
+      filters: openDialogFilters(),
     })
     if (result.canceled || result.filePaths.length === 0) return { ok: false, canceled: true }
 
     try {
-      const pages = result.filePaths.map((fp) => importMarkdown(fp, parentId))
+      const pages = result.filePaths.map((fp) => importFile(fp, parentId))
       return { ok: true, pages }
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) }
     }
+  })
+
+  // Drag-and-drop: the renderer only has a File object, so it reads the
+  // bytes itself and hands them over here.
+  ipcMain.handle(
+    'workspace:import-dropped-file',
+    async (_event, fileName: string, data: Uint8Array, parentId?: string) => {
+      try {
+        return { ok: true, page: importDroppedFile(fileName, data, parentId) }
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) }
+      }
+    },
+  )
+
+  // ── Binary payloads ──
+
+  ipcMain.handle('workspace:get-page-bytes', async (_event, pageId: string) => {
+    const bytes = readAssetBytes(pageId)
+    // Buffer crosses the structured-clone boundary as a Uint8Array; the
+    // renderer turns it back into an ArrayBuffer for pdfjs / SheetJS.
+    return bytes ? new Uint8Array(bytes) : null
+  })
+
+  ipcMain.handle('workspace:get-page-asset', async (_event, pageId: string) => {
+    return getAsset(pageId)
   })
 
   ipcMain.handle('workspace:import-folder', async (_event, parentId?: string) => {
@@ -147,14 +177,16 @@ export function registerWorkspaceHandlers() {
     if (!page) return { ok: false, error: 'Page not found' }
 
     const win = getMainWindow()
+    const defaultName = exportFileNameFor(page)
+    const ext = defaultName.slice(defaultName.lastIndexOf('.') + 1)
     const result = await dialog.showSaveDialog(win!, {
-      defaultPath: `${page.title}.md`,
-      filters: [{ name: 'Markdown', extensions: ['md'] }],
+      defaultPath: defaultName,
+      filters: [{ name: ext.toUpperCase(), extensions: [ext] }],
     })
     if (result.canceled || !result.filePath) return { ok: false, canceled: true }
 
     try {
-      exportMarkdown(pageId, result.filePath)
+      exportPageToFile(pageId, result.filePath)
       return { ok: true, filePath: result.filePath }
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) }

@@ -19,7 +19,7 @@ import { highlightEntitiesIn } from '../lib/graph/entityHighlighter'
  *    entities, the cached graph entities, or a best-effort
  *    `findEntities({ limit: 200 })` call.
  */
-export function useEntityLinking(containerRef: React.RefObject<HTMLElement>) {
+export function useEntityLinking(containerRef: React.RefObject<HTMLElement>, enabled = true) {
   const graphEnabled = useSettingsStore((s) => s.insightGraph.enabled)
   const entityLinking = useSettingsStore((s) => s.insightGraph.entityLinking)
   const currentFilePath = useWorkspaceStore((s) => s.currentFilePath)
@@ -31,7 +31,7 @@ export function useEntityLinking(containerRef: React.RefObject<HTMLElement>) {
   const focusEntity = useUIStore((s) => s.focusEntity)
 
   useEffect(() => {
-    if (!graphEnabled || !entityLinking) return
+    if (!enabled || !graphEnabled || !entityLinking) return
     const el = containerRef.current
     if (!el || !currentFilePath) return
 
@@ -78,6 +78,7 @@ export function useEntityLinking(containerRef: React.RefObject<HTMLElement>) {
       disposer?.()
     }
   }, [
+    enabled,
     graphEnabled,
     entityLinking,
     currentFilePath,

@@ -58,7 +58,7 @@ export function makeHost(pluginId: string): PluginHost {
  * a list in the settings page. Deactivation runs `plugin.deactivate` and
  * removes every registration the plugin made.
  */
-interface PluginManagerStore {
+export interface PluginManagerStore {
   loaded: Record<string, { plugin: Plugin; error?: string }>
   setLoaded: (id: string, plugin: Plugin) => void
   setError: (id: string, plugin: Plugin, error: string) => void

@@ -1,6 +1,11 @@
 import { create } from 'zustand'
 import type { TocEntry } from '../lib/markdown/remarkToc'
-import type { FileFormat } from '../lib/fileFormat'
+import {
+  isSupported,
+  kindOfFormat,
+  normalizeFormat as formatFromString,
+  type FileFormat,
+} from '../lib/fileFormat'
 import type { PageTreeNode, WorkspacePage } from '../types/electron'
 
 /**
@@ -31,6 +36,12 @@ export interface WorkspaceTab {
   title: string
   format: FileFormat | null
   content: string | null
+  /**
+   * Raw payload for binary formats (PDF, XLSX), fetched from the asset
+   * store when the tab opens. Null for text formats, whose payload is
+   * `content`.
+   */
+  bytes: ArrayBuffer | null
   scrollY: number
 }
 
@@ -61,7 +72,7 @@ interface WorkspaceStore {
    * one-line import swap. Display-name consumers use `currentTitle` instead.
    */
   currentFilePath: string | null
-  /** Always null — pages are markdown text, never binary. Kept for compat. */
+  /** Raw bytes of the active tab when it holds a binary document (PDF/XLSX). */
   currentBytes: ArrayBuffer | null
 
   toc: TocEntry[]
@@ -96,6 +107,8 @@ interface WorkspaceStore {
   // --- Import / Export ---
   importFile: (parentId?: string | null) => Promise<void>
   importFolder: (parentId?: string | null) => Promise<void>
+  /** Import files dropped onto the window (any supported format). */
+  importDroppedFiles: (files: File[], parentId?: string | null) => Promise<void>
   exportPage: (pageId: string) => Promise<void>
 
   // --- Tab actions ---
@@ -132,33 +145,94 @@ function syncFromActiveTab(tabs: WorkspaceTab[], activeTabId: string | null) {
     currentFormat: tab.format,
     currentContent: tab.content,
     currentFilePath: tab.pageId,
-    currentBytes: null,
+    currentBytes: tab.bytes,
   }
 }
 
 /**
- * Normalize a stored page `format` string to a renderer `FileFormat`.
- * Pages persist markdown as `'md'`, so map the markdown aliases to
- * `'markdown'`; pass through other known formats; default to markdown.
+ * Fetch the binary payload of an asset-backed page. Returns null for text
+ * formats (their payload is `content`) and for a binary page whose file has
+ * gone missing — the viewers render their own "nothing to show" state.
  */
-function formatFromString(format: string): FileFormat {
-  switch (format) {
-    case 'md':
-    case 'mdx':
-    case 'markdown':
-      return 'markdown'
-    case 'pdf':
-    case 'csv':
-    case 'json':
-    case 'xlsx':
-      return format
-    default:
-      return 'markdown'
+async function loadPageBytes(pageId: string, format: FileFormat): Promise<ArrayBuffer | null> {
+  if (kindOfFormat(format) !== 'binary') return null
+  try {
+    const bytes = await window.electronAPI.workspaceGetPageBytes(pageId)
+    if (!bytes) return null
+    // The IPC boundary hands back a Uint8Array that may be a view into a
+    // larger pooled buffer — copy so pdfjs/SheetJS get exactly our document.
+    return bytes.slice().buffer as ArrayBuffer
+  } catch (err) {
+    console.error('[workspace] failed to read page bytes:', err)
+    return null
   }
 }
 
 // Per-page autosave timers so rapid edits coalesce into one write.
 const autosaveTimers = new Map<string, ReturnType<typeof setTimeout>>()
+
+/**
+ * Pages extraction has already been attempted for this session.
+ *
+ * Importing a PDF both opens it (which extracts) and queues a background
+ * pass over the imported set, so the same page arrives here twice — once
+ * while the first run is still going, and once after it finished with a
+ * `content` snapshot that is now stale. A single "attempted" set covers
+ * both without re-parsing.
+ */
+const extractionAttempted = new Set<string>()
+
+/**
+ * Backfill a PDF page's `content` with its text layer.
+ *
+ * The bytes render the document; the extracted text is what search, RAG and
+ * the agent actually read. Extraction is lazy and idempotent — it runs once,
+ * when a PDF is first imported or first opened, and skips any page that
+ * already has content (including one where a previous run legitimately found
+ * nothing, e.g. a scan without a text layer, so we don't re-parse it forever).
+ */
+async function ensureExtractedText(
+  pageId: string,
+  format: FileFormat,
+  bytes: ArrayBuffer | null,
+  currentContent: string | null,
+): Promise<void> {
+  if (format !== 'pdf' || !bytes) return
+  if (extractionAttempted.has(pageId)) return
+  if ((currentContent ?? '').trim().length > 0) return
+
+  extractionAttempted.add(pageId)
+  try {
+    const { extractPdfText } = await import('../lib/pdf/extractText')
+    const { text, pageCount, truncated } = await extractPdfText(bytes)
+    const body = truncated
+      ? `${text}\n\n[Extraction stopped early — this PDF has ${pageCount} pages.]`
+      : text
+    // A scan with no text layer yields nothing; leaving content empty keeps
+    // the page honest (it just won't match text queries).
+    if (!body.trim()) return
+    await useWorkspaceStore.getState().savePage(pageId, body)
+  } catch (err) {
+    // Transient failure (corrupt read, worker hiccup) — let the next open
+    // try again rather than writing the page off for the whole session.
+    extractionAttempted.delete(pageId)
+    console.warn('[workspace] PDF text extraction failed:', pageId, err)
+  }
+}
+
+/** Kick off extraction for freshly imported pages without blocking the UI. */
+function extractImportedPdfs(pages: Array<{ id: string; format: string; content: string }>): void {
+  void (async () => {
+    for (const page of pages) {
+      const format = formatFromString(page.format)
+      // Checked before fetching bytes — the page opened right after import
+      // is already handled, and its file shouldn't be read a second time.
+      if (format !== 'pdf' || extractionAttempted.has(page.id)) continue
+      const bytes = await loadPageBytes(page.id, format)
+      await ensureExtractedText(page.id, format, bytes, page.content)
+    }
+  })()
+}
 
 export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
   pageTree: [],
@@ -286,12 +360,16 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     const { useEditorStore } = await import('./editorStore')
     await get().flushPendingSaves()
 
+    const format = formatFromString(page.format)
+    const bytes = await loadPageBytes(page.id, format)
+
     const newTab: WorkspaceTab = {
       id: crypto.randomUUID(),
       pageId: page.id,
       title: page.title,
-      format: formatFromString(page.format),
+      format,
       content: page.content,
+      bytes,
       scrollY: 0,
     }
 
@@ -308,6 +386,9 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
     })
     // Load the freshly-active document into the editor buffer.
     useEditorStore.getState().syncForActiveTab()
+    // A PDF opened before extraction ever ran (imported via a folder scan,
+    // or created by an older build) gets its text layer indexed now.
+    void ensureExtractedText(page.id, newTab.format!, bytes, page.content)
   },
 
   savePage: async (pageId: string, content: string) => {
@@ -478,10 +559,47 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       // Open the first imported page.
       if (res.pages && res.pages.length > 0) {
         await get().openPage(res.pages[0].id)
+        // Index the rest in the background — the user explicitly picked this
+        // set, so it is bounded (unlike a folder scan, which stays lazy).
+        extractImportedPdfs(res.pages)
       }
     } catch (err) {
       showToast('error', err instanceof Error ? err.message : String(err))
     }
+  },
+
+  importDroppedFiles: async (files, parentId = null) => {
+    const supported = files.filter((f) => isSupported(f.name))
+    if (supported.length === 0) {
+      if (files.length > 0) showToast('warning', 'No supported files in that drop')
+      return
+    }
+
+    const imported: WorkspacePage[] = []
+    for (const file of supported) {
+      try {
+        const buffer = await file.arrayBuffer()
+        const res = await window.electronAPI.workspaceImportDroppedFile(
+          file.name,
+          new Uint8Array(buffer),
+          parentId ?? undefined,
+        )
+        if (!res.ok || !res.page) {
+          showToast('error', res.error ?? `Failed to import ${file.name}`)
+          continue
+        }
+        imported.push(res.page)
+      } catch (err) {
+        showToast('error', `${file.name}: ${err instanceof Error ? err.message : String(err)}`)
+      }
+    }
+
+    if (imported.length === 0) return
+    await get().loadTree()
+    invalidateSearchIndex()
+    showToast('success', `Imported ${imported.length} file${imported.length === 1 ? '' : 's'}`)
+    await get().openPage(imported[0].id)
+    extractImportedPdfs(imported)
   },
 
   importFolder: async (parentId = null) => {

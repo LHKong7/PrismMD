@@ -1,7 +1,5 @@
 import { getThemeById } from '../theme/themes'
-// @ts-expect-error Vite raw import
 import markdownCss from '../../styles/markdown.css?raw'
-// @ts-expect-error Vite raw import
 import katexCss from 'katex/dist/katex.min.css?raw'
 
 /**

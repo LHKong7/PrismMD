@@ -84,7 +84,16 @@ export const prodProfile: BuildProfile = {
     new MakerDeb({
       options: {
         categories: ['Utility'],
-        mimeType: ['text/markdown'],
+        // Every format reader mode can render — keep in sync with
+        // `electron/services/fileFormats.ts`.
+        mimeType: [
+          'text/markdown',
+          'text/plain',
+          'text/csv',
+          'application/json',
+          'application/pdf',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ],
         ...(appConfig.icon ? { icon: `${appConfig.icon}.png` } : {}),
       },
     }),
