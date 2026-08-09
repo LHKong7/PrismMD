@@ -34,13 +34,11 @@ export type {
     AutonomousPhase,
 } from './types';
 
-// ---- LLM providers ----
-export { OpenAIProvider } from './providers/openai';
-export { AnthropicProvider } from './providers/anthropic';
-export { GoogleProvider } from './providers/google';
+// ---- LLM providers (pi-ai backed) ----
+export { PiLLMProvider } from './pi/piLLMProvider';
+export { resolveModel } from './pi/models';
+export type { ProviderName, PiModelConfig, ResolvedModel } from './pi/models';
 export type { LLMProvider, LLMResponse, ToolCall, ChatMessage } from './llmProtocol';
-export type { ProviderName, RetryOptions } from './providers/base';
-export { getContextWindowForModel, withRetry } from './providers/base';
 
 // ---- Pricing & Token Usage ----
 export {

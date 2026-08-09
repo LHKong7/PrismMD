@@ -21,12 +21,22 @@ import {
 } from './types';
 import type { SandboxConfig } from './sandbox';
 import type { EmbeddingProvider } from './providers/embeddings';
-import type { ProviderName } from './providers/base';
+import type { ProviderName } from './pi/models';
 import { setModelPricing as _setModelPricing, type ModelPricing } from './pricing';
 import { AgentInstance } from './agentInstance';
-import { OpenAIProvider } from './providers/openai';
-import { AnthropicProvider } from './providers/anthropic';
-import { GoogleProvider } from './providers/google';
+import { PiLLMProvider } from './pi/piLLMProvider';
+
+/**
+ * 只在调用方没给 model 时兜底。ollama / custom 没有合理默认值 —— 模型名由
+ * 用户在设置里填，缺了就让 pi 报「provider 未知模型」，好过默默连错模型。
+ */
+const DEFAULT_MODELS: Record<ProviderName, string> = {
+    openai: 'gpt-4o',
+    anthropic: 'claude-sonnet-4-20250514',
+    google: 'gemini-2.0-flash',
+    ollama: '',
+    custom: '',
+};
 
 export class AgentBuilder {
     private _config: AgentConfig = {
@@ -234,33 +244,11 @@ export class AgentBuilder {
 
     private _createProvider(cfg: LLMConfig): LLMProvider {
         const provider = cfg.provider ?? 'openai';
-
-        switch (provider) {
-            case 'openai': {
-                return new OpenAIProvider({
-                    apiKey: cfg.apiKey,
-                    model: cfg.model ?? 'gpt-4o',
-                    baseUrl: cfg.baseUrl,
-                    timeout: cfg.timeout ?? 120,
-                });
-            }
-            case 'anthropic': {
-                return new AnthropicProvider({
-                    apiKey: cfg.apiKey,
-                    model: cfg.model ?? 'claude-sonnet-4-20250514',
-                    baseUrl: cfg.baseUrl,
-                    timeout: cfg.timeout ?? 120,
-                });
-            }
-            case 'google': {
-                return new GoogleProvider({
-                    apiKey: cfg.apiKey,
-                    model: cfg.model ?? 'gemini-2.0-flash',
-                    baseUrl: cfg.baseUrl,
-                });
-            }
-            default:
-                throw new Error(`Unknown provider: ${provider}. Use 'openai', 'anthropic', or 'google'.`);
-        }
+        return new PiLLMProvider({
+            provider,
+            model: cfg.model ?? DEFAULT_MODELS[provider],
+            apiKey: cfg.apiKey,
+            baseUrl: cfg.baseUrl,
+        });
     }
 }

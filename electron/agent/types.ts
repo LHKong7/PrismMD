@@ -7,7 +7,7 @@
 import type { LLMProvider } from './llmProtocol';
 import type { SandboxConfig } from './sandbox';
 import type { EmbeddingProvider } from './providers/embeddings';
-import type { ProviderName } from './providers/base';
+import type { ProviderName } from './pi/models';
 import type { TokenUsage } from './pricing';
 
 // ---------------------------------------------------------------------------

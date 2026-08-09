@@ -53,7 +53,6 @@ export interface LLMProvider {
 }
 
 // ---------------------------------------------------------------------------
-// Re-export OpenAIProvider for backward compatibility
+// 实现见 `pi/piLLMProvider.ts`（pi-ai 适配器）。这个文件只留接口 ——
+// 它是 agent 循环和 provider 之间的接缝，换 provider 实现时不用动上层。
 // ---------------------------------------------------------------------------
-
-export { OpenAIProvider } from './providers/openai';
