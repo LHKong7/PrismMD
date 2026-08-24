@@ -1,4 +1,4 @@
-import { Pin, PinOff, List, User, Network } from 'lucide-react'
+import { Pin, PinOff, List, User, Network, Link2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { clsx } from 'clsx'
 import type { LucideIcon } from 'lucide-react'
@@ -9,6 +9,7 @@ import { useSidebarPanelRegistry } from '../../store/sidebarPanelRegistry'
 import { TableOfContents } from '../toc/TableOfContents'
 import { EntityPanel } from '../graph/EntityPanel'
 import { RelatedRail } from '../graph/RelatedRail'
+import { KnowledgePanel } from '../knowledge/KnowledgePanel'
 import type { TocEntry } from '../../lib/markdown/remarkToc'
 
 interface RightSidebarProps {
@@ -18,7 +19,9 @@ interface RightSidebarProps {
 /**
  * Tabbed right-side panel.
  *
- *   - **TOC**      — always available (legacy content).
+ *   - **TOC**       — always available (legacy content).
+ *   - **Knowledge** — backlinks, outgoing links and related notes from the
+ *                     local note index. Always available; needs no service.
  *   - **Entity**   — only surfaced when the Knowledge Graph feature is on;
  *                    defaults to the focused entity from `uiStore`.
  *   - **Related**  — placeholder tab; its real body lands in B4. We show
@@ -42,6 +45,9 @@ export function RightSidebar({ toc }: RightSidebarProps) {
     hidden?: boolean
   }[] = [
     { id: 'toc', icon: List, label: t('sidebar.contents') },
+    // Always available: the note index needs no external service, unlike the
+    // two graph tabs below it.
+    { id: 'knowledge', icon: Link2, label: t('sidebar.knowledge') },
     { id: 'entity', icon: User, label: t('sidebar.entity'), hidden: !graphEnabled },
     { id: 'related', icon: Network, label: t('sidebar.related'), hidden: !graphEnabled },
     // Plugin-contributed tabs appear after the built-ins. Plugins can
@@ -113,6 +119,7 @@ export function RightSidebar({ toc }: RightSidebarProps) {
               {t('sidebar.noHeadings')}
             </p>
           ))}
+        {activeTab === 'knowledge' && <KnowledgePanel />}
         {activeTab === 'entity' && graphEnabled && (
           <div className="h-full overflow-y-auto">
             <EntityPanel />

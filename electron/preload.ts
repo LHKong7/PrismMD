@@ -43,6 +43,88 @@ export interface Annotation {
   updatedAt: string
 }
 
+/**
+ * Knowledge-index shapes, re-declared here rather than imported from
+ * `electron/knowledge/engine.ts`.
+ *
+ * ★ The preload bundle is what the renderer loads; importing the engine to
+ * borrow one interface would drag better-sqlite3 (a native module) into it.
+ * `src/types/electron.d.ts` derives the renderer's API from this file, so
+ * these declarations are still the single source of truth for the renderer.
+ */
+export interface KnowledgeHit {
+  pageId: string
+  title: string
+  chunkIndex: number
+  headingPath: string[]
+  snippet: string
+  startOffset: number
+  endOffset: number
+  score: number
+  /** Which signals matched: `body`, `title`, `tag`, `link`. */
+  matchedOn: string[]
+  updatedAt: number
+}
+
+export interface KnowledgeLink {
+  pageId: string
+  title: string
+  updatedAt: number
+  occurrences: number
+  heading: string | null
+  context?: string
+}
+
+export interface KnowledgeOutgoingLink extends KnowledgeLink {
+  /** The link target as it was typed. */
+  target: string
+  /** False when no note with that title exists yet. */
+  resolved: boolean
+}
+
+export interface KnowledgeRelatedNote {
+  pageId: string
+  title: string
+  updatedAt: number
+  score: number
+  /** Why: `link`, `backlink`, `tag`, `text`. */
+  reasons: string[]
+  sharedTags: string[]
+}
+
+export interface KnowledgeUnresolvedLink {
+  target: string
+  normalized: string
+  sources: { pageId: string; title: string }[]
+}
+
+export interface KnowledgeNoteRef {
+  pageId: string
+  title: string
+  updatedAt: number
+}
+
+export interface KnowledgeCitation {
+  index: number
+  pageId: string
+  title: string
+  headingPath: string[]
+  text: string
+  startOffset: number
+}
+
+export interface KnowledgeStats {
+  notes: number
+  chunks: number
+  links: number
+  resolvedLinks: number
+  unresolvedLinks: number
+  tags: number
+  orphans: number
+  lastIndexedAt: number | null
+  fullTextSearch: boolean
+}
+
 const electronAPI = {
   // ── Library (reader mode) ──
   // Read-only browsing of a folder on disk. There is no library write
@@ -173,6 +255,62 @@ const electronAPI = {
     ipcRenderer.invoke('kb:search', query),
   kbGetContext: (query: string, maxDocs?: number): Promise<{ ok: boolean; context?: string; error?: string }> =>
     ipcRenderer.invoke('kb:get-context', query, maxDocs),
+
+  // Knowledge index — search, the link graph and index maintenance over the
+  // live workspace. Unlike the `kb*` channels above (a curated snapshot list),
+  // everything here reads the notes as they are right now.
+  knowledgeSearch: (
+    query: string,
+    options?: { limit?: number; contextPageId?: string; excludePageIds?: string[] },
+  ): Promise<{ ok: boolean; hits?: KnowledgeHit[]; error?: string }> =>
+    ipcRenderer.invoke('knowledge:search', query, options),
+  knowledgeNoteContext: (pageId: string): Promise<{
+    ok: boolean
+    backlinks?: KnowledgeLink[]
+    outgoing?: KnowledgeOutgoingLink[]
+    related?: KnowledgeRelatedNote[]
+    tags?: string[]
+    error?: string
+  }> => ipcRenderer.invoke('knowledge:note-context', pageId),
+  knowledgeBacklinks: (pageId: string): Promise<{ ok: boolean; links?: KnowledgeLink[]; error?: string }> =>
+    ipcRenderer.invoke('knowledge:backlinks', pageId),
+  knowledgeOutgoing: (pageId: string): Promise<{ ok: boolean; links?: KnowledgeOutgoingLink[]; error?: string }> =>
+    ipcRenderer.invoke('knowledge:outgoing', pageId),
+  knowledgeRelated: (pageId: string, limit?: number): Promise<{ ok: boolean; notes?: KnowledgeRelatedNote[]; error?: string }> =>
+    ipcRenderer.invoke('knowledge:related', pageId, limit),
+  knowledgeUnresolved: (limit?: number): Promise<{ ok: boolean; links?: KnowledgeUnresolvedLink[]; error?: string }> =>
+    ipcRenderer.invoke('knowledge:unresolved', limit),
+  knowledgeOrphans: (limit?: number): Promise<{ ok: boolean; notes?: KnowledgeNoteRef[]; error?: string }> =>
+    ipcRenderer.invoke('knowledge:orphans', limit),
+  knowledgeTags: (limit?: number): Promise<{ ok: boolean; tags?: { tag: string; notes: number }[]; error?: string }> =>
+    ipcRenderer.invoke('knowledge:tags', limit),
+  knowledgeNotesByTag: (tag: string, limit?: number): Promise<{ ok: boolean; notes?: KnowledgeNoteRef[]; error?: string }> =>
+    ipcRenderer.invoke('knowledge:notes-by-tag', tag, limit),
+  knowledgeStats: (): Promise<{ ok: boolean; stats?: KnowledgeStats; error?: string }> =>
+    ipcRenderer.invoke('knowledge:stats'),
+  knowledgeRetrieve: (
+    query: string,
+    options?: { maxPassages?: number; contextPageId?: string },
+  ): Promise<{ ok: boolean; context?: string; citations?: KnowledgeCitation[]; error?: string }> =>
+    ipcRenderer.invoke('knowledge:retrieve', query, options),
+  knowledgeIndexPage: (pageId: string): Promise<{ ok: boolean; changed?: boolean; error?: string }> =>
+    ipcRenderer.invoke('knowledge:index-page', pageId),
+  knowledgeReindex: (force?: boolean): Promise<{
+    ok: boolean
+    report?: { indexed: number; skipped: number; removed: number }
+    error?: string
+  }> => ipcRenderer.invoke('knowledge:reindex', force),
+  knowledgePropagateRename: (pageId: string, oldTitle: string, newTitle: string): Promise<{
+    ok: boolean
+    updated?: { pageId: string; title: string }[]
+    error?: string
+  }> => ipcRenderer.invoke('knowledge:propagate-rename', pageId, oldTitle, newTitle),
+  /** Fires whenever the note index changes, so panels refresh without polling. */
+  onKnowledgeUpdated: (callback: () => void): (() => void) => {
+    const handler = () => callback()
+    ipcRenderer.on('knowledge:updated', handler)
+    return () => ipcRenderer.removeListener('knowledge:updated', handler)
+  },
 
   // Settings
   loadSettings: (): Promise<Record<string, unknown>> =>
@@ -571,8 +709,18 @@ const electronAPI = {
     ipcRenderer.invoke('workspace:create-folder', title, parentId),
   workspaceGetPage: (pageId: string): Promise<any> =>
     ipcRenderer.invoke('workspace:get-page', pageId),
-  workspaceUpdatePage: (pageId: string, updates: Record<string, any>): Promise<{ ok: boolean; error?: string }> =>
-    ipcRenderer.invoke('workspace:update-page', pageId, updates),
+  workspaceUpdatePage: (
+    pageId: string,
+    updates: Record<string, any>,
+  ): Promise<{
+    ok: boolean
+    /**
+     * Notes whose text was rewritten to follow a title change. Their content
+     * on disk no longer matches whatever an open tab is holding.
+     */
+    relinkedPageIds?: string[]
+    error?: string
+  }> => ipcRenderer.invoke('workspace:update-page', pageId, updates),
   workspaceDeletePage: (pageId: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('workspace:delete-page', pageId),
   workspaceRestorePage: (pageId: string): Promise<{ ok: boolean; error?: string }> =>

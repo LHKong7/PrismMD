@@ -11,6 +11,7 @@ import { usePluginManager, type PluginManagerStore } from '../../lib/plugins/hos
 import { reloadExternalPlugins } from '../../lib/plugins/externalLoader'
 import { useUpdaterStore } from '../../store/updaterStore'
 import { useKnowledgeBaseStore } from '../../store/knowledgeBaseStore'
+import { useKnowledgeStore } from '../../store/knowledgeStore'
 import { TemplateSettings } from './TemplateSettings'
 import { PromptSettings } from './PromptSettings'
 import { AgentSessionsPanel } from './AgentSessionsPanel'
@@ -498,10 +499,52 @@ function KnowledgeSettings() {
   const refresh = useKnowledgeBaseStore((s) => s.refresh)
   const removeDocument = useKnowledgeBaseStore((s) => s.removeDocument)
 
+  const stats = useKnowledgeStore((s) => s.stats)
+  const reindexing = useKnowledgeStore((s) => s.reindexing)
+  const loadStats = useKnowledgeStore((s) => s.loadStats)
+  const reindex = useKnowledgeStore((s) => s.reindex)
+
   useEffect(() => { refresh() }, [refresh])
+  useEffect(() => { void loadStats() }, [loadStats])
 
   return (
     <div>
+      <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+        {t('settings.knowledge.indexTitle')}
+      </h3>
+      <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
+        {t('settings.knowledge.indexDescription')}
+      </p>
+
+      <div className="rounded-lg border p-3 mb-6" style={{ borderColor: 'var(--border-color)' }}>
+        <div className="grid grid-cols-2 gap-y-2 sm:grid-cols-4">
+          <Stat label={t('settings.knowledge.statNotes')} value={stats?.notes} />
+          <Stat label={t('settings.knowledge.statLinks')} value={stats?.resolvedLinks} />
+          <Stat label={t('settings.knowledge.statUnresolved')} value={stats?.unresolvedLinks} />
+          <Stat label={t('settings.knowledge.statOrphans')} value={stats?.orphans} />
+        </div>
+
+        {stats && !stats.fullTextSearch && (
+          <p className="mt-3 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            {t('settings.knowledge.noFts')}
+          </p>
+        )}
+
+        <div className="mt-3 flex items-center gap-2">
+          <button
+            onClick={() => void reindex()}
+            disabled={reindexing}
+            className="rounded px-2 py-1 text-xs transition-colors disabled:opacity-50"
+            style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+          >
+            {reindexing ? t('settings.knowledge.rebuilding') : t('settings.knowledge.rebuild')}
+          </button>
+          <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            {t('settings.knowledge.rebuildHint')}
+          </span>
+        </div>
+      </div>
+
       <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
         {t('settings.knowledge.title')}
       </h3>
@@ -577,6 +620,18 @@ function KnowledgeSettings() {
       <p className="text-[11px] mt-4" style={{ color: 'var(--text-muted)' }}>
         {t('settings.knowledge.tip')}
       </p>
+    </div>
+  )
+}
+
+/** One number from the index, with a dash while the stats are still loading. */
+function Stat({ label, value }: { label: string; value?: number }) {
+  return (
+    <div>
+      <div className="text-lg font-semibold leading-none" style={{ color: 'var(--text-primary)' }}>
+        {value ?? '—'}
+      </div>
+      <div className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>{label}</div>
     </div>
   )
 }

@@ -142,6 +142,22 @@ export interface MuseCard {
  */
 import type { ElectronAPI as PreloadAPI } from '../../electron/preload'
 
+/**
+ * Knowledge-index shapes. Re-exported from preload for the same reason the
+ * API itself is derived there: one declaration, so a change to the channel
+ * and a change to the renderer's view of it cannot drift apart.
+ */
+export type {
+  KnowledgeCitation,
+  KnowledgeHit,
+  KnowledgeLink,
+  KnowledgeNoteRef,
+  KnowledgeOutgoingLink,
+  KnowledgeRelatedNote,
+  KnowledgeStats,
+  KnowledgeUnresolvedLink,
+} from '../../electron/preload'
+
 type Assert<T extends true> = T
 
 interface Overrides {

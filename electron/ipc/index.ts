@@ -8,6 +8,7 @@ import { registerMcpHandlers } from './mcpHandlers'
 import { registerUpdaterHandlers } from './updaterHandlers'
 import { registerExportHandlers } from './exportHandlers'
 import { registerKnowledgeBaseHandlers } from './knowledgeBaseHandlers'
+import { registerKnowledgeHandlers } from './knowledgeHandlers'
 import { registerWorkspaceHandlers } from './workspaceHandlers'
 import { registerLibraryHandlers } from './libraryHandlers'
 import { registerDataLocationHandlers } from './dataLocationHandlers'
@@ -33,6 +34,7 @@ export function registerIpcHandlers() {
   registerUpdaterHandlers()
   registerExportHandlers()
   registerKnowledgeBaseHandlers()
+  registerKnowledgeHandlers()
   registerWorkspaceHandlers()
   registerLibraryHandlers()
   registerDataLocationHandlers()

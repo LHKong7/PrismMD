@@ -88,7 +88,8 @@
     "importFolder": "Import folder",
     "searchPages": "Search pages…",
     "noPages": "No pages yet",
-    "noResults": "No pages found"
+    "noResults": "No pages found",
+    "knowledge": "Knowledge"
   },
   "pagetree": {
     "untitled": "Untitled",
@@ -97,7 +98,7 @@
     "newFolder": "New folder",
     "rename": "Rename",
     "export": "Export as Markdown",
-    "addToKb": "Add to Knowledge Base",
+    "addToKb": "Save a snapshot",
     "moveToRoot": "Move to top level",
     "delete": "Delete",
     "more": "More",
@@ -406,13 +407,23 @@
       "save": "Save"
     },
     "knowledge": {
-      "title": "Knowledge Base",
-      "description": "Documents added to the Knowledge Base are automatically used as context when chatting with the AI Agent.",
+      "title": "Imported snapshots",
+      "description": "Copies of documents taken when they were added, kept for reference. They are not what the assistant searches — that is the live note index above.",
       "loading": "Loading...",
-      "empty": "No documents in the Knowledge Base yet. Right-click a file in the file tree and select \"Add to Knowledge Base\" to get started.",
+      "empty": "No imported snapshots.",
       "addedOn": "Added",
-      "remove": "Remove from Knowledge Base",
-      "tip": "Tip: The Agent automatically searches the Knowledge Base for relevant documents when you send a message."
+      "remove": "Delete this snapshot",
+      "tip": "The assistant retrieves from your notes as they are now, so you no longer need to add anything here for it to be found.",
+      "indexTitle": "Note index",
+      "indexDescription": "Every note in your workspace is indexed automatically — for search, for backlinks, and for the AI assistant's answers. Nothing to add by hand.",
+      "statNotes": "Notes",
+      "statLinks": "Links",
+      "statUnresolved": "Unwritten",
+      "statOrphans": "Unconnected",
+      "rebuild": "Rebuild index",
+      "rebuilding": "Rebuilding…",
+      "rebuildHint": "Only needed if search results look out of date.",
+      "noFts": "Full-text search is unavailable in this build, so search is falling back to a slower, less precise scan."
     },
     "ai": {
       "title": "AI Providers",
@@ -750,7 +761,7 @@
     "saveToGraph": "Save to Knowledge Graph",
     "savingToGraph": "Saving…",
     "ingestFolder": "Ingest whole folder into Graph ({{count}} files)",
-    "addToKB": "Add to Knowledge Base"
+    "addToKB": "Save a snapshot"
   },
   "batchIngest": {
     "running": "Ingesting {{done}} / {{total}}",
@@ -879,8 +890,18 @@
     "read": "Read",
     "edit": "Edit",
     "pickHint": "Pick a book to set its status, genre and quality, or open it.",
-    "status": { "draft": "Draft", "done": "Done", "revise": "Revise", "hot": "Hot" },
-    "genre": { "tech": "Tech", "biz": "Business", "essay": "Essay", "note": "Note" }
+    "status": {
+      "draft": "Draft",
+      "done": "Done",
+      "revise": "Revise",
+      "hot": "Hot"
+    },
+    "genre": {
+      "tech": "Tech",
+      "biz": "Business",
+      "essay": "Essay",
+      "note": "Note"
+    }
   },
   "muse": {
     "title": "Muse Wall",
@@ -893,7 +914,12 @@
     "aiError": "The muse came up empty — try again.",
     "copy": "Copy",
     "delete": "Delete",
-    "kind": { "topic": "Topic", "quote": "Line", "snippet": "Snippet", "opening": "Opening" }
+    "kind": {
+      "topic": "Topic",
+      "quote": "Line",
+      "snippet": "Snippet",
+      "opening": "Opening"
+    }
   },
   "library": {
     "collect": "Save a copy to notes",
@@ -903,8 +929,8 @@
     "readerMode": "Reader",
     "welcomeTitle": "Read a folder",
     "welcomeBody": "Reader mode opens documents where they already live. Nothing is copied, nothing is written back.",
-    "openFolder": "Open folder\u2026",
-    "openFile": "Open file\u2026",
+    "openFolder": "Open folder…",
+    "openFile": "Open file…",
     "openWorkspace": "Open note mode",
     "toggleSidebar": "Toggle folder",
     "refresh": "Refresh",
@@ -912,7 +938,29 @@
     "emptyFolder": "Nothing readable here",
     "truncated": "Too many files to list them all",
     "pickAFile": "Pick a file from the folder to start reading.",
-    "loading": "Opening\u2026",
+    "loading": "Opening…",
     "openError": "Could not open this file"
+  },
+  "knowledge": {
+    "noNoteOpen": "Open a note to see how it connects.",
+    "backlinks": "Backlinks",
+    "backlinksHint": "Nothing links here yet. Write [[this note's title]] in another note to connect them.",
+    "outgoing": "Links from here",
+    "related": "Related",
+    "relatedHint": "Related notes appear once notes share links, tags or wording.",
+    "notWrittenYet": "Not written yet — click to create",
+    "emptyNote": "This note stands alone. Link it with [[Note title]], or tag it with #topic, and it will start showing up beside the notes it belongs with.",
+    "reasonLink": "You linked to it",
+    "reasonBacklink": "It links here",
+    "reasonTag": "Shares a tag",
+    "reasonText": "Similar wording",
+    "indexSummary": "{{notes}} notes · {{links}} links · {{unresolved}} unwritten",
+    "reindex": "Rebuild the note index",
+    "openNote": "Open “{{title}}”",
+    "createNote": "Create “{{title}}”",
+    "createdFromLink": "Created “{{title}}”",
+    "searchPlaceholder": "Search your notes…",
+    "noResults": "Nothing in your notes matches that.",
+    "citedNotes": "From your notes"
   }
 }

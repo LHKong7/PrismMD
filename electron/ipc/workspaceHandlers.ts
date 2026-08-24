@@ -22,6 +22,14 @@ import {
   ensureWelcomePage,
 } from '../services/documentService'
 import { getAsset, readAssetBytes } from '../services/assetService'
+import {
+  forgetPage,
+  indexPageNow,
+  propagateRename,
+  scheduleIndex,
+  searchPageSummaries,
+  syncWorkspaceIndex,
+} from '../services/knowledgeService'
 import { openDialogFilters } from '../services/fileFormats'
 import { getMainWindow } from '../main'
 
@@ -37,7 +45,12 @@ export function registerWorkspaceHandlers() {
 
   ipcMain.handle('workspace:create-page', async (_event, title?: string, parentId?: string, content?: string) => {
     try {
-      return { ok: true, page: createPage(title, parentId, content) }
+      const page = createPage(title, parentId, content)
+      // Indexed immediately rather than on a debounce: a brand-new note's
+      // title is what resolves every [[link]] someone already wrote to it,
+      // and waiting a second and a half to say so looks like a broken link.
+      indexPageNow(page.id)
+      return { ok: true, page }
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) }
     }
@@ -57,7 +70,24 @@ export function registerWorkspaceHandlers() {
 
   ipcMain.handle('workspace:update-page', async (_event, pageId: string, updates: Record<string, any>) => {
     try {
+      // Read the old title *before* writing: a rename has to be followed
+      // through every note that links here, and afterwards there is nothing
+      // left to match those links against.
+      const before = updates.title !== undefined ? getPage(pageId) : null
       updatePage(pageId, updates)
+
+      const renamedFrom = before && before.title !== updates.title ? before.title : null
+      if (renamedFrom) {
+        indexPageNow(pageId)
+        // The ids go back to the renderer because those notes' text changed
+        // underneath any tab that has them open — a stale tab would autosave
+        // the pre-rewrite content straight back over the fix.
+        const { updated } = propagateRename(pageId, renamedFrom, String(updates.title))
+        return { ok: true, relinkedPageIds: updated.map((u) => u.pageId) }
+      }
+
+      // Content edits arrive on every autosave tick, so they are debounced.
+      scheduleIndex(pageId)
       return { ok: true }
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) }
@@ -67,6 +97,10 @@ export function registerWorkspaceHandlers() {
   ipcMain.handle('workspace:delete-page', async (_event, pageId: string) => {
     try {
       deletePage(pageId)
+      forgetPage(pageId)
+      // deletePage cascades to descendants, so a full reconcile is the only
+      // way to evict them all — one pass over unchanged notes is a hash each.
+      syncWorkspaceIndex()
       return { ok: true }
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) }
@@ -76,6 +110,7 @@ export function registerWorkspaceHandlers() {
   ipcMain.handle('workspace:restore-page', async (_event, pageId: string) => {
     try {
       restorePage(pageId)
+      syncWorkspaceIndex()
       return { ok: true }
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) }
@@ -106,6 +141,14 @@ export function registerWorkspaceHandlers() {
   })
 
   ipcMain.handle('workspace:search', async (_event, query: string) => {
+    // Ranked, index-backed results; `searchPages` remains the fallback so a
+    // partial word ("sched") still finds something the tokenizer cannot.
+    try {
+      const ranked = searchPageSummaries(query)
+      if (ranked.length > 0) return ranked
+    } catch (err) {
+      console.error('[workspace] Knowledge search failed, falling back:', err)
+    }
     return searchPages(query)
   })
 
@@ -125,6 +168,7 @@ export function registerWorkspaceHandlers() {
 
     try {
       const pages = result.filePaths.map((fp) => importFile(fp, parentId))
+      for (const page of pages) indexPageNow(page.id)
       return { ok: true, pages }
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) }
@@ -137,7 +181,9 @@ export function registerWorkspaceHandlers() {
     'workspace:import-dropped-file',
     async (_event, fileName: string, data: Uint8Array, parentId?: string) => {
       try {
-        return { ok: true, page: importDroppedFile(fileName, data, parentId) }
+        const page = importDroppedFile(fileName, data, parentId)
+        indexPageNow(page.id)
+        return { ok: true, page }
       } catch (err) {
         return { ok: false, error: err instanceof Error ? err.message : String(err) }
       }
@@ -166,6 +212,9 @@ export function registerWorkspaceHandlers() {
 
     try {
       const pages = importFolder(result.filePaths[0], parentId)
+      // A folder import can be hundreds of files; one reconcile covers them
+      // all and skips whatever was already indexed.
+      syncWorkspaceIndex()
       return { ok: true, count: pages.length }
     } catch (err) {
       return { ok: false, error: err instanceof Error ? err.message : String(err) }

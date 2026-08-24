@@ -68,9 +68,23 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const currentFilePath = useWorkspaceStore((s) => s.currentFilePath)
   const [copied, setCopied] = useState(false)
 
+  const openPage = useWorkspaceStore((s) => s.openPage)
+
   const onCitationClick = useCallback(
-    (ev: CitationEvidence) => scrollToEvidence(ev.text),
-    [scrollToEvidence],
+    async (ev: CitationEvidence) => {
+      // A citation from the note index points at a note that is very often
+      // not the one on screen; scrolling the open document for a passage that
+      // lives elsewhere finds nothing and looks like a dead link.
+      if (ev.pageId && ev.pageId !== currentFilePath) {
+        await openPage(ev.pageId)
+        // The reader re-registers its DOM after the new note renders, so the
+        // scroll has to wait for that frame.
+        requestAnimationFrame(() => scrollToEvidence(ev.text))
+        return
+      }
+      scrollToEvidence(ev.text)
+    },
+    [scrollToEvidence, openPage, currentFilePath],
   )
 
   const handleCopy = async () => {

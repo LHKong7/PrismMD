@@ -143,7 +143,7 @@ function PageNode({ node, depth }: { node: PageTreeNode; depth: number }) {
         { id: 'new-sub', label: t('pagetree.newSubpage', 'New subpage'), onSelect: () => void newChildPage() },
         { id: 'rename', label: t('pagetree.rename', 'Rename'), onSelect: () => setRenamingId(node.id) },
         { id: 'export', label: t('pagetree.export', 'Export as Markdown'), onSelect: () => void exportPage(node.id) },
-        { id: 'add-kb', label: t('pagetree.addToKb', 'Add to Knowledge Base'), onSelect: () => void addPageToKB(node.id) },
+        { id: 'add-kb', label: t('pagetree.addToKb', 'Save a snapshot'), onSelect: () => void addPageToKB(node.id) },
         ...moveToRootItem,
         { id: 'delete', label: t('pagetree.delete', 'Delete'), onSelect: () => void deletePage(node.id), destructive: true },
       ]

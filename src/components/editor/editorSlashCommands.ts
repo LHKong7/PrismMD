@@ -1,4 +1,5 @@
 import { autocompletion, type CompletionContext, type Completion } from '@codemirror/autocomplete'
+import { wikiLinkCompletions } from './editorWikiLinkComplete'
 
 const SLASH_COMMANDS: Completion[] = [
   {
@@ -80,10 +81,10 @@ const SLASH_COMMANDS: Completion[] = [
     apply: '[text](url)',
   },
   {
-    label: '/knowledge',
-    displayLabel: 'Knowledge Base',
-    detail: 'Reference knowledge base in Agent context',
-    apply: '> [!knowledge] Query your knowledge base via the Agent sidebar.',
+    label: '/link-note',
+    displayLabel: 'Link to a note',
+    detail: 'Wiki link — pick a note, or name one you have not written yet',
+    apply: '[[]]',
   },
   {
     label: '/template',
@@ -109,11 +110,13 @@ function slashCompletions(context: CompletionContext) {
 }
 
 /**
- * CodeMirror extension that provides a slash-command menu.
- * Type `/` at the start of a line or after whitespace to trigger
- * a popup with markdown snippet options.
+ * CodeMirror extension providing the editor's two completion menus: `/` for
+ * markdown snippets and `[[` for links to other notes.
  */
 export const slashCommandExtension = autocompletion({
-  override: [slashCompletions],
+  // Both sources go through one `autocompletion()` instance: two of them in
+  // the same editor fight over the popup, and whichever was registered last
+  // wins silently.
+  override: [slashCompletions, wikiLinkCompletions],
   icons: false,
 })

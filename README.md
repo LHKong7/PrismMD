@@ -25,8 +25,11 @@
 
 ---
 
-PrismMD is a cross-platform desktop reader that treats Markdown as a first-class
-thinking medium. Render GFM, LaTeX and Mermaid side-by-side with an AI reading
+PrismMD is a cross-platform desktop app that treats Markdown as a first-class
+thinking medium — a **personal knowledge base** rather than a folder of files:
+notes link to each other with `[[wiki links]]`, every note carries its
+backlinks and related notes, and the whole workspace is searchable and
+answerable in English and Chinese, entirely on your machine. Render GFM, LaTeX and Mermaid side-by-side with an AI reading
 assistant that can chat over the current document, remember past conversations,
 and — optionally — pull context from a local knowledge graph built from every
 document you save. And when you want to *write*, step through the door into
@@ -39,6 +42,7 @@ books on a shelf and a guild of AI *scribes* helps you draft, critique and polis
 - [Features](#features)
 - [Prerequisites](#prerequisites)
 - [Quick Start](#quick-start)
+- [Your notes as a knowledge base](#your-notes-as-a-knowledge-base)
 - [Configuration](#configuration)
   - [AI Providers](#ai-providers)
   - [Knowledge Graph (optional)](#knowledge-graph-optional)
@@ -96,6 +100,9 @@ right) drops you straight into the classic reader.
 - **Markdown rendering** — full GitHub-flavored Markdown with syntax highlighting, KaTeX math and Mermaid diagrams
 - **AI reading assistant** — chat with your documents using OpenAI, Anthropic, Google AI, local Ollama, or any OpenAI-compatible endpoint
 - **Conversation memory** — the assistant remembers past discussions per file for richer follow-up answers
+- **Your notes, linked** — write `[[Note title]]` anywhere to link one note to another, with `[[` autocomplete while you type. Every note gets **backlinks**, **related notes** and its **tags** in the Knowledge panel; a link to a note you have not written yet is a one-click prompt to write it, and renaming a note follows its links instead of breaking them
+- **Search that actually finds things** — every note is chunked and indexed locally (SQLite FTS5 + BM25), in **English and Chinese**, with results ranked across body text, titles, tags and the link graph. No server, no configuration, nothing to add by hand
+- **Ask your own notes** — the assistant retrieves passages from your whole workspace *as it is right now* and cites them by number; clicking a citation opens the note it came from and scrolls to the passage
 - **Knowledge graph (opt-in)** — save documents as nodes in your own [Neo4j](https://neo4j.com/) instance and ask questions across them via [InsightGraph](https://www.npmjs.com/package/@insightgraph/sdk-embedded) graph-RAG
 - **Privacy mode** — one click to block every external API call and force local-only models
 - **Annotations** — highlight and note passages directly in the document
@@ -105,6 +112,38 @@ right) drops you straight into the classic reader.
 - **Themes & vibrancy** — light/dark plus system appearance, with native macOS vibrancy
 - **Focus mode** — distraction-free reading with everything but the page dimmed
 - **i18n** — English and Simplified Chinese out of the box
+
+## Your notes as a knowledge base
+
+PrismMD indexes every note in your workspace — automatically, locally, and with
+nothing to switch on. Three things fall out of that:
+
+**Links.** Type `[[` anywhere and pick a note; the link renders as a link and
+the target note gains a **backlink**. A link to a note that does not exist yet
+is not an error — it is shown as *not written yet*, and clicking it creates the
+note. Rename a note and every `[[link]]` pointing at it is rewritten in place,
+so improving a title never costs you the connections.
+
+**Search.** Notes are split into passages at their headings and indexed with
+SQLite's FTS5, ranked by BM25 across body text, titles, `#tags` and the link
+graph. Searching works in **English and Chinese** — CJK text is indexed as
+overlapping bigrams, because SQLite's stock tokenizer treats a whole Chinese
+sentence as a single word and would silently find nothing.
+
+**Answers with sources.** When you ask the assistant something, it retrieves
+the relevant passages from your notes and is told to cite them as `[1]`, `[2]`.
+Each citation is clickable: it opens the note the passage came from and scrolls
+to it. That works with any provider, including a local Ollama model, and needs
+no external service.
+
+The **Knowledge** tab in the right sidebar shows where the open note sits:
+what links here, what it links to, which notes are related (by link, tag or
+wording), and its tags. **Settings → Knowledge** shows the index status and a
+rebuild button.
+
+> The separate [Knowledge Graph](#knowledge-graph-optional) feature is a
+> different, optional thing: it extracts *entities* into a Neo4j instance you
+> run yourself. The note index above needs none of that.
 
 ## Prerequisites
 
@@ -220,9 +259,12 @@ PrismMD/
 │   ├── main.ts                    # App entry, window lifecycle
 │   ├── preload.ts                 # Context bridge (typed IPC API)
 │   ├── ipc/                       # IPC handler registration
+│   ├── knowledge/                 # Note index — tokenizer, chunker, link parser,
+│   │                              #   ranking, SQLite/FTS5 engine (pure, unit-tested)
 │   └── services/                  # Main-process services
 │       ├── aiService.ts           # AI agent (borderless-agent)
 │       ├── memoryService.ts       # Conversation memory
+│       ├── knowledgeService.ts    # Note index scheduling + IPC-facing reads
 │       ├── insightGraphService.ts # Graph-RAG (optional)
 │       ├── fileWatcher.ts         # chokidar-based file watching
 │       └── settingsStore.ts       # Persistent settings
@@ -231,6 +273,7 @@ PrismMD/
 │   │   ├── agent/                 # AI chat sidebar
 │   │   ├── frontstage/            # 烛笺阁 pixel world (Pixi.js): rooms, scribes, round table, archive, shelf
 │   │   ├── reader/                # Markdown renderer + pipeline
+│   │   ├── knowledge/             # Wiki links + Knowledge panel (backlinks, related)
 │   │   ├── filetree/              # Explorer with context menu
 │   │   ├── settings/              # Settings panel (AI, Graph, Privacy)
 │   │   └── layout/                # AppShell, StatusBar, TitleBar

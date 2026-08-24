@@ -15,6 +15,7 @@ import { mountRoot, mountFileParent } from './services/libraryService'
 import { rememberFile, rememberRoot } from './services/libraryRecents'
 import { stopWatching } from './services/libraryWatcher'
 import { handleSquirrelEvent } from './services/windowsIntegration'
+import { flushPendingIndexing, initKnowledgeIndex } from './services/knowledgeService'
 
 /**
  * What a reader window was asked to show when it was created. The renderer
@@ -336,6 +337,12 @@ app.whenReady().then(async () => {
     createWindow()
   }
 
+  // Reconcile the note index with the workspace. Runs after the window is
+  // created, not before: a first-run index of a large workspace should not
+  // sit between the user and their notes, and every read path initializes
+  // the schema on its own if this has not finished yet.
+  setImmediate(initKnowledgeIndex)
+
   // Fire MCP servers in the background — failures don't block window
   // creation, and individual server errors are logged inside the service.
   startMcpServers().catch((err) => console.warn('[mcp] startAll failed:', err))
@@ -374,6 +381,15 @@ app.on('before-quit', (event) => {
         }),
         new Promise<void>((resolve) => setTimeout(resolve, FLUSH_TIMEOUT_MS)),
       ])
+    }
+
+    // Debounced index jobs hold the *last* edit of the session; running them
+    // now is the difference between quitting and losing the final paragraph
+    // from search until the next launch repairs it.
+    try {
+      flushPendingIndexing()
+    } catch (err) {
+      console.warn('[knowledge] flush on quit failed:', err)
     }
 
     // Close workspace database synchronously (SQLite, no async needed)

@@ -1,6 +1,17 @@
 import { create } from 'zustand'
 import type { KBEntry } from '../types/electron'
 
+/**
+ * The legacy snapshot list: copies of documents taken at the moment they were
+ * added, kept only for reference.
+ *
+ * ★ This used to be "the knowledge base", and it was the wrong shape for one:
+ * a snapshot goes stale the instant you edit the note, and nothing was in it
+ * unless you remembered to put it there. What the assistant and search now
+ * read is the live note index (`knowledgeStore` / `electron/knowledge/`),
+ * which covers every note as it currently is.
+ */
+
 interface KnowledgeBaseStore {
   entries: KBEntry[]
   loading: boolean
@@ -33,7 +44,7 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
       if (res.ok) {
         await get().refresh()
         const { useToastStore } = await import('./toastStore')
-        useToastStore.getState().show('success', 'Added to Knowledge Base')
+        useToastStore.getState().show('success', 'Snapshot saved')
         return true
       } else {
         const { useToastStore } = await import('./toastStore')
@@ -53,7 +64,7 @@ export const useKnowledgeBaseStore = create<KnowledgeBaseStore>((set, get) => ({
       const { useToastStore } = await import('./toastStore')
       if (res.ok) {
         await get().refresh()
-        useToastStore.getState().show('success', 'Added to Knowledge Base')
+        useToastStore.getState().show('success', 'Snapshot saved')
         return true
       }
       useToastStore.getState().show('error', res.error ?? 'Failed to add')
