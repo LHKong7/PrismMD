@@ -6,7 +6,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { WORKDIR } from './config';
-import { sanitizeForStorage } from './memoryCore';
+import { sanitizeForStorage } from './sanitize';
 import { SessionStore } from './storage/protocols';
 
 const SESSION_DIR =

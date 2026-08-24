@@ -12,6 +12,9 @@
  *
  * const result = await agent.chat('Hello');
  * ```
+ *
+ * 循环本身跑在 `@earendil-works/pi-agent-core` 上，provider 层是
+ * `@earendil-works/pi-ai`。这里只导出 PrismMD 自己那一层。
  */
 
 // ---- Builder & Instance ----
@@ -21,7 +24,6 @@ export { AgentInstance } from './agentInstance';
 // ---- Public types ----
 export type {
     ToolDefinition,
-    SkillDefinition,
     AgentConfig,
     LLMConfig,
     StorageConfig,
@@ -34,13 +36,9 @@ export type {
     AutonomousPhase,
 } from './types';
 
-// ---- LLM providers ----
-export { OpenAIProvider } from './providers/openai';
-export { AnthropicProvider } from './providers/anthropic';
-export { GoogleProvider } from './providers/google';
-export type { LLMProvider, LLMResponse, ToolCall, ChatMessage } from './llmProtocol';
-export type { ProviderName, RetryOptions } from './providers/base';
-export { getContextWindowForModel, withRetry } from './providers/base';
+// ---- Models (pi-ai backed) ----
+export { resolveModel } from './pi/models';
+export type { ProviderName, PiModelConfig, ResolvedModel } from './pi/models';
 
 // ---- Pricing & Token Usage ----
 export {
@@ -53,12 +51,10 @@ export {
     mergeTokenUsage,
 } from './pricing';
 
-// ---- Storage helpers ----
+// ---- Session persistence (used directly by electron/services/sessionService) ----
 export { createFileBackend as createFileStorage } from './storage/fileBackend';
 export { StorageBackend } from './storage/protocols';
 export type { SessionStore, MemoryStore, SkillStore, ContextStore } from './storage/protocols';
-
-// ---- Session manager ----
 export { SessionManager, Session } from './sessionCore';
 
 // ---- Telemetry & metrics ----
@@ -85,10 +81,6 @@ export type {
     BuildContextResult,
 } from './contextBuilder';
 
-// ---- Composition root ----
-export { AgentHarness, ToolRegistry } from './harness';
-export type { HarnessConfig } from './harness';
-
 // ---- Guardrails ----
 export {
     GuardPipeline,
@@ -97,22 +89,6 @@ export {
     DEFAULT_PII_PATTERNS,
 } from './guardrails';
 export type { Guard, GuardContext, GuardResult, GuardOutcome, GuardPipelineOptions } from './guardrails';
-
-// ---- Skills (registry + lifecycle) ----
-export { SkillRegistry } from './skillRegistry';
-export { SkillLifecycleManager } from './skillLifecycle';
-export type { SkillContext } from './types';
-export type { SkillLoadResult, SkillLifecycleManagerOptions } from './skillLifecycle';
-
-// ---- Tool execution ----
-export { ToolExecutor } from './toolExecutor';
-export type {
-    ToolCallRequest,
-    ToolCallResult,
-    ExecutionPlan,
-    ToolExecutorContext,
-    ToolExecutorOptions,
-} from './toolExecutor';
 
 // ---- Errors ----
 export {
@@ -132,7 +108,6 @@ export {
 export {
     estimateTokens,
     getBudget,
-    assembleSystem,
-    sanitizeUserInput,
-    LifecycleManager,
+    selectHistory,
+    foldObservation,
 } from './contextCore';

@@ -9,12 +9,22 @@ interface ResizeHandleProps {
   onResize: (width: number) => void
   /** Called once on mouseup — useful for persisting the final value. */
   onResizeEnd?: () => void
+  /** Drag bounds in pixels. Defaults suit the workbench sidebars. */
+  minWidth?: number
+  maxWidth?: number
 }
 
 const MIN_WIDTH = 160
 const MAX_WIDTH = 500
 
-export function ResizeHandle({ side, currentWidth, onResize, onResizeEnd }: ResizeHandleProps) {
+export function ResizeHandle({
+  side,
+  currentWidth,
+  onResize,
+  onResizeEnd,
+  minWidth = MIN_WIDTH,
+  maxWidth = MAX_WIDTH,
+}: ResizeHandleProps) {
   const dragging = useRef(false)
   const startX = useRef(0)
   const startWidth = useRef(0)
@@ -31,7 +41,7 @@ export function ResizeHandle({ side, currentWidth, onResize, onResizeEnd }: Resi
         const delta = side === 'left'
           ? ev.clientX - startX.current
           : startX.current - ev.clientX
-        const next = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, startWidth.current + delta))
+        const next = Math.max(minWidth, Math.min(maxWidth, startWidth.current + delta))
         onResize(next)
       }
 
@@ -49,7 +59,7 @@ export function ResizeHandle({ side, currentWidth, onResize, onResizeEnd }: Resi
       document.addEventListener('mousemove', onMouseMove)
       document.addEventListener('mouseup', onMouseUp)
     },
-    [side, currentWidth, onResize, onResizeEnd],
+    [side, currentWidth, onResize, onResizeEnd, minWidth, maxWidth],
   )
 
   // Position: at the right edge of a left sidebar, or left edge of a right sidebar.
@@ -71,8 +81,8 @@ export function ResizeHandle({ side, currentWidth, onResize, onResizeEnd }: Resi
       role="separator"
       aria-orientation="vertical"
       aria-valuenow={currentWidth}
-      aria-valuemin={MIN_WIDTH}
-      aria-valuemax={MAX_WIDTH}
+      aria-valuemin={minWidth}
+      aria-valuemax={maxWidth}
     />
   )
 }

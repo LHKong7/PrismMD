@@ -19,6 +19,15 @@ if (!parentPort) throw new Error('agentWorker must be run as a worker thread')
 
 let aborted = false
 
+/**
+ * 当前在跑的 agent，供 abort 用。
+ *
+ * 迁到 pi 之前 abort 只是把 `aborted` 置位，让消费流的 for-await 提前 break ——
+ * 底下的 LLM 请求还在跑，token 照烧。pi 的 `Agent` 有真正的 abort，所以这里
+ * 额外持一个引用，收到 abort 时把请求也掐掉。
+ */
+let activeAgent: AgentInstance | null = null
+
 function checkAbort(): boolean {
   return aborted
 }
@@ -75,16 +84,16 @@ function buildAgent(
   const builder = new AgentBuilder()
     .setProvider(providerName, config)
     .setSystemPrompt(systemPrompt)
-    .setIncludeBuiltinTools(false)
     .enableContext(true)
-    .enableMemory(false)
     .setMaxToolRounds(options?.maxToolRounds ?? 8)
 
   if (options?.toolDefs?.length) {
     builder.addTools(createProxiedTools(options.toolDefs))
   }
 
-  return builder.build()
+  const agent = builder.build()
+  activeAgent = agent
+  return agent
 }
 
 // ─── Handlers ───────────────────────────────────────────────────────────────
@@ -215,6 +224,7 @@ parentPort.on('message', (msg: { type: string; [key: string]: any }) => {
       break
     case 'abort':
       aborted = true
+      activeAgent?.abort()
       break
     case 'tool-result': {
       const pending = pendingToolCalls.get(msg.id)

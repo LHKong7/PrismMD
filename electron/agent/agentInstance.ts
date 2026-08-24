@@ -1,275 +1,103 @@
 /**
- * agentInstance.ts — Runtime agent returned by AgentBuilder.build().
+ * agentInstance.ts — PrismMD 的 agent 门面，跑在 pi-agent-core 的 `Agent` 上。
  *
- * Provides: chat(), stream(), createSession(), restoreSession().
- * All internal modules are wired through dependency injection — no globals.
+ * 这一层**只负责 PrismMD 特有的东西**，循环本身交给 pi：
+ *
+ *   guardrails 过输入 ──┐
+ *   历史按预算裁剪    ──┤
+ *   ContextBuilder 组 ──┼──→ pi Agent（工具循环 / 流式 / 并行执行 / abort）
+ *   装每轮 system      │        │
+ *   工具观察后处理    ──┘        └──→ 事件流 → StreamChunk / ChatResult
+ *
+ * 公共 API（`chat` / `stream` / `runTask` / `close` / `tools` / `telemetry` /
+ * `getMetrics`）保持不变 —— `electron/workers/agentWorker.ts` 是唯一消费者，
+ * 它和主进程之间的消息协议因此一个字节都不用动。
+ *
+ * 迁移前这里还挂着 sandbox / builtin 工具 / memory / session 存储 / MCP 客户端 /
+ * skills 六个子系统。核实后它们在 PrismMD 的运行时全部不可达（agentWorker 把对应
+ * 开关都关着，MCP 走主进程的 mcpService 代理成普通工具传进来），已随本次迁移删除。
+ * 详见 recordDocs/2026-08-09-pi-agent-migration-phase2.md。
  */
 
-import { v4 as uuidv4 } from 'uuid';
+import { Agent, type AgentTool } from '@earendil-works/pi-agent-core';
+import type { AssistantMessage, Message, Model, Api, MutableModels } from '@earendil-works/pi-ai';
 import {
-    AgentConfig,
     ToolDefinition,
-    SkillDefinition,
+    AgentConfig,
     ChatResult,
     StreamChunk,
-    AgentSession,
     AutonomousTaskConfig,
     AutonomousTaskResult,
 } from './types';
 import { AutonomousLoop } from './autonomousLoop';
-import { LLMProvider, LLMResponse, ToolCall } from './llmProtocol';
-import { SessionManager, Session } from './sessionCore';
-import { LifecycleManager, getBudget, selectHistory, assembleSystem, sanitizeUserInput, foldObservation, contextEnabled as envContextEnabled } from './contextCore';
+import { getBudget, selectHistory, foldObservation } from './contextCore';
 import { ContextBuilder } from './contextBuilder';
-import { retrieve, consolidateTurn, writeInsight, setMemoryStore, setEmbeddingProvider, MEMORY_ENABLED } from './memoryCore';
-import { createFileBackend } from './storage/fileBackend';
-import { StorageBackend } from './storage/protocols';
 import { toTokenUsage, mergeTokenUsage, estimateCost, type TokenUsage } from './pricing';
-import { Sandbox } from './sandbox';
-import { MCPManager, MCPServerConfig } from './mcpClient';
-import { ToolExecutor, ToolCallRequest } from './toolExecutor';
 import { Telemetry } from './telemetry';
 import { MetricsCollector } from './metrics';
-import { AgentHarness } from './harness';
-import { SkillRegistry } from './skillRegistry';
-import { SkillLifecycleManager } from './skillLifecycle';
 import { GuardPipeline } from './guardrails';
-import * as _toolsCore from './toolsCore';
+import { resolveModel } from './pi/models';
+import { toAgentTools } from './pi/tools';
 
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
-
-/** Convert ToolDefinition[] → OpenAI function-calling tool format */
-function toolDefsToOpenAI(tools: ToolDefinition[]): Record<string, any>[] {
-    return tools.map((t) => ({
-        type: 'function',
-        function: {
-            name: t.name,
-            description: t.description,
-            parameters: {
-                type: 'object',
-                properties: Object.fromEntries(
-                    Object.entries(t.parameters ?? {}).map(([k, v]) => [k, v]),
-                ),
-                required: t.required ?? [],
-            },
-        },
-    }));
-}
-
-/** Convert SkillDefinition[] → inline skill descriptions */
-function skillDescriptions(skills: SkillDefinition[]): string {
-    if (!skills.length) return '';
-    return (
-        '\n\n**Available skills** (use the `Skill` tool to load one):\n' +
-        skills.map((s) => `- ${s.name}: ${s.description}`).join('\n')
-    );
-}
-
-/** Build the Skill meta-tool backed by a SkillLifecycleManager */
-function buildSkillTool(manager: SkillLifecycleManager): ToolDefinition | null {
-    if (!manager.registry.list().length) return null;
-    const describeAvailable = () =>
-        manager.registry.list().map((s) => `- ${s.name}: ${s.description}`).join('\n');
+/** pi 的 Usage → 上层 `toTokenUsage` 认的 snake_case 计数。 */
+function legacyUsage(msg: AssistantMessage | null): Record<string, number> {
+    if (!msg?.usage) return {};
     return {
-        name: 'Skill',
-        description:
-            'Load / unload / inspect skills for specialised knowledge.\n' +
-            'Actions: load (default) | unload | list | search | info\n\n' +
-            'Available:\n' + describeAvailable(),
-        parameters: {
-            skill: { type: 'string', description: 'Skill name (or search query for action=search)' },
-            action: {
-                type: 'string',
-                description: 'load | unload | list | search | info (default: load)',
-                enum: ['load', 'unload', 'list', 'search', 'info'],
-            },
-        },
-        required: ['skill'],
-        execute: async (args) => {
-            const action = (args.action ?? 'load') as string;
-            const name = args.skill ?? '';
-            switch (action) {
-                case 'list': {
-                    const all = manager.registry.list();
-                    if (!all.length) return '(no skills available)';
-                    return all.map((s) => `- ${s.name}: ${s.description}`).join('\n');
-                }
-                case 'search': {
-                    const hits = manager.registry.search(name);
-                    if (!hits.length) return `No skills matching '${name}'.`;
-                    return hits.map((s) => `- ${s.name}: ${s.description}`).join('\n');
-                }
-                case 'info': {
-                    const s = manager.registry.get(name);
-                    if (!s) return `Skill '${name}' not found.`;
-                    return [
-                        `## ${s.name} (v${s.version ?? '1.0.0'})`,
-                        s.description,
-                        s.tags?.length ? `Tags: ${s.tags.join(', ')}` : '',
-                        s.categories?.length ? `Categories: ${s.categories.join(', ')}` : '',
-                        s.dependencies?.length ? `Dependencies: ${s.dependencies.join(', ')}` : '',
-                    ].filter(Boolean).join('\n');
-                }
-                case 'unload': {
-                    await manager.unloadSkill(name);
-                    return `Unloaded skill '${name}'.`;
-                }
-                case 'load':
-                default: {
-                    if (manager.isLoaded(name)) {
-                        return `(Skill '${name}' already loaded. Use the knowledge in context.)`;
-                    }
-                    const r = await manager.loadSkill(name);
-                    if (!r.success) {
-                        return `Failed to load '${name}': ${r.error ?? 'unknown error'}. Available: ${manager.registry.list().map((s) => s.name).join(', ')}`;
-                    }
-                    const extras = r.loadedDependencies.length
-                        ? ` (also loaded dependencies: ${r.loadedDependencies.join(', ')})`
-                        : '';
-                    return `Loaded skill '${name}'${extras}. Knowledge is now active in context — do NOT call Skill again for this skill.`;
-                }
-            }
-        },
+        input_tokens: msg.usage.input ?? 0,
+        output_tokens: msg.usage.output ?? 0,
+        total_tokens: msg.usage.totalTokens ?? 0,
     };
 }
 
-// Built-in tools (only included when includeBuiltinTools is true)
-function getBuiltinToolDefs(): ToolDefinition[] {
-    const {
-        runBash,
-        runRead,
-        runGrep,
-        runWrite,
-        runEdit,
-        runTodo,
-        runSearchKnowledgeBase,
-        runReadEmail,
-        runWebSearch,
-        runWebFetch,
-    } = _toolsCore;
-
-    return [
-        {
-            name: 'bash',
-            description: 'Run a shell command.',
-            parameters: { command: { type: 'string' } },
-            required: ['command'],
-            execute: (args) => runBash(args.command),
-        },
-        {
-            name: 'read_file',
-            description: 'Read file with pagination (offset/limit).',
-            parameters: {
-                path: { type: 'string' },
-                offset: { type: 'integer', description: '0-based start line' },
-                limit: { type: 'integer', description: 'Max lines' },
-            },
-            required: ['path'],
-            execute: (args) => runRead(args.path, args.offset ?? 0, args.limit),
-        },
-        {
-            name: 'grep',
-            description: 'Search for pattern in file.',
-            parameters: {
-                path: { type: 'string' },
-                pattern: { type: 'string' },
-                context_before: { type: 'integer' },
-                context_after: { type: 'integer' },
-            },
-            required: ['path', 'pattern'],
-            execute: (args) =>
-                runGrep(args.path, args.pattern, args.context_before ?? 0, args.context_after ?? 0),
-        },
-        {
-            name: 'write_file',
-            description: 'Write content to file (creates backup).',
-            parameters: {
-                path: { type: 'string' },
-                content: { type: 'string' },
-            },
-            required: ['path', 'content'],
-            requiresApproval: true,
-            execute: (args) => runWrite(args.path, args.content),
-        },
-        {
-            name: 'edit_file',
-            description: 'Replace text in file.',
-            parameters: {
-                path: { type: 'string' },
-                old_text: { type: 'string' },
-                new_text: { type: 'string' },
-            },
-            required: ['path', 'old_text', 'new_text'],
-            requiresApproval: true,
-            execute: (args) => runEdit(args.path, args.old_text, args.new_text),
-        },
-        {
-            name: 'TodoWrite',
-            description: 'Update task list.',
-            parameters: {
-                items: {
-                    type: 'array',
-                    description: 'Array of {content, status, activeForm}',
+/**
+ * 渲染层传来的 `{role, content}[]` → pi 的 `Message[]`。
+ *
+ * user 消息**必须**用 `[{type:'text'}]` 块数组，而不是裸字符串 —— pi 的
+ * `Agent.normalizePromptInput()` 就是这么包当前提问的（`agent.js:263`）。
+ * 两种形状在 wire 上不同：同一句话第一轮作为提问发出去、第二轮作为历史再发，
+ * 字节不一致就会**打断 provider 的 prompt 缓存前缀**，而且不报任何错，
+ * 只有账单和首 token 延迟会变差。`promptCache.test.ts` 钉住了这一点。
+ */
+function historyToPiMessages(history: Record<string, any>[]): Message[] {
+    const out: Message[] = [];
+    for (const m of history) {
+        const content = typeof m.content === 'string' ? m.content : String(m.content ?? '');
+        if (!content) continue;
+        // 只有 user / assistant 两种 —— aiService 传上来的历史已经滤掉 system，
+        // 也不含 tool_calls（见 aiService.ts:148）。
+        if (m.role === 'assistant') {
+            out.push({
+                role: 'assistant',
+                content: [{ type: 'text', text: content }],
+                api: 'openai-completions',
+                provider: 'history',
+                model: '',
+                usage: {
+                    input: 0, output: 0, cacheRead: 0, cacheWrite: 0,
+                    totalTokens: 0,
+                    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
                 },
-            },
-            required: ['items'],
-            execute: (args) => runTodo(args.items),
-        },
-        {
-            name: 'WebSearch',
-            description:
-                'Search the web for current information. Returns formatted search results with titles, URLs, and snippets.',
-            parameters: {
-                query: { type: 'string', description: 'The search query' },
-                allowed_domains: {
-                    type: 'array',
-                    description: 'Only include results from these domains',
-                },
-                blocked_domains: {
-                    type: 'array',
-                    description: 'Exclude results from these domains',
-                },
-            },
-            required: ['query'],
-            permissionLevel: 'dangerous',
-            execute: async (args) =>
-                runWebSearch(args.query ?? '', args.allowed_domains, args.blocked_domains),
-        },
-        {
-            name: 'WebFetch',
-            description:
-                'Fetch content from a URL and return as plain text. HTML is stripped to text automatically.',
-            parameters: {
-                url: { type: 'string', description: 'The URL to fetch' },
-                prompt: {
-                    type: 'string',
-                    description: 'Instructions for processing the fetched content',
-                },
-            },
-            required: ['url', 'prompt'],
-            permissionLevel: 'dangerous',
-            execute: async (args) => runWebFetch(args.url ?? '', args.prompt ?? ''),
-        },
-    ];
+                stopReason: 'stop',
+                timestamp: Date.now(),
+            });
+        } else {
+            out.push({
+                role: 'user',
+                content: [{ type: 'text', text: content }],
+                timestamp: Date.now(),
+            });
+        }
+    }
+    return out;
 }
 
-interface ToolCallMsg {
-    id: string;
-    type: string;
-    function: { name: string; arguments: string };
-}
-
-function toolCallsToMsgShape(toolCalls: ToolCall[]): ToolCallMsg[] {
-    return toolCalls.map((tc) => ({
-        id: tc.id,
-        type: 'function',
-        function: {
-            name: tc.name,
-            arguments: tc.arguments ? JSON.stringify(tc.arguments) : '{}',
-        },
-    }));
+/** 从 pi 的 assistant 消息里取纯文本。 */
+function assistantText(msg: AssistantMessage | null): string {
+    if (!msg) return '';
+    return msg.content
+        .filter((b): b is { type: 'text'; text: string } => b.type === 'text')
+        .map((b) => b.text)
+        .join('');
 }
 
 // ---------------------------------------------------------------------------
@@ -277,305 +105,104 @@ function toolCallsToMsgShape(toolCalls: ToolCall[]): ToolCallMsg[] {
 // ---------------------------------------------------------------------------
 
 export class AgentInstance {
-    private _llm: LLMProvider;
+    private _models: MutableModels;
+    private _model: Model<Api>;
     private _systemPrompt: string;
     private _tools: ToolDefinition[];
-    private _skills: SkillDefinition[];
-    private _openaiTools: Record<string, any>[];
-    private _toolMap: Map<string, ToolDefinition>;
-    private _sessionMgr: SessionManager;
     private _maxToolRounds: number;
     private _maxTokens: number;
-    private _mcpToolNames: Set<string> = new Set();
-    private _memoryEnabled: boolean;
-    private _streamingEnabled: boolean;
     private _contextEnabled: boolean;
-    private _approvalCallback?: (
-        name: string,
-        args: Record<string, any>,
-    ) => Promise<boolean> | boolean;
+    private _guards: GuardPipeline;
+    private _telemetry: Telemetry;
+    private _metrics: MetricsCollector;
     private _humanInputCallback?: (question: string) => Promise<string> | string;
-    private _harness!: AgentHarness;
-    private _skillRegistry!: SkillRegistry;
-    private _skillManager!: SkillLifecycleManager;
-    private _guards!: GuardPipeline;
 
-    // Convenience accessors that delegate to the harness. Kept private so
-    // callers either go through the public API or grab the harness directly.
-    private get _sandbox(): Sandbox { return this._harness.sandbox; }
-    private get _telemetry(): Telemetry { return this._harness.telemetry; }
-    private get _metrics(): MetricsCollector { return this._harness.metrics; }
-    private get _toolExecutor(): ToolExecutor { return this._harness.toolExecutor; }
-    private get _mcpManager(): MCPManager | null { return this._harness.mcpManager; }
-    private _storageInitialized: boolean = false;
-    private _storageInitPromise: Promise<void> | null = null;
-    private _storageConfig?: AgentConfig['storage'];
+    /** 当前在跑的 pi Agent，供 abort 用。 */
+    private _active: Agent | null = null;
 
     constructor(config: AgentConfig) {
-        this._llm = config.llm!;
+        const llm = config.llmConfig;
+        if (!llm) throw new Error('AgentInstance: llmConfig is required.');
+        const resolved = resolveModel({
+            provider: llm.provider ?? 'openai',
+            model: llm.model ?? '',
+            apiKey: llm.apiKey,
+            baseUrl: llm.baseUrl,
+        });
+        this._models = resolved.models;
+        this._model = resolved.model;
+
         this._maxToolRounds = config.maxToolRounds ?? 20;
         this._maxTokens = config.maxTokens ?? 8000;
-        this._memoryEnabled = config.enableMemory ?? false;
-        this._guards = config.guards ?? GuardPipeline.defaults();
-        this._streamingEnabled = config.enableStreaming ?? false;
         this._contextEnabled = config.enableContext ?? true;
-        this._approvalCallback = config.approvalCallback;
+        this._guards = config.guards ?? GuardPipeline.defaults();
+        this._telemetry = config.telemetry ?? new Telemetry();
+        this._metrics = new MetricsCollector();
         this._humanInputCallback = config.humanInputCallback;
 
-        // Assemble tools
-        this._tools = [];
-        if (config.includeBuiltinTools !== false) {
-            this._tools.push(...getBuiltinToolDefs());
-        }
-        if (config.tools?.length) {
-            this._tools.push(...config.tools);
-        }
+        this._tools = [...(config.tools ?? []), this._buildAskUserTool()];
 
-        // Skills — registry + lifecycle manager
-        this._skills = config.skills ?? [];
-        this._skillRegistry = new SkillRegistry(this._skills);
-
-        // Human-in-the-loop tool
-        this._tools.push(this._buildAskUserTool());
-
-        // Build the harness (composition root for sandbox / executor / telemetry / metrics / mcp).
-        this._harness = new AgentHarness({
-            llm: this._llm,
-            tools: this._tools,
-            sandbox: config.sandbox,
-            telemetry: config.telemetry,
-            mcpServers: config.mcpServers ?? [],
-        });
-
-        // Lifecycle manager needs telemetry from the harness; build it after.
-        this._skillManager = new SkillLifecycleManager({
-            registry: this._skillRegistry,
-            telemetry: this._harness.telemetry,
-        });
-
-        // The Skill meta-tool is now backed by the lifecycle manager.
-        const skillTool = buildSkillTool(this._skillManager);
-        if (skillTool) {
-            this._tools.push(skillTool);
-            this._harness.toolRegistry.register(skillTool);
-        }
-
-        // Tool lookup and OpenAI format (mirror the harness registry for the LLM payload).
-        this._toolMap = this._harness.toolRegistry.asMap();
-        this._openaiTools = toolDefsToOpenAI(this._tools);
-
-        // System prompt
         this._systemPrompt =
             config.systemPrompt ??
             'You are a helpful assistant. Use the provided tools when needed.';
-        if (this._skills.length) {
-            this._systemPrompt += skillDescriptions(this._skills);
-        }
-
-        // Storage & session manager (cloud backend init is deferred since it's async)
-        this._storageConfig = config.storage;
-        let storage: StorageBackend | undefined;
-        if (config.storage) {
-            if (config.storage.custom) {
-                storage = config.storage.custom;
-            } else if (config.storage.backend === 'file') {
-                storage = createFileBackend({ sessionDir: config.storage.dir });
-            }
-            // cloud backend is initialized lazily via initStorage()
-        }
-        this._sessionMgr = new SessionManager({
-            store: storage?.sessionStore ?? undefined,
-        });
-        if (storage?.memoryStore && this._memoryEnabled) {
-            setMemoryStore(storage.memoryStore);
-        }
-        if (config.embeddingProvider && this._memoryEnabled) {
-            setEmbeddingProvider(config.embeddingProvider);
-        }
-        this._storageInitialized = config.storage?.backend !== 'cloud';
-    }
-
-    /**
-     * Initialize cloud storage backend. Called lazily on first chat/stream,
-     * or can be called explicitly for eager initialization.
-     */
-    async initStorage(): Promise<void> {
-        if (this._storageInitialized) return;
-        if (this._storageInitPromise) return this._storageInitPromise;
-
-        this._storageInitPromise = (async () => {
-            // Cloud storage removed — PrismMD uses local file storage only.
-            this._storageInitialized = true;
-        })();
-
-        return this._storageInitPromise;
-    }
-
-    /**
-     * Initialize MCP server connections. Called lazily on first chat/stream,
-     * or can be called explicitly for eager initialization.
-     *
-     * The harness owns the MCPManager; we still need to merge the discovered
-     * MCP tool descriptors into the LLM-facing `_openaiTools` payload here,
-     * since that's the surface the agent loop hands to the provider.
-     */
-    async initMCP(): Promise<void> {
-        if (!this._harness.mcpConfigs.length) return;
-        await this._harness.initMCP();
-        const mgr = this._harness.mcpManager;
-        if (!mgr) return;
-
-        // Drop any previously-registered MCP tools so reconnects don't duplicate.
-        if (this._mcpToolNames.size) {
-            this._openaiTools = this._openaiTools.filter(
-                (t) => !this._mcpToolNames.has(t?.function?.name),
-            );
-            this._mcpToolNames.clear();
-        }
-        for (const mcpTool of mgr.getToolDefinitions()) {
-            this._openaiTools.push({
-                type: 'function',
-                function: {
-                    name: mcpTool.name,
-                    description: mcpTool.description,
-                    parameters: mcpTool.input_schema,
-                },
-            });
-            this._mcpToolNames.add(mcpTool.name);
-        }
     }
 
     // ---- Public API ----
 
-    /** Send a single message (no session, stateless). */
+    /** 单轮对话（无会话，历史由调用方传入）。 */
     async chat(message: string, history?: Record<string, any>[]): Promise<ChatResult> {
-        const hist = history ? [...history] : [];
-        const result = await this._runLoop(message, hist);
+        let result!: ChatResult;
+        // 复用流式实现：非流式只是丢掉中间块。两条路径共用一份循环逻辑，
+        // 避免它们各自漂移（迁移前是两份近乎重复的 ~90 行）。
+        for await (const _ of this._run(message, history ?? [], (r) => { result = r; })) {
+            /* drain */
+        }
         return result;
     }
 
-    /** Stream a single message (no session, stateless). */
+    /** 流式单轮对话。 */
     async *stream(
         message: string,
         history?: Record<string, any>[],
     ): AsyncGenerator<StreamChunk> {
-        const hist = history ? [...history] : [];
-        yield* this._runLoopStream(message, hist);
+        yield* this._run(message, history ?? []);
     }
 
-    /** Create a new session (persisted, maintains conversation history). */
-    async createSession(): Promise<AgentSession> {
-        const session = await this._sessionMgr.createSession({ context: {} });
-        return this._wrapSession(session);
-    }
-
-    /** Restore a previously saved session by ID. */
-    async restoreSession(sessionId: string): Promise<AgentSession | null> {
-        const session = await this._sessionMgr.restoreSession(sessionId);
-        if (!session) return null;
-        return this._wrapSession(session);
-    }
-
-    /** List saved session IDs. */
-    async listSessions(): Promise<string[]> {
-        return this._sessionMgr.listSessionIds();
-    }
-
-    /** List saved session summaries. */
-    async listSessionSummaries(limit?: number): Promise<Record<string, any>[]> {
-        return this._sessionMgr.listSessionsSummary(limit);
-    }
-
-    /** Get the underlying LLM provider. */
-    get llm(): LLMProvider {
-        return this._llm;
-    }
-
-    /** Get the list of registered tools. */
+    /** 已注册的工具（含 ask_user）。 */
     get tools(): ToolDefinition[] {
         return [...this._tools];
     }
 
-    /** Get the telemetry instance (no-op by default). */
     get telemetry(): Telemetry {
         return this._telemetry;
     }
 
-    /** Snapshot of agent metrics: turns, tool calls, errors, tokens, cost. */
+    /** 轮次 / 工具调用 / 错误 / token / 成本 的快照。 */
     getMetrics() {
         return this._metrics.getMetrics();
     }
 
-    /** SkillRegistry containing every registered skill (read-mostly). */
-    get skillRegistry(): SkillRegistry { return this._skillRegistry; }
-
-    /** Lifecycle manager for the active skill set (load / unload / triggers). */
-    get skillManager(): SkillLifecycleManager { return this._skillManager; }
-
-    /**
-     * Run an autonomous task loop.
-     *
-     * The agent iterates through plan → execute → review → evaluate phases
-     * until self-evaluation meets the quality threshold or max iterations.
-     */
+    /** 自主任务循环（Horse Mode）。 */
     async runTask(config: AutonomousTaskConfig): Promise<AutonomousTaskResult> {
         const loop = new AutonomousLoop(this);
         return loop.run(config);
     }
 
+    /** 中断当前这一轮。worker 的 `abort` 消息走这里。 */
+    abort(): void {
+        this._active?.abort();
+    }
+
     /**
-     * Gracefully shut down MCP server connections.
-     * Call this when the agent is no longer needed to release resources.
+     * 释放资源。迁移后已无 MCP 连接和沙箱进程要收，保留方法是因为
+     * `agentWorker` 的 `safeClose(agent)` 每条路径都会调它。
      */
     async close(): Promise<void> {
-        await this._harness.close();
+        this._active?.abort();
+        this._active = null;
     }
 
-    /**
-     * The underlying composition root. Exposed for advanced use (custom
-     * tool execution, observability, sharing telemetry across agents).
-     */
-    get harness(): AgentHarness {
-        return this._harness;
-    }
-
-    // ---- Session wrapper ----
-
-    private _wrapSession(session: Session): AgentSession {
-        const self = this;
-        return {
-            get id(): string {
-                return session.id;
-            },
-            async chat(message: string): Promise<ChatResult> {
-                const result = await self._runLoop(message, session.history);
-                session.history = result.history;
-                session.updatedAt = Date.now() / 1000;
-                try {
-                    await self._sessionMgr.saveSession(session);
-                } catch (e: any) {
-                    console.error('[AgentInstance] Failed to save session:', e.message ?? e);
-                }
-                return { ...result, sessionId: session.id };
-            },
-            async *stream(message: string): AsyncGenerator<StreamChunk> {
-                const chunks: string[] = [];
-                yield* self._runLoopStream(message, session.history, async (fullResult) => {
-                    session.history = fullResult.history;
-                    session.updatedAt = Date.now() / 1000;
-                    await self._sessionMgr.saveSession(session);
-                });
-            },
-            getHistory(): Record<string, any>[] {
-                return [...session.history];
-            },
-            async save(): Promise<void> {
-                await self._sessionMgr.saveSession(session);
-            },
-        };
-    }
-
-    // ---- Human-in-the-loop ----
+    // ---- Internals ----
 
     private _buildAskUserTool(): ToolDefinition {
         const self = this;
@@ -587,10 +214,7 @@ export class AgentInstance {
                 'confirmation on an important decision, or when the task is ambiguous. ' +
                 'Do NOT use this for trivial questions you can resolve yourself.',
             parameters: {
-                question: {
-                    type: 'string',
-                    description: 'The question to ask the user',
-                },
+                question: { type: 'string', description: 'The question to ask the user' },
             },
             required: ['question'],
             execute: async (args) => {
@@ -608,79 +232,21 @@ export class AgentInstance {
         };
     }
 
-    // ---- Internal agent loop ----
-
-    /**
-     * Execute a batch of tool calls using the parallel-aware ToolExecutor.
-     * Returns observations in the **original order** of `tcs`, ready to be
-     * folded back into the conversation history.
-     */
-    private async _executeToolBatch(
-        tcs: ToolCallMsg[],
-    ): Promise<{ tool_call_id: string; content: string }[]> {
-        const requests: ToolCallRequest[] = [];
-        const failures: { tool_call_id: string; content: string }[] = [];
-        const indexById = new Map<string, number>();
-
-        // Parse arguments up-front so parse failures don't make it to the executor.
-        for (const tc of tcs) {
-            let args: Record<string, any>;
-            try {
-                args = JSON.parse(tc.function.arguments || '{}');
-            } catch {
-                failures.push({
-                    tool_call_id: tc.id,
-                    content: `[ARG_PARSE_ERROR] Could not parse arguments for tool "${tc.function.name}". Raw: ${(tc.function.arguments || '').slice(0, 200)}`,
-                });
-                continue;
-            }
-            indexById.set(tc.id, requests.length);
-            requests.push({ id: tc.id, name: tc.function.name, arguments: args });
-        }
-
-        const results = requests.length
-            ? await this._toolExecutor.executeAll(requests, {
-                  approvalCallback: this._approvalCallback,
-                  mcpRouter: this._mcpManager,
-              })
-            : [];
-
-        // Reassemble in input order.
-        const out: { tool_call_id: string; content: string }[] = [];
-        for (const tc of tcs) {
-            const failure = failures.find((f) => f.tool_call_id === tc.id);
-            if (failure) {
-                out.push(failure);
-                continue;
-            }
-            const idx = indexById.get(tc.id);
-            const r = idx !== undefined ? results[idx] : undefined;
-            out.push({
-                tool_call_id: tc.id,
-                content: r ? r.output : `[Tool error] ${tc.function.name}: missing result`,
-            });
-        }
-        return out;
-    }
-
+    /** 每轮的 system prompt：ContextBuilder 按预算和优先级组装。 */
     private async _buildSystemForTurn(userInput: string): Promise<string> {
         if (!this._contextEnabled) return this._systemPrompt;
 
         const budget = getBudget();
-        // Reserve the per-turn system budget separately so RAG and project
-        // knowledge live within their own slice of the input window.
+        // 给 RAG 和项目知识单独切一块输入窗口，不和历史抢。
         const systemBudget = budget.system + Math.floor(budget.rag);
 
-        const builder = new ContextBuilder({
-            baseSystemPrompt: this._systemPrompt,
-            includeProjectKnowledge: true,
-            includeMemory: this._memoryEnabled,
-            activeSkills: this._skillManager.getActiveSkillBodies(),
-            telemetry: this._telemetry,
-        });
-
         try {
-            const result = await builder.build(userInput, systemBudget);
+            const result = await new ContextBuilder({
+                baseSystemPrompt: this._systemPrompt,
+                includeProjectKnowledge: true,
+                includeMemory: false,
+                telemetry: this._telemetry,
+            }).build(userInput, systemBudget);
             this._telemetry.debug('context', 'system assembled', {
                 tokensUsed: result.tokensUsed,
                 included: result.included,
@@ -689,387 +255,175 @@ export class AgentInstance {
             });
             return result.text || this._systemPrompt;
         } catch (e: any) {
-            this._telemetry.warn('context', 'context assembly failed; falling back to base system prompt', { error: e?.message ?? String(e) });
+            this._telemetry.warn('context', 'context assembly failed; falling back to base system prompt', {
+                error: e?.message ?? String(e),
+            });
             return this._systemPrompt;
         }
     }
 
-    private async _runLoop(
-        userInput: string,
-        history: Record<string, any>[],
-    ): Promise<ChatResult> {
-        return this._telemetry.withSpan('agent.turn', async (turnSpan) => {
-            const turnStart = Date.now();
-            const result = await this._runLoopInner(userInput, history, turnSpan);
-            this._metrics.recordTurn({
-                turnNumber: this._metrics.getMetrics().turnCount + 1,
-                hadToolCalls: result.hadToolCalls,
-                toolCallCount: 0,
-                inputTokens: result.usage?.inputTokens ?? 0,
-                outputTokens: result.usage?.outputTokens ?? 0,
-                durationMs: Date.now() - turnStart,
-                estimatedCost: result.estimatedCost,
-                timestamp: Date.now(),
+    /** 工具观察的后处理：guardrails 标注 + 超长折叠。 */
+    private _transformObservation = async (raw: string): Promise<string> => {
+        const guarded = await this._guards.runObservation(raw);
+        if (guarded.annotations.length) {
+            this._telemetry.debug('guardrails', 'observation annotated', {
+                annotations: guarded.annotations,
             });
-            turnSpan.setAttributes({
-                'agent.turn.input_tokens': result.usage?.inputTokens ?? 0,
-                'agent.turn.output_tokens': result.usage?.outputTokens ?? 0,
-                'agent.turn.had_tool_calls': result.hadToolCalls,
-            });
-            return result;
-        });
-    }
-
-    private async _runLoopInner(
-        userInput: string,
-        history: Record<string, any>[],
-        _turnSpan: import('./telemetry').Span,
-    ): Promise<ChatResult> {
-        await this.initStorage();
-        await this.initMCP();
-        const sanitized = await this._guards.runInput(userInput);
-        if (sanitized.annotations.length) {
-            this._telemetry.debug('guardrails', 'input annotated', { annotations: sanitized.annotations });
         }
-        const message = sanitized.value;
-        // Auto-load any skills whose triggers fire on this message; the
-        // freshly-loaded bodies will appear in the system prompt below.
-        await this._skillManager.autoLoadFromTriggers(message);
-        const system = await this._buildSystemForTurn(message);
+        return this._contextEnabled ? foldObservation(guarded.value) : guarded.value;
+    };
 
-        // Trim history if context management enabled
-        let workingHistory = [...history];
-        if (this._contextEnabled) {
-            const budget = getBudget();
-            const selected = selectHistory(workingHistory, message, budget.history);
-            // #16: guarantee at least last 2 messages if history exists
-            workingHistory = selected.length > 0 ? selected
-                : workingHistory.length >= 2 ? workingHistory.slice(-2)
-                : [...workingHistory];
-        }
-        workingHistory.push({ role: 'user', content: message });
-
-        const apiMessages: Record<string, any>[] = [
-            { role: 'system', content: system },
-            ...workingHistory,
-        ];
-
-        let toolRounds = 0;
-        let hadToolCalls = false;
-        let accumulatedUsage: TokenUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
-
-        while (true) {
-            // #1: LLM call with retry
-            let response: LLMResponse;
-            try {
-                response = await this._llmCallWithRetry(apiMessages, false) as LLMResponse;
-            } catch (e: any) {
-                const errMsg = `I encountered an error communicating with the AI model: ${e.message ?? String(e)}. Please try again.`;
-                workingHistory.push({ role: 'assistant', content: errMsg });
-                return { reply: errMsg, history: workingHistory, hadToolCalls, usage: accumulatedUsage };
-            }
-
-            // Accumulate token usage
-            if (response.usage && Object.keys(response.usage).length > 0) {
-                accumulatedUsage = mergeTokenUsage(accumulatedUsage, toTokenUsage(response.usage));
-            }
-
-            const tcs = response.toolCalls?.length
-                ? toolCallsToMsgShape(response.toolCalls)
-                : [];
-            const content = response.content ?? '';
-            const thinking = response.thinking ?? null;
-
-            if (!tcs.length) {
-                const assistantMsg: Record<string, any> = { role: 'assistant', content: content.trim() };
-                if (thinking) assistantMsg.thinking = thinking;
-                workingHistory.push(assistantMsg);
-                // #8: memory consolidation failure handling
-                if (this._memoryEnabled) {
-                    const cspan = this._telemetry.startSpan('memory.consolidate');
-                    try { await consolidateTurn(message, content.trim()); }
-                    catch (e: any) {
-                        cspan.setStatus('error', e?.message ?? String(e));
-                        console.error('[AgentInstance] consolidateTurn failed:', e.message ?? e);
-                    }
-                    finally { cspan.end(); }
-                }
-                const model = response.model ?? '';
-                return {
-                    reply: content.trim(),
-                    history: workingHistory,
-                    hadToolCalls,
-                    usage: accumulatedUsage,
-                    estimatedCost: estimateCost(accumulatedUsage, model),
-                };
-            }
-
-            hadToolCalls = true;
-            toolRounds++;
-            if (toolRounds >= this._maxToolRounds) {
-                const msg =
-                    'Stopped: reached tool-use safety limit. Please simplify your request.';
-                workingHistory.push({ role: 'assistant', content: msg });
-                return { reply: msg, history: workingHistory, hadToolCalls, usage: accumulatedUsage };
-            }
-
-            // Execute tools (parallel-safe ones in parallel via ToolExecutor)
-            const results = await this._executeToolBatch(tcs);
-            for (const r of results) {
-                const guarded = await this._guards.runObservation(r.content);
-                if (guarded.annotations.length) {
-                    this._telemetry.debug('guardrails', 'observation annotated', { annotations: guarded.annotations });
-                }
-                r.content = this._contextEnabled ? foldObservation(guarded.value) : guarded.value;
-            }
-
-            // Append to conversation (preserve thinking if present)
-            const assistantToolMsg: Record<string, any> = {
-                role: 'assistant',
-                content: content || '',
-                tool_calls: tcs,
-            };
-            if (thinking) assistantToolMsg.thinking = thinking;
-            apiMessages.push(assistantToolMsg);
-            workingHistory.push({ ...assistantToolMsg });
-            for (const r of results) {
-                apiMessages.push({
-                    role: 'tool',
-                    tool_call_id: r.tool_call_id,
-                    content: r.content,
-                });
-                workingHistory.push({
-                    role: 'tool',
-                    tool_call_id: r.tool_call_id,
-                    content: r.content,
-                });
-            }
-        }
-    }
-
-    private async *_runLoopStream(
+    /**
+     * 唯一的循环实现。`chat` 和 `stream` 都走这里 —— 前者丢掉中间块。
+     *
+     * `onComplete` 在收尾时拿到完整 ChatResult（`chat()` 用它取返回值，
+     * 流式调用方则从末块的 `reply` / `usage` 拿）。
+     */
+    private async *_run(
         userInput: string,
         history: Record<string, any>[],
         onComplete?: (result: ChatResult) => void,
     ): AsyncGenerator<StreamChunk> {
-        await this.initStorage();
-        await this.initMCP();
+        const turnStart = Date.now();
+        const span = this._telemetry.startSpan('agent.turn');
+
         const sanitized = await this._guards.runInput(userInput);
         if (sanitized.annotations.length) {
-            this._telemetry.debug('guardrails', 'input annotated', { annotations: sanitized.annotations });
+            this._telemetry.debug('guardrails', 'input annotated', {
+                annotations: sanitized.annotations,
+            });
         }
         const message = sanitized.value;
-        await this._skillManager.autoLoadFromTriggers(message);
         const system = await this._buildSystemForTurn(message);
 
+        // 历史按预算裁剪；预算算不出结果时至少保住最后两条，避免上下文断裂。
         let workingHistory = [...history];
         if (this._contextEnabled) {
-            const budget = getBudget();
-            const selected = selectHistory(workingHistory, message, budget.history);
-            workingHistory = selected.length > 0 ? selected
-                : workingHistory.length >= 2 ? workingHistory.slice(-2)
-                : [...workingHistory];
+            const selected = selectHistory(workingHistory, message, getBudget().history);
+            workingHistory =
+                selected.length > 0
+                    ? selected
+                    : workingHistory.length >= 2
+                      ? workingHistory.slice(-2)
+                      : [...workingHistory];
         }
-        workingHistory.push({ role: 'user', content: message });
 
-        const apiMessages: Record<string, any>[] = [
-            { role: 'system', content: system },
-            ...workingHistory,
-        ];
+        const agentTools: AgentTool<any>[] = toAgentTools(this._tools, this._transformObservation);
 
-        let toolRounds = 0;
-        let hadToolCalls = false;
-        let accumulatedUsage: TokenUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
-        let lastModel = '';
-
-        while (true) {
-            let streamGen: AsyncGenerator<LLMResponse>;
-            try {
-                streamGen = await this._llmCallWithRetry(apiMessages, true) as AsyncGenerator<LLMResponse>;
-            } catch (e: any) {
-                const errMsg = `I encountered an error communicating with the AI model: ${e.message ?? String(e)}. Please try again.`;
-                workingHistory.push({ role: 'assistant', content: errMsg });
-                const errResult: ChatResult = { reply: errMsg, history: workingHistory, hadToolCalls, usage: accumulatedUsage };
-                if (onComplete) onComplete(errResult);
-                yield { reply: errMsg, done: true, usage: accumulatedUsage };
-                return;
-            }
-
-            let lastResponse: LLMResponse | null = null;
-            let prevContentLen = 0;
-            try {
-                // eslint-disable-next-line no-inner-declarations
-                for await (const r of streamGen) {
-                    // Forward incremental text deltas regardless of whether the
-                    // round will end in tool_use. Anthropic interleaves text
-                    // *then* tool_use; the final yield carries `toolCalls` plus
-                    // the cumulative content — suppressing on toolCalls drops
-                    // any preceding text from the user-facing stream.
-                    if (r.content) {
-                        const cur = r.content;
-                        let delta: string;
-                        if (cur.length > prevContentLen && cur.startsWith(cur.slice(0, prevContentLen))) {
-                            // Cumulative content (final yield from some providers).
-                            delta = cur.slice(prevContentLen);
-                            prevContentLen = cur.length;
-                        } else {
-                            // Incremental delta (per-chunk yields).
-                            delta = cur;
-                            prevContentLen += cur.length;
-                        }
-                        if (delta) yield { delta, done: false };
-                    }
-                    lastResponse = r;
-                }
-            } catch (e: any) {
-                const errMsg = `Stream interrupted: ${e.message ?? String(e)}`;
-                workingHistory.push({ role: 'assistant', content: errMsg });
-                const errResult: ChatResult = { reply: errMsg, history: workingHistory, hadToolCalls, usage: accumulatedUsage };
-                if (onComplete) onComplete(errResult);
-                yield { reply: errMsg, done: true, usage: accumulatedUsage };
-                return;
-            }
-
-            // Accumulate usage from final chunk.
-            if (lastResponse?.usage && Object.keys(lastResponse.usage).length > 0) {
-                accumulatedUsage = mergeTokenUsage(accumulatedUsage, toTokenUsage(lastResponse.usage));
-            }
-            if (lastResponse?.model) lastModel = lastResponse.model;
-
-            const content = lastResponse?.content ?? '';
-            const thinking = lastResponse?.thinking ?? null;
-            const tcs = lastResponse?.toolCalls?.length
-                ? toolCallsToMsgShape(lastResponse.toolCalls)
-                : [];
-
-            if (!tcs.length) {
-                const assistantMsg: Record<string, any> = { role: 'assistant', content: content.trim() };
-                if (thinking) assistantMsg.thinking = thinking;
-                workingHistory.push(assistantMsg);
-                if (this._memoryEnabled) {
-                    const cspan = this._telemetry.startSpan('memory.consolidate');
-                    try { await consolidateTurn(message, content.trim()); }
-                    catch (e: any) {
-                        cspan.setStatus('error', e?.message ?? String(e));
-                        console.error('[AgentInstance] consolidateTurn failed:', e.message ?? e);
-                    }
-                    finally { cspan.end(); }
-                }
-                const estimatedCost = estimateCost(accumulatedUsage, lastModel);
-                const result: ChatResult = {
-                    reply: content.trim(),
-                    history: workingHistory,
-                    hadToolCalls,
-                    usage: accumulatedUsage,
-                    estimatedCost,
-                };
-                if (onComplete) onComplete(result);
-                yield { reply: content.trim(), done: true, usage: accumulatedUsage, estimatedCost };
-                return;
-            }
-
-            hadToolCalls = true;
-            toolRounds++;
-            if (toolRounds >= this._maxToolRounds) {
-                const msg = 'Stopped: reached tool-use safety limit.';
-                workingHistory.push({ role: 'assistant', content: msg });
-                const result: ChatResult = { reply: msg, history: workingHistory, hadToolCalls, usage: accumulatedUsage };
-                if (onComplete) onComplete(result);
-                yield { reply: msg, done: true, usage: accumulatedUsage };
-                return;
-            }
-            // (Next round resets its own prevContentLen via the let above.)
-
-            // Execute tools (non-streaming phase, parallel-safe ones in parallel)
-            const results = await this._executeToolBatch(tcs);
-            for (const r of results) {
-                const guarded = await this._guards.runObservation(r.content);
-                if (guarded.annotations.length) {
-                    this._telemetry.debug('guardrails', 'observation annotated', { annotations: guarded.annotations });
-                }
-                r.content = this._contextEnabled ? foldObservation(guarded.value) : guarded.value;
-            }
-
-            const assistantToolMsg: Record<string, any> = {
-                role: 'assistant',
-                content: content || '',
-                tool_calls: tcs,
-            };
-            if (thinking) assistantToolMsg.thinking = thinking;
-            apiMessages.push(assistantToolMsg);
-            workingHistory.push({ ...assistantToolMsg });
-            for (const r of results) {
-                apiMessages.push({
-                    role: 'tool',
-                    tool_call_id: r.tool_call_id,
-                    content: r.content,
-                });
-                workingHistory.push({
-                    role: 'tool',
-                    tool_call_id: r.tool_call_id,
-                    content: r.content,
-                });
-            }
-        }
-    }
-
-    // #1: LLM call with exponential backoff retry
-    private async _llmCallWithRetry(
-        apiMessages: Record<string, any>[],
-        stream: boolean,
-        maxRetries: number = 3,
-    ): Promise<LLMResponse | AsyncGenerator<LLMResponse>> {
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            const span = this._telemetry.startSpan('llm.chat', {
-                attributes: {
-                    'gen_ai.operation.name': 'chat',
-                    'llm.attempt': attempt,
-                    'llm.stream': stream,
-                    'llm.message_count': apiMessages.length,
-                },
-            });
-            const startedAt = Date.now();
-            try {
-                const result = this._llm.chat(apiMessages, {
-                    tools: this._openaiTools,
+        let turns = 0;
+        const agent = new Agent({
+            initialState: {
+                systemPrompt: system,
+                model: this._model,
+                tools: agentTools,
+                messages: historyToPiMessages(workingHistory),
+            },
+            // maxTokens 是 per-request 的流选项，不是 Agent 级配置 —— 包一层塞进去。
+            streamFn: (model, context, options) =>
+                this._models.streamSimple(model, context, {
+                    ...options,
                     maxTokens: this._maxTokens,
-                    stream,
-                });
-                // For non-streaming we can record usage once the promise settles.
-                if (!stream) {
-                    const resp = await (result as Promise<LLMResponse>);
-                    if (resp.usage) {
-                        this.telemetry.recordChat(
-                            span,
-                            resp.model ?? '',
-                            {
-                                input: (resp.usage as any).input_tokens ?? (resp.usage as any).inputTokens,
-                                output: (resp.usage as any).output_tokens ?? (resp.usage as any).outputTokens,
-                            },
-                            Date.now() - startedAt,
-                        );
-                    }
-                    span.end();
-                    return resp;
+                }),
+            // 工具轮次安全上限。pi 在 turn_end 之后、下一次 LLM 调用之前问这个钩子。
+            shouldStopAfterTurn: async () => ++turns >= this._maxToolRounds,
+        });
+        this._active = agent;
+
+        // 事件 → 增量文本 / 指标。pi 的订阅者是被 await 的，所以这里用一个
+        // 「推入即唤醒」的队列把事件转成 generator 的 yield，不做轮询。
+        const queue: string[] = [];
+        let wake: (() => void) | null = null;
+        const bump = () => { wake?.(); wake = null; };
+
+        let hadToolCalls = false;
+        let toolCallCount = 0;
+        const unsubscribe = agent.subscribe((ev) => {
+            if (ev.type === 'message_update' && ev.assistantMessageEvent?.type === 'text_delta') {
+                if (ev.assistantMessageEvent.delta) {
+                    queue.push(ev.assistantMessageEvent.delta);
+                    bump();
                 }
-                // Streaming: end span when generator is exhausted (best-effort).
-                span.setAttribute('llm.duration_ms_initiated', Date.now() - startedAt);
-                span.end();
-                return result as AsyncGenerator<LLMResponse>;
-            } catch (e: any) {
-                const status = e?.status ?? e?.response?.status;
-                const retryable = [429, 500, 502, 503].includes(status);
-                span.setStatus('error', e?.message ?? String(e));
-                span.setAttribute('error.code', String(status ?? 'unknown'));
-                span.end();
-                this._metrics.recordError(`LLM_${status ?? 'ERROR'}`);
-                if (attempt < maxRetries && retryable) {
-                    await new Promise(r => setTimeout(r, 1000 * Math.pow(2, attempt - 1)));
+            } else if (ev.type === 'tool_execution_start') {
+                hadToolCalls = true;
+                toolCallCount++;
+            }
+        });
+
+        let failure: string | null = null;
+        let finished = false;
+        const running = agent.prompt(message).catch((e) => {
+            failure = e?.message ?? String(e);
+        });
+        void running.finally(() => { finished = true; bump(); });
+
+        try {
+            while (!finished || queue.length) {
+                if (queue.length) {
+                    yield { delta: queue.shift()!, done: false };
                     continue;
                 }
-                throw e;
+                await new Promise<void>((r) => { wake = r; });
+            }
+            await running;
+        } finally {
+            unsubscribe();
+            this._active = null;
+        }
+
+        // 末态：从 agent 的消息列表里取最后一条 assistant。
+        const messages = agent.state.messages;
+        let last: AssistantMessage | null = null;
+        for (let i = messages.length - 1; i >= 0; i--) {
+            if (messages[i].role === 'assistant') {
+                last = messages[i] as AssistantMessage;
+                break;
             }
         }
-        throw new Error('LLM call failed after retries');
+
+        const errored = failure ?? agent.state.errorMessage ?? last?.errorMessage ?? null;
+        const reply = errored
+            ? `I encountered an error communicating with the AI model: ${errored}. Please try again.`
+            : assistantText(last).trim();
+
+        const usage: TokenUsage = mergeTokenUsage(
+            { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
+            toTokenUsage(legacyUsage(last)),
+        );
+        const model = last?.responseModel ?? last?.model ?? this._model.id;
+        const estimatedCost = estimateCost(usage, model);
+
+        const outHistory = [
+            ...workingHistory,
+            { role: 'user', content: message },
+            { role: 'assistant', content: reply },
+        ];
+        const result: ChatResult = {
+            reply,
+            history: outHistory,
+            hadToolCalls,
+            usage,
+            estimatedCost,
+        };
+
+        this._metrics.recordTurn({
+            turnNumber: this._metrics.getMetrics().turnCount + 1,
+            hadToolCalls,
+            toolCallCount,
+            inputTokens: usage.inputTokens,
+            outputTokens: usage.outputTokens,
+            durationMs: Date.now() - turnStart,
+            estimatedCost,
+            timestamp: Date.now(),
+        });
+        if (errored) this._metrics.recordError('LLM_ERROR');
+        span.setAttributes({
+            'agent.turn.input_tokens': usage.inputTokens,
+            'agent.turn.output_tokens': usage.outputTokens,
+            'agent.turn.had_tool_calls': hadToolCalls,
+        });
+        span.end();
+
+        onComplete?.(result);
+        yield { reply, done: true, usage, estimatedCost };
     }
 }

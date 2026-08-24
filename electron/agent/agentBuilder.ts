@@ -1,5 +1,5 @@
 /**
- * agentBuilder.ts — Fluent builder for creating portable agent instances.
+ * agentBuilder.ts — Fluent builder for creating agent instances.
  *
  * Usage:
  * ```ts
@@ -9,47 +9,44 @@
  *   .addTool({ name: 'greet', description: 'Say hi', execute: () => 'Hi!' })
  *   .build();
  * ```
+ *
+ * 迁到 pi 之前这里还有 `addSkill` / `setStorage` / `enableMemory` /
+ * `setSandbox` / `addMCPServer` / `setApprovalCallback` / `setEmbeddingProvider`
+ * / `setIncludeBuiltinTools` 等一批 setter —— 全部无人调用（`electron/agent/`
+ * 是 vendored 进来的 borderless_agent 全量拷贝，PrismMD 只用其中一小片），
+ * 对应的子系统已随迁移删除。详见
+ * recordDocs/2026-08-09-pi-agent-migration-phase2.md。
  */
 
-import { LLMProvider } from './llmProtocol';
-import {
-    ToolDefinition,
-    SkillDefinition,
-    AgentConfig,
-    LLMConfig,
-    StorageConfig,
-} from './types';
-import type { SandboxConfig } from './sandbox';
-import type { EmbeddingProvider } from './providers/embeddings';
-import type { ProviderName } from './providers/base';
+import { ToolDefinition, AgentConfig, LLMConfig } from './types';
+import type { ProviderName } from './pi/models';
 import { setModelPricing as _setModelPricing, type ModelPricing } from './pricing';
 import { AgentInstance } from './agentInstance';
-import { OpenAIProvider } from './providers/openai';
-import { AnthropicProvider } from './providers/anthropic';
-import { GoogleProvider } from './providers/google';
+
+/**
+ * 只在调用方没给 model 时兜底。ollama / custom 没有合理默认值 —— 模型名由
+ * 用户在设置里填，缺了就让 pi 报「provider 未知模型」，好过默默连错模型。
+ */
+const DEFAULT_MODELS: Record<ProviderName, string> = {
+    openai: 'gpt-4o',
+    anthropic: 'claude-sonnet-4-20250514',
+    google: 'gemini-2.0-flash',
+    ollama: '',
+    custom: '',
+};
 
 export class AgentBuilder {
     private _config: AgentConfig = {
-        includeBuiltinTools: true,
-        enableMemory: false,
-        enableStreaming: false,
         enableContext: true,
         maxToolRounds: 20,
         tools: [],
-        skills: [],
     };
 
     // ---- LLM ----
 
-    /** Provide an LLM config (creates a provider automatically based on config.provider). */
+    /** Provide an LLM config (provider selected via `config.provider`). */
     setLLM(config: LLMConfig): this {
         this._config.llmConfig = config;
-        return this;
-    }
-
-    /** Provide a custom LLMProvider instance directly. */
-    setLLMProvider(provider: LLMProvider): this {
-        this._config.llm = provider;
         return this;
     }
 
@@ -59,8 +56,8 @@ export class AgentBuilder {
      *
      * @example
      * builder.setProvider('anthropic', { apiKey: 'sk-ant-...', model: 'claude-sonnet-4-20250514' })
-     * builder.setProvider('openai', { apiKey: 'sk-...', baseUrl: 'https://my-proxy.com/v1' })
-     * builder.setProvider('google', { apiKey: 'AIza...', model: 'gemini-2.0-flash' })
+     * builder.setProvider('ollama', { apiKey: '', model: 'llama3.1:8b' })
+     * builder.setProvider('custom', { apiKey: 'k', model: 'm', baseUrl: 'https://vllm.internal/v1' })
      */
     setProvider(provider: ProviderName, config: LLMConfig): this {
         this._config.llmConfig = { ...config, provider };
@@ -91,49 +88,7 @@ export class AgentBuilder {
         return this;
     }
 
-    /** Whether to include built-in tools (bash, read_file, etc.). Default: true. */
-    setIncludeBuiltinTools(include: boolean): this {
-        this._config.includeBuiltinTools = include;
-        return this;
-    }
-
-    // ---- Skills ----
-
-    /** Add a single skill. */
-    addSkill(skill: SkillDefinition): this {
-        this._config.skills = this._config.skills ?? [];
-        this._config.skills.push(skill);
-        return this;
-    }
-
-    /** Add multiple skills at once. */
-    addSkills(skills: SkillDefinition[]): this {
-        this._config.skills = this._config.skills ?? [];
-        this._config.skills.push(...skills);
-        return this;
-    }
-
-    // ---- Storage ----
-
-    /** Configure storage backend. */
-    setStorage(config: StorageConfig): this {
-        this._config.storage = config;
-        return this;
-    }
-
     // ---- Feature toggles ----
-
-    /** Enable long-term memory (episodic + semantic). */
-    enableMemory(enable: boolean = true): this {
-        this._config.enableMemory = enable;
-        return this;
-    }
-
-    /** Enable streaming responses by default. */
-    enableStreaming(enable: boolean = true): this {
-        this._config.enableStreaming = enable;
-        return this;
-    }
 
     /** Enable context management (token budgeting, history trimming). */
     enableContext(enable: boolean = true): this {
@@ -147,11 +102,9 @@ export class AgentBuilder {
         return this;
     }
 
-    /** Set approval callback for mutating tools. */
-    setApprovalCallback(
-        cb: (toolName: string, args: Record<string, any>) => Promise<boolean> | boolean,
-    ): this {
-        this._config.approvalCallback = cb;
+    /** Max output tokens per LLM call. */
+    setMaxTokens(max: number): this {
+        this._config.maxTokens = max;
         return this;
     }
 
@@ -160,55 +113,16 @@ export class AgentBuilder {
      * When the agent needs clarification or input from the user mid-task,
      * it calls the `ask_user` tool which invokes this callback.
      */
-    setHumanInputCallback(
-        cb: (question: string) => Promise<string> | string,
-    ): this {
+    setHumanInputCallback(cb: (question: string) => Promise<string> | string): this {
         this._config.humanInputCallback = cb;
-        return this;
-    }
-
-    // ---- Embeddings (optional) ----
-
-    /**
-     * Set an embedding provider for vector-based memory retrieval.
-     * This is entirely optional — without it, memory uses keyword-based scoring.
-     */
-    setEmbeddingProvider(provider: EmbeddingProvider): this {
-        this._config.embeddingProvider = provider;
         return this;
     }
 
     // ---- Pricing ----
 
-    /**
-     * Override model pricing for cost estimation.
-     */
+    /** Override model pricing for cost estimation. */
     setModelPricing(pricing: Record<string, ModelPricing>): this {
         _setModelPricing(pricing);
-        return this;
-    }
-
-    // ---- MCP ----
-
-    /** Add an MCP server to connect to when the agent is built. */
-    addMCPServer(config: import('./mcpClient').MCPServerConfig): this {
-        this._config.mcpServers = this._config.mcpServers ?? [];
-        this._config.mcpServers.push(config);
-        return this;
-    }
-
-    /** Add multiple MCP servers at once. */
-    addMCPServers(configs: import('./mcpClient').MCPServerConfig[]): this {
-        this._config.mcpServers = this._config.mcpServers ?? [];
-        this._config.mcpServers.push(...configs);
-        return this;
-    }
-
-    // ---- Sandbox ----
-
-    /** Configure the execution sandbox (file guards, command filtering, resource limits). */
-    setSandbox(config: SandboxConfig): this {
-        this._config.sandbox = config;
         return this;
     }
 
@@ -216,51 +130,16 @@ export class AgentBuilder {
 
     /** Validate config and build the agent instance. */
     build(): AgentInstance {
-        // Resolve LLM provider
-        if (!this._config.llm) {
-            const cfg = this._config.llmConfig;
-            if (!cfg?.apiKey) {
-                throw new Error(
-                    'AgentBuilder: must call .setLLM({ apiKey }), .setProvider(), or .setLLMProvider() before .build()',
-                );
-            }
-            this._config.llm = this._createProvider(cfg);
+        const cfg = this._config.llmConfig;
+        if (!cfg) {
+            throw new Error('AgentBuilder: must call .setLLM() or .setProvider() before .build()');
         }
-
-        return new AgentInstance({ ...this._config });
-    }
-
-    // ---- Private ----
-
-    private _createProvider(cfg: LLMConfig): LLMProvider {
         const provider = cfg.provider ?? 'openai';
-
-        switch (provider) {
-            case 'openai': {
-                return new OpenAIProvider({
-                    apiKey: cfg.apiKey,
-                    model: cfg.model ?? 'gpt-4o',
-                    baseUrl: cfg.baseUrl,
-                    timeout: cfg.timeout ?? 120,
-                });
-            }
-            case 'anthropic': {
-                return new AnthropicProvider({
-                    apiKey: cfg.apiKey,
-                    model: cfg.model ?? 'claude-sonnet-4-20250514',
-                    baseUrl: cfg.baseUrl,
-                    timeout: cfg.timeout ?? 120,
-                });
-            }
-            case 'google': {
-                return new GoogleProvider({
-                    apiKey: cfg.apiKey,
-                    model: cfg.model ?? 'gemini-2.0-flash',
-                    baseUrl: cfg.baseUrl,
-                });
-            }
-            default:
-                throw new Error(`Unknown provider: ${provider}. Use 'openai', 'anthropic', or 'google'.`);
-        }
+        this._config.llmConfig = {
+            ...cfg,
+            provider,
+            model: cfg.model || DEFAULT_MODELS[provider],
+        };
+        return new AgentInstance({ ...this._config });
     }
 }
