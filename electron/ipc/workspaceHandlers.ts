@@ -12,7 +12,7 @@
  */
 import { ipcMain, dialog } from 'electron'
 import { getNoteRepository } from '../repositories/repositoryFactory'
-import { getAsset, readAssetBytes } from '../services/assetService'
+import { getAsset } from '../services/assetService'
 import {
   forgetPage,
   indexPageNow,
@@ -189,10 +189,10 @@ export function registerWorkspaceHandlers() {
   // ── Binary payloads ──
 
   ipcMain.handle('workspace:get-page-bytes', async (_event, pageId: string) => {
-    const bytes = readAssetBytes(pageId)
-    // Buffer crosses the structured-clone boundary as a Uint8Array; the
-    // renderer turns it back into an ArrayBuffer for pdfjs / SheetJS.
-    return bytes ? new Uint8Array(bytes) : null
+    // Through the repository, not the asset store: in a vault the PDF *is* a
+    // file in the vault, and reaching straight for the asset store would find
+    // nothing there.
+    return repository.readPageBytes(pageId)
   })
 
   ipcMain.handle('workspace:get-page-asset', async (_event, pageId: string) => {

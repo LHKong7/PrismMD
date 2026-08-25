@@ -340,6 +340,24 @@ export function describeNoteRepository(label: string, harness: RepositoryHarness
         ).rejects.toThrow()
       })
 
+      it('keeps a binary document\'s bytes retrievable', async () => {
+        // ★ A PDF is a note whose payload is not text. Whatever the backend
+        // does with those bytes, handing them back byte-identical is the
+        // contract — the viewer has no other source for them.
+        const repo = await fresh()
+        const bytes = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37])
+        const page = await repo.importDroppedFile('Paper.pdf', bytes, null)
+
+        expect(page.format).toBe('pdf')
+        expect([...(await repo.readPageBytes(page.id))!]).toEqual([...bytes])
+      })
+
+      it('returns no bytes for a text note', async () => {
+        const repo = await fresh()
+        const page = await repo.createPage({ title: 'Text', content: 'body' })
+        expect(await repo.readPageBytes(page.id)).toBeNull()
+      })
+
       it('writes a note back out to disk', async () => {
         const repo = await fresh()
         const page = await repo.createPage({ title: 'Export me', content: '# Exported\n' })

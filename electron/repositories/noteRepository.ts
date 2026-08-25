@@ -92,6 +92,15 @@ export interface NoteRepository {
   getAncestors(id: string): Promise<PageSummary[]>
   countPages(): Promise<number>
   /**
+   * Raw bytes of a binary document (PDF, spreadsheet), or null for a text
+   * note. ★ Without this the PDF viewer would have to reach past the
+   * repository to whatever store the bytes happen to live in today, which is
+   * exactly the coupling the seam removes — and it would break the moment
+   * that store changed.
+   */
+  readPageBytes(id: string): Promise<Uint8Array | null>
+
+  /**
    * Substring fallback search. The ranked search lives in the knowledge
    * index; this is what answers a partial word the tokenizer cannot produce
    * a term for ("sched").

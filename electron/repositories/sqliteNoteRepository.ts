@@ -11,6 +11,7 @@
 import { getDb } from '../services/workspaceDb'
 import { extractWikiLinks, normalizeTitle, rewriteWikiLinks } from '../knowledge/links'
 import * as documents from '../services/documentService'
+import { readAssetBytes } from '../services/assetService'
 import type {
   CreateFolderInput,
   CreatePageInput,
@@ -69,6 +70,11 @@ export class SqliteNoteRepository implements NoteRepository {
 
   async countPages(): Promise<number> {
     return documents.getPageCount()
+  }
+
+  async readPageBytes(id: string): Promise<Uint8Array | null> {
+    const bytes = readAssetBytes(id)
+    return bytes ? new Uint8Array(bytes) : null
   }
 
   async searchPages(query: string): Promise<PageSummary[]> {
