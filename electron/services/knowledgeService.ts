@@ -8,8 +8,7 @@
  */
 import { BrowserWindow } from 'electron'
 import { getDb } from './workspaceDb'
-import { getPage, updatePage } from './documentService'
-import { normalizeTitle, rewriteWikiLinks } from '../knowledge/links'
+import { getNoteRepository } from '../repositories/repositoryFactory'
 import {
   buildRetrievalContext,
   getBacklinks,
@@ -34,27 +33,23 @@ import {
 
 // ─── Page source ────────────────────────────────────────────────────────────
 
-function rowToIndexable(row: Record<string, any>): IndexablePage {
-  return {
-    id: row.id,
-    title: row.title ?? 'Untitled',
-    content: row.content ?? '',
-    format: row.format ?? 'md',
-    updatedAt: row.updated_at ?? 0,
-    isFolder: !!row.is_folder,
-  }
-}
-
 /**
- * Every live, non-folder page. Read straight from SQLite rather than through
- * `documentService.getChildren` recursion: a flat scan of a few thousand rows
- * is one query, and the tree shape is irrelevant to the index.
+ * Every live, non-folder note, from whichever backend is active.
+ *
+ * ★ This used to be a `SELECT ... FROM pages` right here, which is precisely
+ * the coupling the repository seam exists to remove: the index cares about
+ * text, not about the text living in a column.
  */
-function allIndexablePages(): IndexablePage[] {
-  const rows = getDb().prepare(
-    'SELECT id, title, content, format, updated_at, is_folder FROM pages WHERE is_deleted = 0 AND is_folder = 0',
-  ).all() as Record<string, any>[]
-  return rows.map(rowToIndexable)
+async function allIndexablePages(): Promise<IndexablePage[]> {
+  const pages = await getNoteRepository().listPages()
+  return pages.map((page) => ({
+    id: page.id,
+    title: page.title || 'Untitled',
+    content: page.content ?? '',
+    format: page.format || 'md',
+    updatedAt: page.updatedAt ?? 0,
+    isFolder: page.isFolder,
+  }))
 }
 
 // ─── Change notification ────────────────────────────────────────────────────
@@ -94,24 +89,22 @@ export function scheduleIndex(pageId: string, delayMs = INDEX_DEBOUNCE_MS): void
     pageId,
     setTimeout(() => {
       pending.delete(pageId)
-      try {
-        indexPageNow(pageId)
-      } catch (err) {
+      void indexPageNow(pageId).catch((err) => {
         console.error('[knowledge] Failed to index page', pageId, err)
-      }
+      })
     }, delayMs),
   )
 }
 
 /** Index one page immediately, cancelling any debounced run for it. */
-export function indexPageNow(pageId: string): boolean {
+export async function indexPageNow(pageId: string): Promise<boolean> {
   const timer = pending.get(pageId)
   if (timer) {
     clearTimeout(timer)
     pending.delete(pageId)
   }
 
-  const page = getPage(pageId)
+  const page = await getNoteRepository().getPage(pageId)
   if (!page) {
     removePageFromIndex(getDb(), pageId)
     notifyRenderer()
@@ -130,7 +123,7 @@ export function indexPageNow(pageId: string): boolean {
   return changed
 }
 
-export function forgetPage(pageId: string): void {
+export async function forgetPage(pageId: string): Promise<void> {
   const timer = pending.get(pageId)
   if (timer) {
     clearTimeout(timer)
@@ -140,16 +133,24 @@ export function forgetPage(pageId: string): void {
   notifyRenderer()
 }
 
-/** Flush every debounced index job. Call before the app quits. */
-export function flushPendingIndexing(): void {
+/**
+ * Flush every debounced index job. Call before the app quits.
+ *
+ * ★ The caller must `await` this before closing the database. Indexing is
+ * asynchronous now, so a fire-and-forget flush would land its writes on a
+ * connection that has already been closed — and the symptom is the last
+ * paragraph of the session missing from search, which nobody notices until
+ * they go looking for it.
+ */
+export async function flushPendingIndexing(): Promise<void> {
   const ids = [...pending.keys()]
-  for (const id of ids) {
-    try {
-      indexPageNow(id)
-    } catch {
-      // A page that vanished mid-flush is not worth blocking shutdown over.
-    }
-  }
+  await Promise.all(
+    ids.map((id) =>
+      indexPageNow(id).catch(() => {
+        // A page that vanished mid-flush is not worth blocking shutdown over.
+      }),
+    ),
+  )
 }
 
 /**
@@ -157,8 +158,8 @@ export function flushPendingIndexing(): void {
  * fell behind (a crash mid-write, an older app version, a restored backup)
  * repairs itself without the user knowing there was an index.
  */
-export function syncWorkspaceIndex(options?: { force?: boolean }): SyncReport {
-  const report = syncIndex(getDb(), allIndexablePages(), options)
+export async function syncWorkspaceIndex(options?: { force?: boolean }): Promise<SyncReport> {
+  const report = syncIndex(getDb(), await allIndexablePages(), options)
   if (report.indexed > 0 || report.removed > 0) notifyRenderer()
   return report
 }
@@ -172,69 +173,25 @@ export function syncWorkspaceIndex(options?: { force?: boolean }): SyncReport {
  * writes in `clearPageRows`, which keeps matching a passage that no longer
  * exists. Nothing here is a source of truth, so dropping it costs only time.
  */
-export function rebuildIndex(): SyncReport {
+export async function rebuildIndex(): Promise<SyncReport> {
   const db = getDb()
   resetKnowledgeIndex(db)
-  const report = syncIndex(db, allIndexablePages(), { force: true })
+  const report = syncIndex(db, await allIndexablePages(), { force: true })
   notifyRenderer()
   return report
 }
 
 /** Called once at startup. Never throws: a broken index must not block launch. */
-export function initKnowledgeIndex(): void {
+export async function initKnowledgeIndex(): Promise<void> {
   try {
     initKnowledge(getDb())
-    const report = syncWorkspaceIndex()
+    const report = await syncWorkspaceIndex()
     console.log(
       `[knowledge] index ready — ${report.indexed} indexed, ${report.skipped} unchanged, ${report.removed} removed`,
     )
   } catch (err) {
     console.error('[knowledge] Failed to initialize the note index:', err)
   }
-}
-
-// ─── Rename propagation ─────────────────────────────────────────────────────
-
-export interface RenameReport {
-  /** Notes whose text was rewritten. */
-  updated: { pageId: string; title: string }[]
-}
-
-/**
- * Follow a note rename through every `[[link]]` that pointed at it.
- *
- * ★ A knowledge base that breaks all its own links when you rename a note
- * teaches you not to rename notes, which is the same as teaching you not to
- * improve them. The rewrite is done on the *source text* rather than by
- * remapping ids, so what is on disk stays the truth and stays readable in any
- * other markdown tool.
- */
-export function propagateRename(pageId: string, oldTitle: string, newTitle: string): RenameReport {
-  const db = getDb()
-  initKnowledge(db)
-  const report: RenameReport = { updated: [] }
-
-  const fromNorm = normalizeTitle(oldTitle)
-  if (!fromNorm || fromNorm === normalizeTitle(newTitle)) return report
-
-  const sources = db.prepare(`
-    SELECT DISTINCT l.source_page_id AS id
-    FROM note_links l
-    WHERE l.target_norm = ? AND l.source_page_id != ?
-  `).all(fromNorm, pageId) as { id: string }[]
-
-  for (const { id } of sources) {
-    const page = getPage(id)
-    if (!page) continue
-    const rewritten = rewriteWikiLinks(page.content, oldTitle, newTitle)
-    if (rewritten === page.content) continue
-    updatePage(id, { content: rewritten })
-    indexPageNow(id)
-    report.updated.push({ pageId: id, title: page.title })
-  }
-
-  if (report.updated.length > 0) notifyRenderer()
-  return report
 }
 
 // ─── Read paths ─────────────────────────────────────────────────────────────
@@ -249,23 +206,30 @@ export function search(query: string, options?: SearchOptions) {
  * without a rewrite. One row per note — a palette listing the same note three
  * times because three passages matched is worse than one that lists it once.
  */
-export function searchPageSummaries(query: string, limit = 30) {
+export async function searchPageSummaries(query: string, limit = 30) {
+  const repository = getNoteRepository()
   const hits = searchNotes(getDb(), query, { limit: limit * 2, maxPerNote: 1 })
-  const out: { id: string; title: string; icon: string | null; format: string; updatedAt: number; isFolder: false }[] = []
+  const out: {
+    id: string
+    title: string
+    icon: string | null
+    format: string
+    updatedAt: number
+    isFolder: false
+  }[] = []
   const seen = new Set<string>()
-  const read = getDb().prepare('SELECT id, title, icon, format, updated_at FROM pages WHERE id = ? AND is_deleted = 0')
 
   for (const hit of hits) {
     if (seen.has(hit.pageId)) continue
-    const row = read.get(hit.pageId) as Record<string, any> | undefined
-    if (!row) continue
+    const page = await repository.getPage(hit.pageId)
+    if (!page) continue
     seen.add(hit.pageId)
     out.push({
-      id: row.id,
-      title: row.title,
-      icon: row.icon ?? null,
-      format: row.format,
-      updatedAt: row.updated_at,
+      id: page.id,
+      title: page.title,
+      icon: page.icon,
+      format: page.format,
+      updatedAt: page.updatedAt,
       isFolder: false,
     })
     if (out.length >= limit) break

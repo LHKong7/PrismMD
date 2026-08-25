@@ -300,11 +300,6 @@ const electronAPI = {
     report?: { indexed: number; skipped: number; removed: number }
     error?: string
   }> => ipcRenderer.invoke('knowledge:reindex', force),
-  knowledgePropagateRename: (pageId: string, oldTitle: string, newTitle: string): Promise<{
-    ok: boolean
-    updated?: { pageId: string; title: string }[]
-    error?: string
-  }> => ipcRenderer.invoke('knowledge:propagate-rename', pageId, oldTitle, newTitle),
   /** Fires whenever the note index changes, so panels refresh without polling. */
   onKnowledgeUpdated: (callback: () => void): (() => void) => {
     const handler = () => callback()

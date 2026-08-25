@@ -16,6 +16,7 @@ import { rememberFile, rememberRoot } from './services/libraryRecents'
 import { stopWatching } from './services/libraryWatcher'
 import { handleSquirrelEvent } from './services/windowsIntegration'
 import { flushPendingIndexing, initKnowledgeIndex } from './services/knowledgeService'
+import { getNoteRepository } from './repositories/repositoryFactory'
 
 /**
  * What a reader window was asked to show when it was created. The renderer
@@ -326,6 +327,16 @@ app.whenReady().then(async () => {
     console.error('[app] IPC handler registration failed:', err)
   }
 
+  // Seed a welcome page on first launch so the workspace isn't empty. Awaited
+  // *before* the window exists: the first thing a fresh window does is ask for
+  // the page tree, and answering that before the seed lands shows an empty
+  // workspace to someone who has never opened the app.
+  try {
+    await getNoteRepository().ensureWelcomePage()
+  } catch (err) {
+    console.error('[workspace] Failed to seed welcome page:', err)
+  }
+
   // Launched *with* a document → open the reader and nothing else. Creating
   // the workbench too would put a window the user didn't ask for in front of
   // the one they did.
@@ -341,7 +352,7 @@ app.whenReady().then(async () => {
   // created, not before: a first-run index of a large workspace should not
   // sit between the user and their notes, and every read path initializes
   // the schema on its own if this has not finished yet.
-  setImmediate(initKnowledgeIndex)
+  setImmediate(() => void initKnowledgeIndex())
 
   // Fire MCP servers in the background — failures don't block window
   // creation, and individual server errors are logged inside the service.
@@ -387,7 +398,7 @@ app.on('before-quit', (event) => {
     // now is the difference between quitting and losing the final paragraph
     // from search until the next launch repairs it.
     try {
-      flushPendingIndexing()
+      await flushPendingIndexing()
     } catch (err) {
       console.warn('[knowledge] flush on quit failed:', err)
     }

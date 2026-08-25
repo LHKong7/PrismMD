@@ -24,7 +24,7 @@ import {
 } from '../services/libraryRecents'
 import { watchForWindow, stopWatching } from '../services/libraryWatcher'
 import { openDialogFilters } from '../services/fileFormats'
-import { importFile } from '../services/documentService'
+import { getNoteRepository } from '../repositories/repositoryFactory'
 import { createReaderWindow, focusWorkspaceWindow, getLaunchTarget, getMainWindow } from '../main'
 type Ok<T> = { ok: true } & T
 type Err = { ok: false; error: string }
@@ -176,17 +176,17 @@ export function registerLibraryHandlers() {
   /**
    * The one path from reader mode into the workspace: copy a document the
    * user is reading into their notes. Everything else in this file is a
-   * read — this deliberately goes through the same `importFile` the
+   * read — this deliberately goes through the same repository import the
    * workbench uses rather than growing a second import path.
    *
    * The file being read is *not* modified; a copy joins the workspace.
    */
   ipcMain.handle('library:import-to-workspace', async (_event, filePath: string) =>
-    attempt(() => {
+    attempt(async () => {
       // Confine it to a mounted root — the renderer shouldn't be able to
       // pull arbitrary files into the workspace either.
       const file = statFile(filePath)
-      const page = importFile(file.path, null)
+      const page = await getNoteRepository().importFile(file.path, null)
       // Let an open workbench pick the new page up immediately instead of
       // waiting for its next tree action.
       const win = getMainWindow()

@@ -13,7 +13,6 @@ import {
   notesByTag,
   orphans,
   outgoing,
-  propagateRename,
   rebuildIndex,
   related,
   retrieve,
@@ -130,7 +129,7 @@ export function registerKnowledgeHandlers() {
   /** Index one page right now — used after a save the renderer wants reflected. */
   ipcMain.handle('knowledge:index-page', async (_event, pageId: string) => {
     try {
-      return { ok: true, changed: indexPageNow(pageId) }
+      return { ok: true, changed: await indexPageNow(pageId) }
     } catch (err) {
       return { ok: false, error: message(err) }
     }
@@ -142,22 +141,11 @@ export function registerKnowledgeHandlers() {
    */
   ipcMain.handle('knowledge:reindex', async (_event, force?: boolean) => {
     try {
-      return { ok: true, report: force === false ? syncWorkspaceIndex() : rebuildIndex() }
+      return { ok: true, report: force === false ? await syncWorkspaceIndex() : await rebuildIndex() }
     } catch (err) {
       return { ok: false, error: message(err) }
     }
   })
-
-  ipcMain.handle(
-    'knowledge:propagate-rename',
-    async (_event, pageId: string, oldTitle: string, newTitle: string) => {
-      try {
-        return { ok: true, ...propagateRename(pageId, oldTitle, newTitle) }
-      } catch (err) {
-        return { ok: false, error: message(err) }
-      }
-    },
-  )
 }
 
 function message(err: unknown): string {
