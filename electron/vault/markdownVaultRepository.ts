@@ -52,6 +52,7 @@ import {
   type CatalogEntry,
 } from './vaultCatalog'
 import { binaryIdsFor, BinaryIdRegistry } from './binaryIds'
+import type { ReconcileContext } from './vaultWatcher'
 import { sidecarFor, VaultSidecar } from './vaultSidecar'
 import {
   folderIdFor,
@@ -259,6 +260,36 @@ export class MarkdownVaultRepository implements NoteRepository {
   /** Whether this process wrote `absolute` moments ago. Read by the watcher. */
   wroteRecently(absolute: string): boolean {
     return this.selfWrites.has(path.resolve(absolute))
+  }
+
+  /** Absolute path of the vault root, for the watcher. */
+  get vaultRoot(): string {
+    return this.root
+  }
+
+  /**
+   * The context `reconcilePaths` needs to tell a move from a delete plus a
+   * create. Reading a path here also files it into the catalog, which is what
+   * makes the returned change immediately actionable.
+   */
+  reconcileContext(): ReconcileContext {
+    return {
+      entryAtPath: (relativePath) => {
+        const entry = getEntryByPath(this.db, relativePath)
+        return entry ? { id: entry.id, contentHash: entry.contentHash } : null
+      },
+      knownPaths: () => new Map(listEntries(this.db).map((e) => [e.id, e.relativePath])),
+      readFile: async (relativePath) => {
+        const entry = await this.readIntoCatalog(relativePath)
+        return entry ? { id: entry.id, contentHash: entry.contentHash } : null
+      },
+    }
+  }
+
+  /** Forget a note whose file is gone. Called by the watcher on a deletion. */
+  forgetPath(relativePath: string): void {
+    const entry = getEntryByPath(this.db, relativePath)
+    if (entry) removeEntry(this.db, entry.id)
   }
 
   // ── Reads ─────────────────────────────────────────────────────────────────

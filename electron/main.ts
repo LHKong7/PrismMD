@@ -17,7 +17,7 @@ import { stopWatching } from './services/libraryWatcher'
 import { handleSquirrelEvent } from './services/windowsIntegration'
 import { flushPendingIndexing, initKnowledgeIndex } from './services/knowledgeService'
 import { getNoteRepository } from './repositories/repositoryFactory'
-import { initStorage } from './services/storageService'
+import { initStorage, stopWatching as stopWatchingVault } from './services/storageService'
 
 /**
  * What a reader window was asked to show when it was created. The renderer
@@ -407,6 +407,12 @@ app.on('before-quit', (event) => {
     // Debounced index jobs hold the *last* edit of the session; running them
     // now is the difference between quitting and losing the final paragraph
     // from search until the next launch repairs it.
+    // Stop watching before the flush: a file event arriving mid-shutdown
+    // would schedule an index write onto a database about to be closed.
+    try {
+      stopWatchingVault()
+    } catch { /* nothing to stop */ }
+
     try {
       await flushPendingIndexing()
     } catch (err) {

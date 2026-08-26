@@ -249,8 +249,13 @@ describe('searchNotes', () => {
     expect(searchNotes(db, '   !!! ')).toEqual([])
   })
 
-  it('never matches a soft-deleted note', () => {
-    db.prepare('UPDATE pages SET is_deleted = 1 WHERE id = ?').run('p1')
+  it('never matches a note that has been evicted from the index', () => {
+    // ★ Eviction is explicit, not inferred. The index used to join `pages`
+    // and filter on `is_deleted`, which quietly stopped working the moment
+    // notes lived in files instead of rows — a fresh vault has no `pages` at
+    // all, so *every* search returned nothing. What removes a note now is the
+    // same call the delete handler makes.
+    removePageFromIndex(db, 'p1')
     expect(searchNotes(db, 'exponential backoff')).toEqual([])
   })
 
@@ -300,10 +305,12 @@ describe('link graph', () => {
     expect(getBacklinks(db, 'p1')[0].context).toContain('Target')
   })
 
-  it('drops a backlink when the linking note is deleted', () => {
+  it('drops a backlink when the linking note leaves the index', () => {
     add('p1', 'Target', 'body')
     add('p2', 'Source', 'see [[Target]]')
-    db.prepare('UPDATE pages SET is_deleted = 1 WHERE id = ?').run('p2')
+    expect(getBacklinks(db, 'p1')).toHaveLength(1)
+
+    removePageFromIndex(db, 'p2')
     expect(getBacklinks(db, 'p1')).toEqual([])
   })
 

@@ -145,6 +145,38 @@ rebuild button.
 > different, optional thing: it extracts *entities* into a Neo4j instance you
 > run yourself. The note index above needs none of that.
 
+### Notes as files (optional)
+
+By default your notes live in the app's database. **Settings → Storage** can
+move them into a **vault**: a folder of ordinary Markdown files you can open in
+Finder, in git, in Obsidian, or in any editor — while PrismMD keeps working
+exactly as before.
+
+```text
+Vault/
+├── Projects/PrismMD.md      a note, with a stable id in its front matter
+├── Attachments/diagram.pdf  documents, as themselves
+├── .trash/                  deleted notes, recoverable
+└── .prism/                  app data
+    ├── ui.json              sidebar order and icons — losable
+    ├── binaries.json        ids for documents that cannot hold one — keep
+    └── annotations/         your highlights — keep
+```
+
+The migration copies every note into a folder you choose, backs up your current
+workspace first, and **checks the copy note by note** before switching anything
+over; if a single note does not match, nothing changes and the partial copy is
+left for you to inspect.
+
+Once you are in a vault, edits made anywhere are picked up live. A note renamed
+or moved in Finder stays the same note — its id lives in the file, so its
+backlinks and highlights follow it. If you are mid-edit when a note changes on
+disk, your unsaved text wins.
+
+> Two things under `.prism/` are not caches: `binaries.json` and
+> `annotations/`. Back those up with your notes; `ui.json` you can lose without
+> consequence beyond alphabetical sidebar order.
+
 ## Prerequisites
 
 - [Node.js](https://nodejs.org/) `>= 18`

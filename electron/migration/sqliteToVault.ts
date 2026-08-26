@@ -53,6 +53,15 @@ export interface MigrationOptions {
    * each is opened once.
    */
   db?: Database.Database
+  /**
+   * The database being migrated *from*, read for highlights.
+   *
+   * ★ Separate from `db` even though production passes the same connection
+   * for both: one is a source and one is a destination, and reading the
+   * destination for the source's rows is a mistake that only shows up when
+   * they differ — which is exactly what a test does.
+   */
+  sourceDb?: Database.Database
   /** Files copied verbatim into the backup, e.g. workspace.db and its WAL. */
   backupFiles?: string[]
   /** Where backups go. Skipped entirely when absent. */
@@ -131,6 +140,12 @@ export async function migrateSqliteToVault(options: MigrationOptions): Promise<M
         }
       }
     }
+    // Highlights come along in bulk, so a freshly migrated vault is complete
+    // from the first moment rather than healing note by note as they are
+    // opened. (The lazy backfill in annotationStore still exists, for vaults
+    // migrated before highlights lived here at all.)
+    if (options.sourceDb) await writeAnnotations(staging, options.sourceDb)
+
     await journal.advance('notes-written', { writtenNoteCount: written })
 
     // 4. Carry sibling order and icons across, so the sidebar looks the same
@@ -278,6 +293,46 @@ async function writeNotes(args: {
     onProgress?.({ step: 'writing', done, total: pages.length })
   }
   return { written: done, binaryIds }
+}
+
+/**
+ * Copy every highlight into `.prism/annotations/`.
+ *
+ * Read straight from the `annotations` table rather than through the
+ * annotation service, which resolves its backend from the *active* storage
+ * mode — still SQLite at this point in the migration, and about to not be.
+ */
+async function writeAnnotations(staging: string, db: Database.Database): Promise<number> {
+  const rows = db.prepare(
+    'SELECT * FROM annotations ORDER BY page_id, start_offset',
+  ).all() as Record<string, any>[]
+  if (rows.length === 0) return 0
+
+  const byPage = new Map<string, Record<string, unknown>[]>()
+  for (const row of rows) {
+    const bucket = byPage.get(row.page_id) ?? []
+    bucket.push({
+      id: row.id,
+      startOffset: row.start_offset,
+      endOffset: row.end_offset,
+      selectedText: row.selected_text ?? '',
+      color: row.color ?? 'yellow',
+      ...(row.note ? { note: row.note } : {}),
+      createdAt: row.created_at ?? '',
+      updatedAt: row.updated_at ?? '',
+    })
+    byPage.set(row.page_id, bucket)
+  }
+
+  const dir = vaultPaths(staging).annotations
+  await fs.promises.mkdir(dir, { recursive: true })
+  for (const [pageId, items] of byPage) {
+    await atomicWriteFile(
+      path.join(dir, `${encodeURIComponent(pageId)}.json`),
+      `${JSON.stringify(items, null, 2)}\n`,
+    )
+  }
+  return byPage.size
 }
 
 /**

@@ -134,6 +134,14 @@ export interface StorageStatus {
   interrupted: { step: string; stagingPath: string; error: string | null } | null
 }
 
+/** One note-level thing that happened to the vault outside the app. */
+export interface VaultChange {
+  kind: 'created' | 'modified' | 'moved' | 'deleted'
+  pageId: string | null
+  relativePath: string
+  previousPath?: string
+}
+
 export interface MigrateOutcome {
   ok: boolean
   vaultPath?: string
@@ -337,6 +345,15 @@ const electronAPI = {
       callback(update)
     ipcRenderer.on('storage:migration-progress', handler)
     return () => ipcRenderer.removeListener('storage:migration-progress', handler)
+  },
+  /**
+   * Fires when the vault changed on disk — someone edited a note in another
+   * editor, or a sync client dropped one in.
+   */
+  onVaultChanged: (callback: (changes: VaultChange[]) => void): (() => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, changes: VaultChange[]) => callback(changes)
+    ipcRenderer.on('vault:changed', handler)
+    return () => ipcRenderer.removeListener('vault:changed', handler)
   },
   onStorageChanged: (callback: (next: StorageStatus) => void): (() => void) => {
     const handler = (_e: Electron.IpcRendererEvent, next: StorageStatus) => callback(next)

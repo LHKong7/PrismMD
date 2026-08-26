@@ -10,7 +10,7 @@ function context(
 ): ReconcileContext {
   return {
     entryAtPath: (relativePath) => catalog[relativePath] ?? null,
-    pathOfId: (id) => Object.entries(catalog).find(([, e]) => e.id === id)?.[0] ?? null,
+    knownPaths: () => new Map(Object.entries(catalog).map(([p, e]) => [e.id, p])),
     readFile: async (relativePath) => disk[relativePath] ?? null,
   }
 }

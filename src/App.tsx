@@ -88,6 +88,28 @@ function AppContent() {
     })
   }, [])
 
+  /**
+   * A vault is a folder anyone can edit — Obsidian, a text editor, a sync
+   * client. When one of them changes a note this window has open, refresh the
+   * tab so the two do not diverge.
+   *
+   * ★ `syncExternalEdit` keeps its `!isDirty` guard, so someone mid-sentence
+   * never has their text replaced. Their own version wins; the disk version
+   * is picked up the next time the note is opened clean. Silently choosing
+   * either side would be data loss, and the side we can afford to defer is
+   * the one that is still on disk.
+   */
+  useEffect(() => {
+    return window.electronAPI.onVaultChanged?.((changes) => {
+      const store = useWorkspaceStore.getState()
+      for (const change of changes) {
+        if (!change.pageId || change.kind === 'deleted') continue
+        if (!store.tabs.some((tab) => tab.pageId === change.pageId)) continue
+        void store.syncExternalEdit(change.pageId)
+      }
+    })
+  }, [])
+
   // Subscribe to agent trace IPC events for the developer debug panel (dev-only).
   useEffect(() => {
     if (!import.meta.env.DEV) return

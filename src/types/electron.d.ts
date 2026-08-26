@@ -158,6 +158,7 @@ export type {
   KnowledgeUnresolvedLink,
   MigrateOutcome,
   StorageStatus,
+  VaultChange,
 } from '../../electron/preload'
 
 type Assert<T extends true> = T

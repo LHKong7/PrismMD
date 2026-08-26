@@ -16,7 +16,9 @@ import { getDb } from './workspaceDb'
 import { backupFilesFor, migrateSqliteToVault } from '../migration/sqliteToVault'
 import { readJournal, type MigrationJournalEntry } from '../migration/migrationJournal'
 import { PRISM_DIR } from '../vault/vaultLayout'
-import { flushPendingIndexing, rebuildIndex } from './knowledgeService'
+import { reconcilePaths, VaultWatcher, type VaultChange } from '../vault/vaultWatcher'
+import type { MarkdownVaultRepository } from '../vault/markdownVaultRepository'
+import { flushPendingIndexing, forgetPage, indexPageNow, rebuildIndex } from './knowledgeService'
 
 export interface StorageStatus {
   mode: StorageSettings['mode']
@@ -42,6 +44,76 @@ export function areWritesSuspended(): boolean {
   return writesSuspended
 }
 
+// ─── Watching the vault ─────────────────────────────────────────────────────
+
+let watcher: VaultWatcher | null = null
+
+/**
+ * Follow the vault while the app is running.
+ *
+ * ★ Without this the promise the vault makes is only half true: notes are
+ * files you can edit anywhere, but the app would keep showing what it read at
+ * startup until something forced a rescan. Editing a note in Obsidian and
+ * watching PrismMD ignore it is worse than not offering the vault at all.
+ */
+function startWatching(repository: MarkdownVaultRepository): void {
+  stopWatching()
+  watcher = new VaultWatcher({
+    root: repository.vaultRoot,
+    wroteRecently: (absolute) => repository.wroteRecently(absolute),
+    onBatch: (paths) => void applyExternalChanges(repository, paths),
+  })
+  watcher.start()
+}
+
+export function stopWatching(): void {
+  watcher?.stop()
+  watcher = null
+}
+
+/**
+ * Turn a batch of changed paths into note-level changes and bring the index
+ * and the renderer in line with them.
+ */
+async function applyExternalChanges(
+  repository: MarkdownVaultRepository,
+  paths: string[],
+): Promise<void> {
+  // A migration is rewriting everything; its own writes are not news.
+  if (writesSuspended) return
+
+  let changes: VaultChange[]
+  try {
+    changes = await reconcilePaths(paths, repository.reconcileContext())
+  } catch (err) {
+    console.error('[vault] Could not reconcile external changes:', err)
+    return
+  }
+  if (changes.length === 0) return
+
+  let treeChanged = false
+  for (const change of changes) {
+    try {
+      if (change.kind === 'deleted') {
+        repository.forgetPath(change.relativePath)
+        if (change.pageId) await forgetPage(change.pageId)
+        treeChanged = true
+        continue
+      }
+      if (change.pageId) await indexPageNow(change.pageId)
+      // A modification leaves the note where it was; the other two do not.
+      if (change.kind !== 'modified') treeChanged = true
+    } catch (err) {
+      console.error('[vault] Could not apply', change.kind, change.relativePath, err)
+    }
+  }
+
+  notify('vault:changed', changes)
+  // The tree is the renderer's own view of the filesystem, so it has to be
+  // told when the filesystem moved underneath it.
+  if (treeChanged) notify('workspace:tree-changed', undefined)
+}
+
 /** Point the app at whichever store the settings name. Called once at startup. */
 export async function initStorage(): Promise<StorageStatus> {
   const settings = getStorageSettings()
@@ -49,7 +121,8 @@ export async function initStorage(): Promise<StorageStatus> {
   if (settings.mode === 'vault' && settings.vaultPath) {
     if (fs.existsSync(settings.vaultPath)) {
       try {
-        await useVaultRepository(settings.vaultPath, getDb())
+        const repository = await useVaultRepository(settings.vaultPath, getDb())
+        startWatching(repository as MarkdownVaultRepository)
         console.log(`[storage] vault mode — ${settings.vaultPath}`)
         return status()
       } catch (err) {
@@ -64,6 +137,7 @@ export async function initStorage(): Promise<StorageStatus> {
     }
   }
 
+  stopWatching()
   setNoteRepository(new SqliteNoteRepository())
   return status()
 }
@@ -114,6 +188,7 @@ export async function migrateWorkspaceToVault(targetPath: string): Promise<Migra
       targetPath,
       source,
       db: getDb(),
+      sourceDb: getDb(),
       readBytes: (pageId) => source.readPageBytes(pageId),
       backupDir: path.join(app.getPath('userData'), 'backups'),
       backupFiles: backupFilesFor(app.getPath('userData')),
@@ -130,8 +205,9 @@ export async function migrateWorkspaceToVault(targetPath: string): Promise<Migra
       }
     }
 
-    await useVaultRepository(result.vaultPath, getDb())
+    const repository = await useVaultRepository(result.vaultPath, getDb())
     setStorageSettings({ mode: 'vault', vaultPath: result.vaultPath, migratedAt: Date.now() })
+    startWatching(repository as MarkdownVaultRepository)
 
     // The index still describes the old store's rows. Rebuilding from the
     // vault is what makes search, backlinks and AI retrieval true again.

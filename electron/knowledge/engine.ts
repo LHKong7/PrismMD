@@ -2,6 +2,13 @@
  * The knowledge index: everything that turns a pile of notes into something
  * you can ask questions of.
  *
+ * ★ The index is **self-contained**: every query joins its own tables and
+ * none of them touch `pages`. It used to, and that was a bug waiting for
+ * vault mode — there `pages` is either empty (a vault created from scratch:
+ * every search silently returns nothing) or a frozen pre-migration archive (a
+ * migrated one: stale titles, and any note written since the migration
+ * invisible). What the index knows, it was told by `indexPage`.
+ *
  * Every function takes the `Database` as its first argument and touches no
  * Electron API, so the whole engine is testable against an in-memory SQLite
  * instance — see `engine.test.ts`. `services/knowledgeService.ts` is the thin
@@ -240,9 +247,17 @@ export function indexPage(db: Database, page: IndexablePage, options?: { force?:
 
     db.prepare(
       `INSERT OR REPLACE INTO note_index_state
-         (page_id, content_hash, title, chunk_count, indexed_at, index_version)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    ).run(page.id, hash, page.title, chunks.length, Date.now(), KNOWLEDGE_INDEX_VERSION)
+         (page_id, content_hash, title, chunk_count, updated_at, indexed_at, index_version)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      page.id,
+      hash,
+      page.title,
+      chunks.length,
+      page.updatedAt || Date.now(),
+      Date.now(),
+      KNOWLEDGE_INDEX_VERSION,
+    )
   })
 
   write()
@@ -316,7 +331,7 @@ const CHUNK_SELECT = `
   SELECT c.id, c.page_id, c.chunk_index, c.heading_path, c.text,
          c.start_offset, c.end_offset, p.title, p.updated_at
   FROM note_chunks c
-  JOIN pages p ON p.id = c.page_id AND p.is_deleted = 0
+  JOIN note_index_state p ON p.page_id = c.page_id
 `
 
 export interface SearchOptions {
@@ -486,7 +501,7 @@ export function getBacklinks(db: Database, pageId: string): LinkRef[] {
     SELECT l.source_page_id AS page_id, p.title, p.updated_at, l.occurrences, l.heading
     FROM note_links l
     JOIN note_titles nt ON nt.norm_title = l.target_norm
-    JOIN pages p ON p.id = l.source_page_id AND p.is_deleted = 0
+    JOIN note_index_state p ON p.page_id = l.source_page_id
     WHERE nt.page_id = ?
     ORDER BY l.occurrences DESC, p.updated_at DESC
   `).all(pageId) as {
@@ -508,12 +523,12 @@ export function getOutgoingLinks(db: Database, pageId: string): OutgoingLinkRef[
   initKnowledge(db)
   const rows = db.prepare(`
     SELECT l.target_norm, l.target_raw, l.heading, l.occurrences,
-           tp.id AS target_page_id, tp.title AS target_title, tp.updated_at
+           tp.page_id AS target_page_id, tp.title AS target_title, tp.updated_at
     FROM note_links l
     LEFT JOIN note_titles nt ON nt.norm_title = l.target_norm
-    LEFT JOIN pages tp ON tp.id = nt.page_id AND tp.is_deleted = 0
+    LEFT JOIN note_index_state tp ON tp.page_id = nt.page_id
     WHERE l.source_page_id = ?
-    ORDER BY (tp.id IS NULL), l.occurrences DESC, l.target_raw
+    ORDER BY (tp.page_id IS NULL), l.occurrences DESC, l.target_raw
   `).all(pageId) as Record<string, any>[]
 
   return rows.map((r) => ({
@@ -539,10 +554,10 @@ export function getUnresolvedLinks(db: Database, limit = 100): UnresolvedLink[] 
   const rows = db.prepare(`
     SELECT l.target_norm, l.target_raw, l.source_page_id, p.title AS source_title
     FROM note_links l
-    JOIN pages p ON p.id = l.source_page_id AND p.is_deleted = 0
+    JOIN note_index_state p ON p.page_id = l.source_page_id
     LEFT JOIN note_titles nt ON nt.norm_title = l.target_norm
-    LEFT JOIN pages tp ON tp.id = nt.page_id AND tp.is_deleted = 0
-    WHERE tp.id IS NULL
+    LEFT JOIN note_index_state tp ON tp.page_id = nt.page_id
+    WHERE tp.page_id IS NULL
     ORDER BY l.target_norm
   `).all() as Record<string, any>[]
 
@@ -567,9 +582,9 @@ export function getOrphanNotes(
 ): { pageId: string; title: string; updatedAt: number }[] {
   initKnowledge(db)
   return db.prepare(`
-    SELECT p.id AS pageId, p.title AS title, p.updated_at AS updatedAt
+    SELECT p.page_id AS pageId, p.title AS title, p.updated_at AS updatedAt
     FROM note_titles nt
-    JOIN pages p ON p.id = nt.page_id AND p.is_deleted = 0
+    JOIN note_index_state p ON p.page_id = nt.page_id
     WHERE NOT EXISTS (SELECT 1 FROM note_links l WHERE l.source_page_id = nt.page_id)
       AND NOT EXISTS (SELECT 1 FROM note_links l WHERE l.target_norm = nt.norm_title)
     ORDER BY p.updated_at DESC
@@ -613,7 +628,7 @@ export function getRelatedNotes(db: Database, pageId: string, limit = 8): Relate
     SELECT nt.page_id AS id, p.title, p.updated_at
     FROM note_links l
     JOIN note_titles nt ON nt.norm_title = l.target_norm
-    JOIN pages p ON p.id = nt.page_id AND p.is_deleted = 0
+    JOIN note_index_state p ON p.page_id = nt.page_id
     WHERE l.source_page_id = ? AND nt.page_id != ?
     ORDER BY l.occurrences DESC
   `).all(pageId, pageId) as Record<string, any>[]
@@ -622,7 +637,7 @@ export function getRelatedNotes(db: Database, pageId: string, limit = 8): Relate
     SELECT l.source_page_id AS id, p.title, p.updated_at
     FROM note_links l
     JOIN note_titles nt ON nt.norm_title = l.target_norm
-    JOIN pages p ON p.id = l.source_page_id AND p.is_deleted = 0
+    JOIN note_index_state p ON p.page_id = l.source_page_id
     WHERE nt.page_id = ? AND l.source_page_id != ?
     ORDER BY l.occurrences DESC
   `).all(pageId, pageId) as Record<string, any>[]
@@ -632,7 +647,7 @@ export function getRelatedNotes(db: Database, pageId: string, limit = 8): Relate
            GROUP_CONCAT(other.tag) AS tags, COUNT(*) AS shared
     FROM note_tags mine
     JOIN note_tags other ON other.tag = mine.tag AND other.page_id != mine.page_id
-    JOIN pages p ON p.id = other.page_id AND p.is_deleted = 0
+    JOIN note_index_state p ON p.page_id = other.page_id
     WHERE mine.page_id = ?
     GROUP BY other.page_id
     ORDER BY shared DESC
@@ -642,7 +657,7 @@ export function getRelatedNotes(db: Database, pageId: string, limit = 8): Relate
   const own = db.prepare(
     'SELECT text FROM note_chunks WHERE page_id = ? ORDER BY chunk_index LIMIT 8',
   ).all(pageId) as { text: string }[]
-  const titleRow = db.prepare('SELECT title FROM pages WHERE id = ?').get(pageId) as
+  const titleRow = db.prepare('SELECT title FROM note_index_state WHERE page_id = ?').get(pageId) as
     | { title: string }
     | undefined
   const profile = `${titleRow?.title ?? ''} ${own.map((c) => c.text).join(' ')}`.trim()
@@ -703,7 +718,7 @@ export function listTags(db: Database, limit = 200): { tag: string; notes: numbe
   return db.prepare(`
     SELECT t.tag AS tag, COUNT(DISTINCT t.page_id) AS notes
     FROM note_tags t
-    JOIN pages p ON p.id = t.page_id AND p.is_deleted = 0
+    JOIN note_index_state p ON p.page_id = t.page_id
     GROUP BY t.tag
     ORDER BY notes DESC, t.tag
     LIMIT ?
@@ -718,9 +733,9 @@ export function getNotesByTag(
 ): { pageId: string; title: string; updatedAt: number }[] {
   initKnowledge(db)
   return db.prepare(`
-    SELECT p.id AS pageId, p.title AS title, p.updated_at AS updatedAt
+    SELECT p.page_id AS pageId, p.title AS title, p.updated_at AS updatedAt
     FROM note_tags t
-    JOIN pages p ON p.id = t.page_id AND p.is_deleted = 0
+    JOIN note_index_state p ON p.page_id = t.page_id
     WHERE t.tag = ?
     ORDER BY p.updated_at DESC
     LIMIT ?
@@ -737,7 +752,7 @@ export function getKnowledgeStats(db: Database): IndexStats {
   const { resolved } = one<{ resolved: number }>(`
     SELECT COUNT(*) AS resolved FROM note_links l
     JOIN note_titles nt ON nt.norm_title = l.target_norm
-    JOIN pages p ON p.id = nt.page_id AND p.is_deleted = 0
+    JOIN note_index_state p ON p.page_id = nt.page_id
   `)
   const { tags } = one<{ tags: number }>('SELECT COUNT(DISTINCT tag) AS tags FROM note_tags')
   const { last } = one<{ last: number | null }>('SELECT MAX(indexed_at) AS last FROM note_index_state')

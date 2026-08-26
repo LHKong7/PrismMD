@@ -30,7 +30,7 @@ import * as path from 'path'
 import { SqliteNoteRepository } from '../repositories/sqliteNoteRepository'
 import { MarkdownVaultRepository } from '../vault/markdownVaultRepository'
 import { parseNote } from '../vault/frontmatter'
-import { closeDb } from '../services/workspaceDb'
+import { closeDb, getDb } from '../services/workspaceDb'
 import { saveAssetFromBytes } from '../services/assetService'
 import { migrateSqliteToVault } from './sqliteToVault'
 import { readJournal } from './migrationJournal'
@@ -300,5 +300,44 @@ describe('migrateSqliteToVault: refusing to sign off', () => {
     expect(journal!.step).toBe('failed')
     expect(journal!.error).toContain('did not arrive')
     expect(journal!.sourceNoteCount).toBe(1)
+  })
+})
+
+describe('migrateSqliteToVault: highlights', () => {
+  it('copies annotations into the vault, so a backup of the folder has them', async () => {
+    // ★ Someone who backs up the vault folder reasonably believes they have
+    // backed up their highlights. Leaving them in the app database means the
+    // folder that looks like "all my notes" silently is not.
+    const page = await source.createPage({ title: 'Annotated', content: 'a passage worth marking' })
+    // Rows written straight into the table the migration reads. Going through
+    // annotationStore would test its backend dispatch instead, and drag
+    // electron-store into a suite that has no Electron.
+    getDb().prepare(`
+      INSERT INTO annotations
+        (id, page_id, start_offset, end_offset, selected_text, color, note, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run('a1', page.id, 2, 9, 'passage', 'yellow', 'a thought', '2026-08-25T10:00:00.000Z', '2026-08-25T10:00:00.000Z')
+
+    const db = new Database(':memory:')
+    scratchDbs.push(db)
+    const result = await migrateSqliteToVault({
+      targetPath: target, source, readBytes, db, sourceDb: getDb(),
+    })
+    expect(result.ok).toBe(true)
+
+    const sidecar = path.join(target, '.prism', 'annotations', `${encodeURIComponent(page.id)}.json`)
+    const stored = JSON.parse(fs.readFileSync(sidecar, 'utf-8'))
+    expect(stored).toHaveLength(1)
+    expect(stored[0]).toMatchObject({ selectedText: 'passage', note: 'a thought' })
+  })
+
+  it('writes no annotations directory when there are none', async () => {
+    await source.createPage({ title: 'Plain', content: 'x' })
+    const db = new Database(':memory:')
+    scratchDbs.push(db)
+    expect((await migrateSqliteToVault({
+      targetPath: target, source, readBytes, db, sourceDb: getDb(),
+    })).ok).toBe(true)
+    expect(fs.existsSync(path.join(target, '.prism', 'annotations'))).toBe(false)
   })
 })

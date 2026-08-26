@@ -13,7 +13,7 @@
 import type { Database } from 'better-sqlite3'
 
 /** Bumped whenever the derived shape changes; a mismatch forces a full re-index. */
-export const KNOWLEDGE_INDEX_VERSION = 1
+export const KNOWLEDGE_INDEX_VERSION = 2
 
 export interface SchemaCapabilities {
   /**
@@ -25,6 +25,13 @@ export interface SchemaCapabilities {
 }
 
 export function ensureKnowledgeSchema(db: Database): SchemaCapabilities {
+  // ★ Indexes built before vault mode declared foreign keys into `pages`.
+  // Those constraints reject every insert once notes live in files, and
+  // SQLite cannot drop a constraint — so the tables are rebuilt. Safe by the
+  // same property as everything else here: the index is derived, so throwing
+  // it away costs a re-scan and nothing else.
+  if (hasLegacyPageConstraints(db)) dropKnowledgeSchema(db)
+
   db.exec(`
     -- One row per indexed passage. The offsets point into pages.content so a
     -- hit can scroll the reader to the passage, not just open the note.
@@ -35,8 +42,7 @@ export function ensureKnowledgeSchema(db: Database): SchemaCapabilities {
       heading_path TEXT NOT NULL DEFAULT '',
       text TEXT NOT NULL,
       start_offset INTEGER NOT NULL DEFAULT 0,
-      end_offset INTEGER NOT NULL DEFAULT 0,
-      FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE
+      end_offset INTEGER NOT NULL DEFAULT 0
     );
 
     -- Normalized title of every indexed note. Link resolution joins against
@@ -46,8 +52,7 @@ export function ensureKnowledgeSchema(db: Database): SchemaCapabilities {
     CREATE TABLE IF NOT EXISTS note_titles (
       page_id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
-      norm_title TEXT NOT NULL,
-      FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE
+      norm_title TEXT NOT NULL
     );
 
     -- One row per (source note, distinct link target).
@@ -58,16 +63,14 @@ export function ensureKnowledgeSchema(db: Database): SchemaCapabilities {
       heading TEXT,
       alias TEXT,
       occurrences INTEGER NOT NULL DEFAULT 1,
-      PRIMARY KEY (source_page_id, target_norm),
-      FOREIGN KEY (source_page_id) REFERENCES pages(id) ON DELETE CASCADE
+      PRIMARY KEY (source_page_id, target_norm)
     );
 
     CREATE TABLE IF NOT EXISTS note_tags (
       page_id TEXT NOT NULL,
       tag TEXT NOT NULL,
       occurrences INTEGER NOT NULL DEFAULT 1,
-      PRIMARY KEY (page_id, tag),
-      FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE
+      PRIMARY KEY (page_id, tag)
     );
 
     -- What the index believes about each page. content_hash is what makes
@@ -77,9 +80,12 @@ export function ensureKnowledgeSchema(db: Database): SchemaCapabilities {
       content_hash TEXT NOT NULL,
       title TEXT NOT NULL,
       chunk_count INTEGER NOT NULL DEFAULT 0,
+      -- The note's own mtime. Held here rather than read from the pages
+      -- table, which in vault mode holds nothing (a vault created from
+      -- scratch) or a frozen pre-migration archive (a migrated one).
+      updated_at INTEGER NOT NULL DEFAULT 0,
       indexed_at INTEGER NOT NULL,
-      index_version INTEGER NOT NULL DEFAULT ${KNOWLEDGE_INDEX_VERSION},
-      FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE
+      index_version INTEGER NOT NULL DEFAULT ${KNOWLEDGE_INDEX_VERSION}
     );
 
     CREATE INDEX IF NOT EXISTS idx_note_chunks_page ON note_chunks(page_id);
@@ -88,6 +94,13 @@ export function ensureKnowledgeSchema(db: Database): SchemaCapabilities {
     CREATE INDEX IF NOT EXISTS idx_note_links_source ON note_links(source_page_id);
     CREATE INDEX IF NOT EXISTS idx_note_tags_tag ON note_tags(tag);
   `)
+
+  // `CREATE TABLE IF NOT EXISTS` never adds a column to a table that already
+  // exists, so an index built by an older build needs the column backfilled.
+  const stateColumns = db.prepare('PRAGMA table_info(note_index_state)').all() as { name: string }[]
+  if (stateColumns.length > 0 && !stateColumns.some((c) => c.name === 'updated_at')) {
+    db.exec('ALTER TABLE note_index_state ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0')
+  }
 
   let fts = true
   try {
@@ -104,6 +117,20 @@ export function ensureKnowledgeSchema(db: Database): SchemaCapabilities {
   }
 
   return { fts }
+}
+
+/**
+ * Whether the tables on disk still reference `pages`.
+ *
+ * Read from `sqlite_master` rather than tracked by a version number: a
+ * version bump re-populates rows, it does not reshape a table, and this needs
+ * the reshape.
+ */
+function hasLegacyPageConstraints(db: Database): boolean {
+  const row = db.prepare(
+    "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'note_index_state'",
+  ).get() as { sql?: string } | undefined
+  return typeof row?.sql === 'string' && /REFERENCES\s+pages/i.test(row.sql)
 }
 
 /**

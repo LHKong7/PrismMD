@@ -34,8 +34,17 @@ export interface VaultChange {
 export interface ReconcileContext {
   /** Catalog entry currently filed under this path, if any. */
   entryAtPath(relativePath: string): { id: string; contentHash: string } | null
-  /** Where the catalog thinks a note with this id lives. */
-  pathOfId(id: string): string | null
+  /**
+   * Note id -> where the catalog currently thinks it lives.
+   *
+   * ★ Taken as a whole map, once, rather than queried per note. Reading a
+   * file *files it into the catalog*, so by the time a rename's second half
+   * is examined the catalog already points at the new path — and a per-note
+   * lookup would answer "it is where it always was" and report a move as a
+   * create plus a delete. The frozen copy is what makes the answer mean
+   * "before this batch".
+   */
+  knownPaths(): Map<string, string>
   /**
    * Read the file and return its identity and hash, or null when it is gone.
    * Also the point at which a newly-seen file gets an id written into it.
@@ -46,48 +55,57 @@ export interface ReconcileContext {
 /**
  * Turn a batch of changed paths into note-level changes.
  *
- * Order matters: a rename arrives as two events, and processing the vanished
- * path first would emit a delete for a note that is about to be found again.
- * So every path is read first, and only then are the leftovers declared gone.
+ * ★ Everything the catalog knew is captured **before** any file is read,
+ * because reading a file updates the catalog. Without the snapshot, a rename
+ * — which arrives as two paths in one batch — reads as a create of the new
+ * path plus a delete of the old, and the note loses its backlinks, its
+ * highlights and its place in the tree on its way through.
+ *
+ * Order matters for the second reason too: every path is read first and only
+ * then are the leftovers declared gone, so the two halves of a rename can be
+ * matched up whichever order they arrive in.
  */
 export async function reconcilePaths(
   paths: string[],
   context: ReconcileContext,
 ): Promise<VaultChange[]> {
+  const unique = dedupe(paths)
+  const knownPaths = context.knownPaths()
+  const before = new Map(unique.map((relativePath) => [relativePath, context.entryAtPath(relativePath)]))
+
   const changes: VaultChange[] = []
   const seenIds = new Set<string>()
   const missing: string[] = []
 
-  for (const relativePath of dedupe(paths)) {
-    const before = context.entryAtPath(relativePath)
+  for (const relativePath of unique) {
     const after = await context.readFile(relativePath)
-
     if (!after) {
       missing.push(relativePath)
       continue
     }
     seenIds.add(after.id)
 
-    const previousPath = context.pathOfId(after.id)
+    const previousPath = knownPaths.get(after.id)
     if (previousPath && previousPath !== relativePath) {
       changes.push({ kind: 'moved', pageId: after.id, relativePath, previousPath })
       continue
     }
-    if (!before) {
+    const wasThere = before.get(relativePath)
+    if (!wasThere) {
       changes.push({ kind: 'created', pageId: after.id, relativePath })
       continue
     }
-    if (before.contentHash !== after.contentHash) {
+    if (wasThere.contentHash !== after.contentHash) {
       changes.push({ kind: 'modified', pageId: after.id, relativePath })
     }
   }
 
   for (const relativePath of missing) {
-    const before = context.entryAtPath(relativePath)
+    const wasThere = before.get(relativePath)
     // The note turned up at another path in this same batch: that was a move,
     // already reported. Reporting a delete too would tell the UI to drop it.
-    if (before && seenIds.has(before.id)) continue
-    changes.push({ kind: 'deleted', pageId: before?.id ?? null, relativePath })
+    if (wasThere && seenIds.has(wasThere.id)) continue
+    changes.push({ kind: 'deleted', pageId: wasThere?.id ?? null, relativePath })
   }
 
   return changes
