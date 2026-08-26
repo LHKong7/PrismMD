@@ -285,6 +285,78 @@ export function describeNoteRepository(label: string, harness: RepositoryHarness
       })
     })
 
+    describe('editorial metadata', () => {
+      it('has nothing to say about a note nobody has classified', async () => {
+        const repo = await fresh()
+        const page = await repo.createPage({ title: 'Unjudged', content: 'x' })
+        const meta = await repo.getNoteMeta(page.id)
+        expect(meta === null || (meta.status === null && meta.genre === null)).toBe(true)
+      })
+
+      it('remembers status, genre and quality', async () => {
+        const repo = await fresh()
+        const page = await repo.createPage({ title: 'Judged', content: 'x' })
+
+        await repo.setNoteMeta(page.id, { status: 'draft', genre: 'tech', quality: 4 })
+        expect(await repo.getNoteMeta(page.id)).toEqual({
+          status: 'draft', genre: 'tech', quality: 4,
+        })
+      })
+
+      it('leaves fields the caller said nothing about alone', async () => {
+        // ★ The renderer saves one control at a time. Treating an absent
+        // field as "clear it" means picking a genre silently wipes the
+        // status the user set a moment earlier.
+        const repo = await fresh()
+        const page = await repo.createPage({ title: 'Judged', content: 'x' })
+
+        await repo.setNoteMeta(page.id, { status: 'hot', genre: 'essay', quality: 5 })
+        await repo.setNoteMeta(page.id, { genre: 'biz' })
+
+        expect(await repo.getNoteMeta(page.id)).toEqual({
+          status: 'hot', genre: 'biz', quality: 5,
+        })
+      })
+
+      it('clears a field that was explicitly set to null', async () => {
+        const repo = await fresh()
+        const page = await repo.createPage({ title: 'Judged', content: 'x' })
+        await repo.setNoteMeta(page.id, { status: 'draft' })
+        await repo.setNoteMeta(page.id, { status: null })
+        expect((await repo.getNoteMeta(page.id))?.status ?? null).toBeNull()
+      })
+
+      it('does not lose the note text it is stored next to', async () => {
+        // ★ In a vault this writes into the note's own front matter, one
+        // surgical line at a time. A round trip through a YAML serializer —
+        // or an off-by-one in the line splice — would eat the body, and the
+        // metadata would still look perfectly correct afterwards.
+        const repo = await fresh()
+        const page = await repo.createPage({ title: 'Judged', content: '# Heading\n\nBody text.' })
+        await repo.setNoteMeta(page.id, { status: 'done', quality: 3 })
+        expect((await repo.getPage(page.id))!.content).toContain('Body text.')
+      })
+
+      it('lists every note, classified or not', async () => {
+        const repo = await fresh()
+        const judged = await repo.createPage({ title: 'Judged', content: 'x' })
+        const plain = await repo.createPage({ title: 'Plain', content: 'yy' })
+        await repo.setNoteMeta(judged.id, { status: 'done' })
+
+        const list = await repo.listNoteMeta()
+        expect(list.find((item) => item.pageId === judged.id)?.status).toBe('done')
+        // Absent from the list, a note has no book on the shelf at all.
+        expect(list.find((item) => item.pageId === plain.id)?.status ?? null).toBeNull()
+      })
+
+      it('survives being asked about a note that is gone', async () => {
+        // The renderer fires this without awaiting, so a rejection surfaces
+        // as an unhandled promise and nothing the user can act on.
+        const repo = await fresh()
+        await expect(repo.setNoteMeta('no-such-note', { status: 'draft' })).resolves.toBeTruthy()
+      })
+    })
+
     describe('search', () => {
       it('finds a note by a fragment of its title', async () => {
         const repo = await fresh()

@@ -22,9 +22,12 @@ import * as path from 'path'
 import type { Database } from 'better-sqlite3'
 import { detectFormat, defaultExtFor, isSupported, kindOfFormat } from '../services/fileFormats'
 import { extractWikiLinks, normalizeTitle, rewriteWikiLinks } from '../knowledge/links'
+import { EMPTY_META, mergeMeta } from '../repositories/noteRepository'
 import type {
   CreateFolderInput,
   CreatePageInput,
+  NoteMeta,
+  NoteMetaListItem,
   NoteRepository,
   Page,
   PageSummary,
@@ -52,6 +55,7 @@ import {
   type CatalogEntry,
 } from './vaultCatalog'
 import { binaryIdsFor, BinaryIdRegistry } from './binaryIds'
+import { trashFor, VaultTrash, type TrashRecord } from './vaultTrash'
 import type { ReconcileContext } from './vaultWatcher'
 import { sidecarFor, VaultSidecar } from './vaultSidecar'
 import {
@@ -64,6 +68,21 @@ import {
   vaultPaths,
   type VaultPaths,
 } from './vaultLayout'
+
+/**
+ * Front matter is text, so `quality` arrives as a string. A value that is not
+ * a number (someone typed `quality: high` by hand) reads back as absent
+ * rather than as `NaN`, which would render as an empty star rating that
+ * silently overwrites their word on the next save.
+ */
+function metaFromFrontmatter(frontmatter: { status?: string; genre?: string; quality?: string }): NoteMeta {
+  const quality = frontmatter.quality === undefined ? NaN : Number(frontmatter.quality)
+  return {
+    status: frontmatter.status ?? null,
+    genre: frontmatter.genre ?? null,
+    quality: Number.isFinite(quality) ? quality : null,
+  }
+}
 
 const WELCOME_TITLE = 'Welcome'
 const WELCOME_CONTENT = `# Welcome to PrismMD
@@ -96,6 +115,7 @@ export class MarkdownVaultRepository implements NoteRepository {
   private readonly db: Database
   private readonly sidecar: VaultSidecar
   private readonly binaryIds: BinaryIdRegistry
+  private readonly trash: VaultTrash
   private scanned = false
 
   /**
@@ -113,6 +133,7 @@ export class MarkdownVaultRepository implements NoteRepository {
     this.db = options.db
     this.sidecar = sidecarFor(this.paths.prism)
     this.binaryIds = binaryIdsFor(this.paths.prism)
+    this.trash = trashFor(this.paths.trash)
     ensureCatalogSchema(this.db)
   }
 
@@ -149,8 +170,36 @@ export class MarkdownVaultRepository implements NoteRepository {
       removed++
     }
 
+    await this.reconcileTrash()
+
     this.scanned = true
     return { indexed, removed }
+  }
+
+  /**
+   * Rebuild the trash table from the manifests on disk.
+   *
+   * ★ This is what makes `note_trash` a cache like everything else in the
+   * database. Without it, the path a deleted note came from would exist
+   * nowhere but `prism.db`, and dropping that file — which the vault model
+   * says costs only time — would quietly turn every recoverable note into an
+   * unplaceable one.
+   */
+  private async reconcileTrash(): Promise<void> {
+    const manifests = await this.trash.readAll()
+    const live = new Set<string>()
+    for (const manifest of manifests) {
+      live.add(manifest.id)
+      recordTrash(this.db, manifest)
+      for (const descendant of manifest.descendants) {
+        live.add(descendant.id)
+        recordTrash(this.db, descendant)
+      }
+    }
+    // A row with no manifest is a trash directory someone emptied by hand.
+    for (const trashed of listTrash(this.db)) {
+      if (!live.has(trashed.id)) removeTrash(this.db, trashed.id)
+    }
   }
 
   private async ensureScanned(): Promise<void> {
@@ -700,48 +749,123 @@ export class MarkdownVaultRepository implements NoteRepository {
     const page = await this.getPage(id)
     if (!page) return
 
+    const deletedAt = Date.now()
+
     if (isFolderId(id)) {
       const relative = folderPathFromId(id)!
       // Descendants leave the catalog with the directory they live in.
+      const descendants: TrashRecord[] = []
       for (const entry of listEntries(this.db)) {
         if (entry.relativePath === relative || entry.relativePath.startsWith(`${relative}/`)) {
-          recordTrash(this.db, {
+          descendants.push({
             id: entry.id,
             originalPath: entry.relativePath,
             title: entry.title,
-            deletedAt: Date.now(),
+            deletedAt,
           })
           removeEntry(this.db, entry.id)
         }
       }
-      recordTrash(this.db, {
+      const manifest = {
         id,
         originalPath: relative,
         title: page.title,
-        deletedAt: Date.now(),
-      })
+        deletedAt,
+        descendants,
+      }
       await movePath(
         toAbsolute(this.root, relative),
         path.join(this.paths.trash, encodeURIComponent(id), path.posix.basename(relative)),
       )
+      // After the move: the manifest goes inside the directory the move
+      // creates, and writing it first would have the move land on top of it.
+      await this.trash.write(manifest)
+      recordTrash(this.db, manifest)
+      for (const record of descendants) recordTrash(this.db, record)
       await this.sidecar.forget(id)
       return
     }
 
     const entry = getEntry(this.db, id)!
-    recordTrash(this.db, {
+    const manifest = {
       id,
       originalPath: entry.relativePath,
       title: entry.title,
-      deletedAt: Date.now(),
-    })
+      deletedAt,
+      descendants: [],
+    }
     await movePath(
       toAbsolute(this.root, entry.relativePath),
       path.join(this.paths.trash, encodeURIComponent(id), path.posix.basename(entry.relativePath)),
     )
+    await this.trash.write(manifest)
+    recordTrash(this.db, manifest)
     removeEntry(this.db, id)
     await this.binaryIds.forget(entry.relativePath)
     await this.sidecar.forget(id)
+  }
+
+  // ── Editorial metadata ──
+
+  /**
+   * Status / genre / quality, read from and written to the note's own front
+   * matter.
+   *
+   * ★ Not a sidecar and not the database. These are judgements the user made
+   * about a note, so by the vault's own rule they cannot live only in the
+   * disposable half — and unlike sidebar order, they are per-note, saved on
+   * an explicit click, and already a convention other Markdown tools
+   * understand. Setting a note to "done" in Obsidian shows up on the shelf
+   * here, which is the whole point of keeping the notes as files.
+   */
+  async getNoteMeta(id: string): Promise<NoteMeta | null> {
+    await this.ensureScanned()
+    const entry = isFolderId(id) ? null : getEntry(this.db, id)
+    if (!entry || kindOfFormat(entry.format) !== 'text') return null
+    const absolute = toAbsolute(this.root, entry.relativePath)
+    const source = await fs.promises.readFile(absolute, 'utf-8').catch(() => null)
+    if (source === null) return null
+    return metaFromFrontmatter(parseNote(source).frontmatter)
+  }
+
+  async setNoteMeta(id: string, partial: Partial<NoteMeta>): Promise<NoteMeta> {
+    await this.ensureScanned()
+    const existing = (await this.getNoteMeta(id)) ?? EMPTY_META
+    const merged = mergeMeta(existing, partial)
+
+    const entry = isFolderId(id) ? null : getEntry(this.db, id)
+    // A binary document has no front matter to write into, and a note that
+    // vanished is a no-op — the renderer does not await this call, so a
+    // rejection would surface as an unhandled promise and nothing else.
+    if (!entry || kindOfFormat(entry.format) !== 'text') return merged
+
+    const absolute = toAbsolute(this.root, entry.relativePath)
+    const source = await fs.promises.readFile(absolute, 'utf-8').catch(() => null)
+    if (source === null) return merged
+
+    const rebuilt = setFrontmatter(source, {
+      id: entry.id,
+      status: merged.status,
+      genre: merged.genre,
+      quality: merged.quality === null ? null : String(merged.quality),
+    })
+    await this.writeFile(absolute, rebuilt)
+    await this.readIntoCatalog(entry.relativePath, entry.id)
+    return merged
+  }
+
+  async listNoteMeta(): Promise<NoteMetaListItem[]> {
+    const pages = await this.listPages()
+    const out: NoteMetaListItem[] = []
+    for (const page of pages) {
+      out.push({
+        ...((await this.getNoteMeta(page.id)) ?? EMPTY_META),
+        pageId: page.id,
+        length: (page.content ?? '').length,
+        updatedAt: page.updatedAt ?? 0,
+      })
+    }
+    return out
   }
 
   async restorePage(id: string): Promise<void> {
@@ -774,6 +898,7 @@ export class MarkdownVaultRepository implements NoteRepository {
       force: true,
     }).catch(() => {})
     removeTrash(this.db, id)
+    await this.trash.forget(id)
 
     // A folder was trashed with its descendants inside it, so restoring it
     // restores them — their trash records have to go too, or they would sit

@@ -59,6 +59,48 @@ export interface PageUpdates {
   isFolder?: boolean
 }
 
+/**
+ * Editorial judgements a user makes about a note: how finished it is, what
+ * kind of thing it is, how good they think it is.
+ *
+ * ★ On the repository rather than in a table of its own because it is user
+ * intent, and the vault's rule is that user intent must survive a lost
+ * database. Each backend puts it where that backend's truth lives — a column
+ * in SQLite mode, front matter in a vault.
+ */
+export interface NoteMeta {
+  status: string | null
+  genre: string | null
+  quality: number | null
+}
+
+export interface NoteMetaListItem extends NoteMeta {
+  pageId: string
+  /** Characters of note text, for sizing the book on the shelf. */
+  length: number
+  updatedAt: number
+}
+
+export const EMPTY_META: NoteMeta = { status: null, genre: null, quality: null }
+
+/**
+ * Merge a partial update over what is already there.
+ *
+ * ★ Shared by both backends rather than written twice, because the rule it
+ * encodes is subtle enough to get wrong differently in each: `undefined`
+ * means "the caller said nothing about this field" and `null` means "the
+ * caller cleared it". Collapsing the two would make un-setting a genre
+ * impossible in one backend and make every partial save wipe the other two
+ * fields in the other.
+ */
+export function mergeMeta(existing: NoteMeta, partial: Partial<NoteMeta>): NoteMeta {
+  const merged: NoteMeta = { ...existing }
+  if (partial.status !== undefined) merged.status = partial.status
+  if (partial.genre !== undefined) merged.genre = partial.genre
+  if (partial.quality !== undefined) merged.quality = partial.quality
+  return merged
+}
+
 export interface RenameResult {
   page: Page
   /**
@@ -115,6 +157,15 @@ export interface NoteRepository {
   movePage(id: string, parentId: string | null, position: number): Promise<void>
   deletePage(id: string): Promise<void>
   restorePage(id: string): Promise<void>
+
+  // ── Editorial metadata ──
+  getNoteMeta(id: string): Promise<NoteMeta | null>
+  /**
+   * Merge in the fields the caller provided. `undefined` leaves a field as it
+   * was; `null` clears it deliberately. Returns the merged result.
+   */
+  setNoteMeta(id: string, partial: Partial<NoteMeta>): Promise<NoteMeta>
+  listNoteMeta(): Promise<NoteMetaListItem[]>
 
   // ── Import / export ──
   importFile(filePath: string, parentId?: string | null): Promise<Page>

@@ -13,6 +13,7 @@ import { getNoteRepository, setNoteRepository, useVaultRepository } from '../rep
 import { SqliteNoteRepository } from '../repositories/sqliteNoteRepository'
 import { getStorageSettings, setStorageSettings, type StorageSettings } from './settingsStore'
 import { getDb } from './workspaceDb'
+import { closeIndexDatabase, openIndexDatabase } from './indexDatabase'
 import { backupFilesFor, migrateSqliteToVault } from '../migration/sqliteToVault'
 import { readJournal, type MigrationJournalEntry } from '../migration/migrationJournal'
 import { PRISM_DIR } from '../vault/vaultLayout'
@@ -121,12 +122,19 @@ export async function initStorage(): Promise<StorageStatus> {
   if (settings.mode === 'vault' && settings.vaultPath) {
     if (fs.existsSync(settings.vaultPath)) {
       try {
-        const repository = await useVaultRepository(settings.vaultPath, getDb())
+        // The catalog, the search index and the caches all live inside the
+        // vault, so opening the vault is what decides which database the rest
+        // of the app derives into.
+        const repository = await useVaultRepository(
+          settings.vaultPath,
+          openIndexDatabase(settings.vaultPath),
+        )
         startWatching(repository as MarkdownVaultRepository)
         console.log(`[storage] vault mode — ${settings.vaultPath}`)
         return status()
       } catch (err) {
         console.error('[storage] Failed to open the vault, staying on SQLite:', err)
+        closeIndexDatabase()
       }
     } else {
       // ★ Do not fall back silently. A vault on an unmounted drive looks
@@ -138,6 +146,7 @@ export async function initStorage(): Promise<StorageStatus> {
   }
 
   stopWatching()
+  closeIndexDatabase()
   setNoteRepository(new SqliteNoteRepository())
   return status()
 }
@@ -187,7 +196,6 @@ export async function migrateWorkspaceToVault(targetPath: string): Promise<Migra
     const result = await migrateSqliteToVault({
       targetPath,
       source,
-      db: getDb(),
       sourceDb: getDb(),
       readBytes: (pageId) => source.readPageBytes(pageId),
       backupDir: path.join(app.getPath('userData'), 'backups'),
@@ -205,7 +213,10 @@ export async function migrateWorkspaceToVault(targetPath: string): Promise<Migra
       }
     }
 
-    const repository = await useVaultRepository(result.vaultPath, getDb())
+    const repository = await useVaultRepository(
+      result.vaultPath,
+      openIndexDatabase(result.vaultPath),
+    )
     setStorageSettings({ mode: 'vault', vaultPath: result.vaultPath, migratedAt: Date.now() })
     startWatching(repository as MarkdownVaultRepository)
 

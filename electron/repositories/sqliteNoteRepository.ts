@@ -9,12 +9,16 @@
  * see the comment on it.
  */
 import { getDb } from '../services/workspaceDb'
+import { indexDb } from '../services/indexDatabase'
 import { extractWikiLinks, normalizeTitle, rewriteWikiLinks } from '../knowledge/links'
 import * as documents from '../services/documentService'
 import { readAssetBytes } from '../services/assetService'
+import { EMPTY_META, mergeMeta } from './noteRepository'
 import type {
   CreateFolderInput,
   CreatePageInput,
+  NoteMeta,
+  NoteMetaListItem,
   NoteRepository,
   Page,
   PageSummary,
@@ -178,6 +182,59 @@ export class SqliteNoteRepository implements NoteRepository {
 
   async restorePage(id: string): Promise<void> {
     documents.restorePage(id)
+  }
+
+  // ── Editorial metadata ──
+
+  async getNoteMeta(id: string): Promise<NoteMeta | null> {
+    const row = indexDb()
+      .prepare('SELECT status, genre, quality FROM page_meta WHERE page_id = ?')
+      .get(id) as NoteMeta | undefined
+    if (!row) return null
+    return { status: row.status ?? null, genre: row.genre ?? null, quality: row.quality ?? null }
+  }
+
+  async setNoteMeta(id: string, partial: Partial<NoteMeta>): Promise<NoteMeta> {
+    const merged = mergeMeta((await this.getNoteMeta(id)) ?? EMPTY_META, partial)
+    // A page that was deleted under us is a no-op rather than an error: the
+    // renderer fires this without awaiting, so a rejection would surface as
+    // an unhandled promise instead of anything the user can act on.
+    if (!getDb().prepare('SELECT 1 FROM pages WHERE id = ?').get(id)) return merged
+    indexDb().prepare(
+      `INSERT INTO page_meta (page_id, status, genre, quality, updated_at) VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT(page_id) DO UPDATE SET
+         status = excluded.status, genre = excluded.genre,
+         quality = excluded.quality, updated_at = excluded.updated_at`,
+    ).run(id, merged.status, merged.genre, merged.quality, Date.now())
+    return merged
+  }
+
+  async listNoteMeta(): Promise<NoteMetaListItem[]> {
+    // Two databases in vault mode, one here — so the join is done in JS
+    // rather than in SQL. The row counts are workspace-sized, and a query
+    // that only works when both tables happen to share a connection is a
+    // trap for whoever moves them apart next.
+    const meta = new Map(
+      (indexDb().prepare('SELECT page_id, status, genre, quality FROM page_meta').all() as Array<
+        { page_id: string } & NoteMeta
+      >).map((row) => [row.page_id, row]),
+    )
+    const rows = getDb().prepare(
+      `SELECT id, LENGTH(content) AS length, updated_at
+       FROM pages WHERE is_deleted = 0 AND is_folder = 0`,
+    ).all() as Array<{ id: string; length: number | null; updated_at: number | null }>
+
+    return rows.map((row) => {
+      const found = meta.get(row.id)
+      return {
+        pageId: row.id,
+        status: found?.status ?? null,
+        genre: found?.genre ?? null,
+        quality: found?.quality ?? null,
+        length: row.length ?? 0,
+        updatedAt: row.updated_at ?? 0,
+      }
+    })
   }
 
   // ── Import / export ──

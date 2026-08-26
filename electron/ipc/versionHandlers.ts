@@ -15,9 +15,11 @@ export function registerVersionHandlers() {
     saveVersion(pageId, content, opts ?? {}),
   )
   ipcMain.handle('version:list', (_event, pageId: string) => listVersions(pageId))
-  ipcMain.handle('version:get', (_event, versionId: string) => getVersion(versionId))
-  ipcMain.handle('version:delete', (_event, versionId: string) => {
-    deleteVersion(versionId)
+  ipcMain.handle('version:get', (_event, versionId: string, pageId?: string) =>
+    getVersion(versionId, pageId),
+  )
+  ipcMain.handle('version:delete', async (_event, versionId: string, pageId?: string) => {
+    await deleteVersion(versionId, pageId)
     return { ok: true }
   })
 }

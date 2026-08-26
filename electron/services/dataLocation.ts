@@ -17,7 +17,16 @@ import * as path from 'path'
 
 const BOOTSTRAP_FILE = 'data-location.json'
 
-/** Known entries under `userData` that should travel together on a move. */
+/**
+ * Known entries under `userData` that should travel together on a move.
+ *
+ * ★ `workspace.db` is still on this list, and should be: it is the *store*
+ * for a workspace that has not been migrated, and after a migration it is the
+ * archive of what that workspace was. What is no longer here is a vault's
+ * catalog and search index — those live in `<vault>/.prism/prism.db` now, so
+ * relocating app data can no longer separate a vault from its index. That
+ * separation was the conflict decision D6 named.
+ */
 const DATA_ENTRIES = [
   'workspace.db',
   'workspace.db-wal',

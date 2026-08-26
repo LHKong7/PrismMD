@@ -160,8 +160,13 @@ Vault/
 └── .prism/                  app data
     ├── ui.json              sidebar order and icons — losable
     ├── binaries.json        ids for documents that cannot hold one — keep
-    └── annotations/         your highlights — keep
+    ├── annotations/         your highlights — keep
+    ├── versions/            snapshot history — keep
+    └── prism.db             search index and caches — safe to delete
 ```
+
+A note's status, genre and rating are front matter, so classifying a note in
+Obsidian shows up on PrismMD's shelf and the other way round.
 
 The migration copies every note into a folder you choose, backs up your current
 workspace first, and **checks the copy note by note** before switching anything
@@ -173,9 +178,19 @@ or moved in Finder stays the same note — its id lives in the file, so its
 backlinks and highlights follow it. If you are mid-edit when a note changes on
 disk, your unsaved text wins.
 
-> Two things under `.prism/` are not caches: `binaries.json` and
-> `annotations/`. Back those up with your notes; `ui.json` you can lose without
-> consequence beyond alphabetical sidebar order.
+**What to back up.** The vault folder, all of it — that is the point of the
+format. If you are being selective: everything except `.prism/prism.db` is
+worth keeping. That one file holds only answers derived from your notes, and
+deleting it costs a re-scan and nothing else. Everything else under `.prism/`
+is either the only copy of something you made (`annotations/`, `versions/`,
+`binaries.json`) or cheap to keep (`ui.json`, whose loss costs you nothing
+beyond alphabetical sidebar order).
+
+A vault is self-contained: copy the folder to another machine and your search
+index, highlights and history come with it. The one exception is the text
+PrismMD extracts from PDFs, which it can only re-read when you next open the
+document — so a freshly copied vault finds your PDFs by name immediately and
+by their contents once you have opened them.
 
 ## Prerequisites
 

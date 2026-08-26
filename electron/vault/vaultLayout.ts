@@ -5,19 +5,32 @@
  * Vault/
  * ├── Inbox/一个想法.md          notes — the only content truth
  * ├── Attachments/diagram.png    binaries, likewise
- * ├── .trash/<uuid>/Note.md      deleted notes, recoverable to their old path
+ * ├── .trash/<uuid>/Note.md      deleted notes, with a meta.json saying where
+ *                              they came from (main data — a scan rebuilds the table)
  * └── .prism/                    app data
  *     ├── ui.json                sibling ordering + icons (user intent, losable)
  *     ├── binaries.json          ids for documents that cannot hold one (main data)
- *     └── annotations/<uuid>.json  highlights (main data — must be backed up)
+ *     ├── annotations/<uuid>.json  highlights (main data — must be backed up)
+ *     ├── versions/<uuid>/*.md   snapshot history (main data — must be backed up)
+ *     └── prism.db               catalog, search index, caches (losable)
  * ```
  *
- * ★ `.prism/` is **not** uniformly a cache. Half of it is derived and can be
- * thrown away (`order.json` degrades to name-sort, `folders.json` to no
- * icon); the other half is the only copy of something the user made
- * (`annotations/`). A backup rule that treats the whole
- * directory as one or the other is wrong in one direction or the other, so
- * the split is named here rather than left to be inferred.
+ * ★ `.prism/` is **not** uniformly a cache, and the split is named here
+ * rather than left to be inferred, because a backup rule that treats the
+ * whole directory as one thing is wrong in one direction or the other:
+ *
+ * | Must be backed up | Safe to delete |
+ * | --- | --- |
+ * | `binaries.json`, `annotations/`, `versions/` | `prism.db` |
+ *
+ * `ui.json` sits between the two: it is user intent (the order you dragged
+ * things into), but it is **declared losable** — without it the sidebar
+ * falls back to alphabetical and icons vanish, and no note is affected.
+ *
+ * The rule that decides which column a thing lands in is the one the whole
+ * vault model rests on: **if walking the files can rebuild it, it is a
+ * cache.** `prism.db` holds only answers derived from the notes; the other
+ * three hold things the notes cannot express.
  */
 import * as path from 'path'
 
@@ -36,6 +49,16 @@ export interface VaultPaths {
   uiFile: string
   binariesFile: string
   annotations: string
+  versions: string
+  /**
+   * Everything derived: the catalog, the search index, the AI caches.
+   *
+   * ★ Inside the vault so that a vault is one self-contained thing — copy the
+   * folder to another machine and its search index comes with it — and so
+   * that two vaults on one machine cannot share a catalog. Deletable at any
+   * time: the next scan rebuilds it from the files.
+   */
+  indexFile: string
 }
 
 export function vaultPaths(root: string): VaultPaths {
@@ -48,6 +71,8 @@ export function vaultPaths(root: string): VaultPaths {
     uiFile: path.join(prism, 'ui.json'),
     binariesFile: path.join(prism, 'binaries.json'),
     annotations: path.join(prism, 'annotations'),
+    versions: path.join(prism, 'versions'),
+    indexFile: path.join(prism, 'prism.db'),
   }
 }
 

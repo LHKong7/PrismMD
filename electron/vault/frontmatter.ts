@@ -9,13 +9,23 @@
  * has to come out with all three untouched — even though PrismMD understands
  * none of them.
  *
- * So: reading understands a deliberately small subset (the five fields below);
+ * So: reading understands a deliberately small subset (the fields below);
  * writing edits *the lines of the keys it owns* and leaves every other byte
  * exactly where it was. Anything this file cannot parse, it preserves.
  *
- * PrismMD writes `id`, `title`, `created` and `updated`. It reads `tags` but
- * never writes them — that list is the author's, and rewriting it would mean
- * having an opinion about a field the user maintains by hand.
+ * PrismMD writes `id`, `title`, `created`, `updated`, and the three editorial
+ * fields `status`, `genre` and `quality`. It reads `tags` but never writes
+ * them — that list is the author's, and rewriting it would mean having an
+ * opinion about a field the user maintains by hand.
+ *
+ * ★ The editorial three are here rather than in a sidecar because they are
+ * things the user decided about a note, and the vault's rule is that user
+ * intent does not live only in SQLite. They are also exactly the fields other
+ * Markdown tools already expect in front matter, so `status: draft` set in
+ * Obsidian shows up on the shelf here, and vice versa. The cost is that
+ * flagging a note dirties its file — acceptable for a per-note judgement
+ * saved on an explicit click, and not acceptable for sidebar drag order,
+ * which is why that stayed in `ui.json`.
  */
 
 export interface NoteFrontmatter {
@@ -26,6 +36,12 @@ export interface NoteFrontmatter {
   tags?: string[]
   created?: string
   updated?: string
+  /** Editorial state: draft / done / revise / hot. */
+  status?: string
+  /** Editorial category: tech / biz / essay / note. */
+  genre?: string
+  /** Star rating, written unquoted so other tools read it as a number. */
+  quality?: string
 }
 
 export interface ParsedNote {
@@ -88,9 +104,9 @@ function parseFields(inner: string): NoteFrontmatter {
       out.tags = parseTags(rest, lines, i)
       continue
     }
-    if (key === 'id' || key === 'title' || key === 'created' || key === 'updated') {
+    if ((WRITABLE as string[]).includes(key)) {
       const value = parseScalar(rest)
-      if (value) out[key] = value
+      if (value) out[key as WritableKey] = value
     }
   }
   return out
@@ -149,8 +165,23 @@ function writeScalar(value: string): string {
 }
 
 /** The keys this module is allowed to rewrite. */
-type WritableKey = 'id' | 'title' | 'created' | 'updated'
-const WRITABLE: WritableKey[] = ['id', 'title', 'created', 'updated']
+type WritableKey = 'id' | 'title' | 'created' | 'updated' | 'status' | 'genre' | 'quality'
+const WRITABLE: WritableKey[] = ['id', 'title', 'created', 'updated', 'status', 'genre', 'quality']
+
+/**
+ * Keys written bare when they look like a number.
+ *
+ * A quoted `quality: "4"` is valid YAML and PrismMD reads it back fine, but
+ * every other tool then sorts and filters it as text — where 10 comes before
+ * 2. Titles get quoted unconditionally because their content is arbitrary;
+ * this one is a rating, and a rating that is not a number is worth writing as
+ * a string rather than corrupting the file.
+ */
+const NUMERIC: ReadonlySet<string> = new Set(['quality'])
+
+function writeValue(key: string, value: string): string {
+  return NUMERIC.has(key) && /^-?\d+(\.\d+)?$/.test(value) ? value : writeScalar(value)
+}
 
 /**
  * Write the given fields into `source`, leaving everything else byte-identical.
@@ -172,14 +203,14 @@ export function setFrontmatter(
 
     const at = indexOfKey(lines, key)
     if (at < 0) {
-      if (value !== null) lines.push(`${key}: ${writeScalar(value)}`)
+      if (value !== null) lines.push(`${key}: ${writeValue(key, value)}`)
       continue
     }
 
     // Replace the key line and drop any continuation lines belonging to it,
     // so switching a block sequence to a scalar does not strand its items.
     const end = endOfEntry(lines, at)
-    const replacement = value === null ? [] : [`${key}: ${writeScalar(value)}`]
+    const replacement = value === null ? [] : [`${key}: ${writeValue(key, value)}`]
     lines.splice(at, end - at, ...replacement)
   }
 
@@ -210,7 +241,7 @@ export function composeNote(frontmatter: NoteFrontmatter, body: string): string 
   const lines: string[] = []
   for (const key of WRITABLE) {
     const value = frontmatter[key]
-    if (value) lines.push(`${key}: ${writeScalar(value)}`)
+    if (value) lines.push(`${key}: ${writeValue(key, value)}`)
   }
   if (frontmatter.tags?.length) {
     lines.push('tags:')

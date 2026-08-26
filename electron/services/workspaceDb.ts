@@ -1,13 +1,19 @@
 /**
  * Workspace Database — SQLite storage for the Notion-like workspace.
  *
- * All pages, annotations, and doc summaries are stored in a single
- * SQLite database at {userData}/workspace.db. Uses better-sqlite3
- * for synchronous, fast, single-file access.
+ * This is the **store**: in SQLite mode it holds the notes themselves. After
+ * a migration to a vault it stays behind as a read-only archive — nothing
+ * writes `pages` any more, and it is kept because it is the only copy left if
+ * someone wants to go back.
+ *
+ * Anything *derived* from the notes goes through `indexDatabase.ts` instead,
+ * which in vault mode answers with a database inside the vault. See the note
+ * there for why the two are split.
  */
 import Database from 'better-sqlite3'
 import * as path from 'path'
 import { app } from 'electron'
+import { ensureSatelliteSchema } from './satelliteSchema'
 
 let db: Database.Database | null = null
 
@@ -55,44 +61,6 @@ export function getDb(): Database.Database {
       FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE
     );
 
-    CREATE TABLE IF NOT EXISTS doc_summaries (
-      page_id TEXT PRIMARY KEY,
-      tldr TEXT,
-      questions TEXT,
-      generated_at INTEGER,
-      signature TEXT,
-      FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS page_versions (
-      id TEXT PRIMARY KEY,
-      page_id TEXT NOT NULL,
-      content TEXT NOT NULL,
-      title TEXT,
-      source TEXT,
-      label TEXT,
-      created_at INTEGER NOT NULL,
-      FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS page_meta (
-      page_id TEXT PRIMARY KEY,
-      status TEXT,
-      genre TEXT,
-      quality INTEGER,
-      updated_at INTEGER,
-      FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS muse_cards (
-      id TEXT PRIMARY KEY,
-      kind TEXT NOT NULL,
-      text TEXT NOT NULL,
-      page_id TEXT,
-      created_at INTEGER NOT NULL,
-      FOREIGN KEY (page_id) REFERENCES pages(id) ON DELETE SET NULL
-    );
-
     -- Binary payload for non-text pages (PDF, XLSX). The bytes live on
     -- disk under {userData}/assets/ rather than in a BLOB column so that
     -- a SELECT * over pages stays cheap no matter how big the document is;
@@ -125,8 +93,6 @@ export function getDb(): Database.Database {
     CREATE INDEX IF NOT EXISTS idx_pages_parent ON pages(parent_id);
     CREATE INDEX IF NOT EXISTS idx_pages_deleted ON pages(is_deleted);
     CREATE INDEX IF NOT EXISTS idx_annotations_page ON annotations(page_id);
-    CREATE INDEX IF NOT EXISTS idx_versions_page ON page_versions(page_id);
-    CREATE INDEX IF NOT EXISTS idx_muse_created ON muse_cards(created_at);
   `)
 
   // ── Migrations for pre-existing databases ──
@@ -136,6 +102,12 @@ export function getDb(): Database.Database {
   if (!pageCols.some((c) => c.name === 'is_folder')) {
     db.exec('ALTER TABLE pages ADD COLUMN is_folder INTEGER NOT NULL DEFAULT 0')
   }
+
+  // Version history, editorial metadata, AI summaries and muse cards are
+  // defined once, in satelliteSchema, because in vault mode they live in the
+  // vault's database instead of this one. Two definitions would drift, and
+  // the drift would show up as a feature that works in one storage mode.
+  ensureSatelliteSchema(db)
 
   return db
 }

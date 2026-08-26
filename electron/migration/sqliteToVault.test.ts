@@ -135,16 +135,19 @@ describe('migrateSqliteToVault', () => {
     // The extracted-text backfill the renderer does; it must survive too.
     await source.updatePage(page.id, { content: 'extracted text' })
 
-    const db = new Database(':memory:')
-    scratchDbs.push(db)
-    const result = await migrateSqliteToVault({ targetPath: target, source, readBytes, db })
+    const result = await migrateSqliteToVault({
+      targetPath: target, source, readBytes, sourceDb: getDb(),
+    })
 
     expect(result.ok).toBe(true)
     expect([...fs.readFileSync(path.join(target, 'Paper.pdf'))]).toEqual([...bytes])
 
     // ★ A PDF's searchable text cannot live inside the PDF, so it travels in
-    // the catalog database. Without this the document arrives unsearchable
-    // and nothing says so.
+    // the vault's own database — which the migration creates and closes
+    // before the swap. Without this the document arrives unsearchable and
+    // nothing says so.
+    const db = new Database(path.join(target, '.prism', 'prism.db'))
+    scratchDbs.push(db)
     const vault = new MarkdownVaultRepository({ root: target, db })
     await vault.scan()
     expect((await vault.getPage(page.id))!.content).toBe('extracted text')
@@ -318,10 +321,8 @@ describe('migrateSqliteToVault: highlights', () => {
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run('a1', page.id, 2, 9, 'passage', 'yellow', 'a thought', '2026-08-25T10:00:00.000Z', '2026-08-25T10:00:00.000Z')
 
-    const db = new Database(':memory:')
-    scratchDbs.push(db)
     const result = await migrateSqliteToVault({
-      targetPath: target, source, readBytes, db, sourceDb: getDb(),
+      targetPath: target, source, readBytes, sourceDb: getDb(),
     })
     expect(result.ok).toBe(true)
 
@@ -331,12 +332,80 @@ describe('migrateSqliteToVault: highlights', () => {
     expect(stored[0]).toMatchObject({ selectedText: 'passage', note: 'a thought' })
   })
 
+  it('carries editorial metadata into front matter', async () => {
+    // ★ `page_meta` has no destination table in a vault — these three become
+    // front matter. A migration that dropped them would quietly un-classify
+    // every note the user had ever marked.
+    const page = await source.createPage({ title: 'Judged', content: 'body' })
+    getDb().prepare(
+      'INSERT INTO page_meta (page_id, status, genre, quality, updated_at) VALUES (?, ?, ?, ?, ?)',
+    ).run(page.id, 'done', 'tech', 4, Date.now())
+
+    expect((await migrateSqliteToVault({
+      targetPath: target, source, readBytes, sourceDb: getDb(),
+    })).ok).toBe(true)
+
+    const raw = fs.readFileSync(path.join(target, 'Judged.md'), 'utf-8')
+    expect(parseNote(raw).frontmatter).toMatchObject({
+      status: 'done', genre: 'tech', quality: '4',
+    })
+    // Unquoted, so other Markdown tools sort it as a number.
+    expect(raw).toContain('quality: 4')
+  })
+
+  it('carries snapshot history into .prism/versions', async () => {
+    // ★ Before the vault had a database of its own, these rows simply stayed
+    // in `workspace.db` and kept working. Now the vault starts with an empty
+    // database, so not copying them means losing every snapshot silently.
+    const page = await source.createPage({ title: 'Rewritten', content: 'new text' })
+    getDb().prepare(
+      'INSERT INTO page_versions (id, page_id, content, title, source, label, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    ).run('v1', page.id, 'old text', 'Rewritten', 'round-table', 'before the rewrite', 1000)
+
+    expect((await migrateSqliteToVault({
+      targetPath: target, source, readBytes, sourceDb: getDb(),
+    })).ok).toBe(true)
+
+    const dir = path.join(target, '.prism', 'versions', encodeURIComponent(page.id))
+    const [file] = fs.readdirSync(dir)
+    const raw = fs.readFileSync(path.join(dir, file), 'utf-8')
+    expect(raw).toContain('old text')
+    expect(raw).toContain('prism-source: "round-table"')
+    expect(raw).toContain('prism-label: "before the rewrite"')
+  })
+
+  it('carries AI summaries into the vault database', async () => {
+    const page = await source.createPage({ title: 'Summarised', content: 'body' })
+    getDb().prepare(
+      'INSERT INTO doc_summaries (page_id, tldr, questions, generated_at, signature) VALUES (?, ?, ?, ?, ?)',
+    ).run(page.id, 'the short version', '[]', 1000, 'sig')
+
+    expect((await migrateSqliteToVault({
+      targetPath: target, source, readBytes, sourceDb: getDb(),
+    })).ok).toBe(true)
+
+    const db = new Database(path.join(target, '.prism', 'prism.db'))
+    scratchDbs.push(db)
+    expect(db.prepare('SELECT tldr FROM doc_summaries WHERE page_id = ?').get(page.id))
+      .toEqual({ tldr: 'the short version' })
+  })
+
+  it('leaves no open handle inside the staging directory', async () => {
+    // The staging directory is renamed into place; on Windows an open
+    // database handle inside it fails that rename outright.
+    await source.createPage({ title: 'Plain', content: 'x' })
+    const result = await migrateSqliteToVault({
+      targetPath: target, source, readBytes, sourceDb: getDb(),
+    })
+    expect(result.ok).toBe(true)
+    expect(fs.existsSync(path.join(target, '.prism', 'prism.db'))).toBe(true)
+    expect(fs.existsSync(`${target}.migrating`)).toBe(false)
+  })
+
   it('writes no annotations directory when there are none', async () => {
     await source.createPage({ title: 'Plain', content: 'x' })
-    const db = new Database(':memory:')
-    scratchDbs.push(db)
     expect((await migrateSqliteToVault({
-      targetPath: target, source, readBytes, db, sourceDb: getDb(),
+      targetPath: target, source, readBytes, sourceDb: getDb(),
     })).ok).toBe(true)
     expect(fs.existsSync(path.join(target, '.prism', 'annotations'))).toBe(false)
   })

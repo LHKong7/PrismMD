@@ -13,10 +13,16 @@
  *    SQLite — a half-migrated workspace is worse than an un-migrated one.
  *
  * ★ Page ids are carried across verbatim into front matter, which is what
- * makes this cheap: `annotations`, `page_versions`, `page_meta`,
- * `doc_summaries` and `muse_cards` are all keyed by page id, so none of them
- * need migrating at all. Generating fresh ids would have orphaned every one
- * of those tables silently.
+ * makes the rest cheap: `annotations`, `page_versions`, `page_meta`,
+ * `doc_summaries` and `muse_cards` are all keyed by page id, so each one is a
+ * copy rather than a remapping. Generating fresh ids would have orphaned
+ * every one of them silently.
+ *
+ * They are still copied, and that is a change from when the vault's database
+ * lived in `userData` and they simply stayed put. Three of them land
+ * somewhere new: highlights and snapshots become files in the vault, and
+ * editorial metadata becomes front matter — because the vault's database is
+ * declared disposable, and none of those three could survive being disposed.
  */
 import * as crypto from 'crypto'
 import * as fs from 'fs'
@@ -29,6 +35,8 @@ import { composeNote } from '../vault/frontmatter'
 import { titleFromFileName, uniqueFileName } from '../vault/fileName'
 import { PRISM_DIR, vaultPaths } from '../vault/vaultLayout'
 import { ensureCatalogSchema, setExtractedText } from '../vault/vaultCatalog'
+import { versionsFor } from '../vault/vaultVersions'
+import { ensureSatelliteSchema } from '../services/satelliteSchema'
 import { binaryIdsFor } from '../vault/binaryIds'
 import type { NoteRepository, Page } from '../repositories/noteRepository'
 import {
@@ -47,19 +55,13 @@ export interface MigrationOptions {
   /** Bytes of a binary page; the vault stores the document itself. */
   readBytes(pageId: string): Promise<Uint8Array | null>
   /**
-   * The database the finished vault's catalog will live in. Given, the
-   * migration carries every binary document's extracted text into it — see
-   * the note on `note_text_cache`. Omitted, PDFs arrive unsearchable until
-   * each is opened once.
-   */
-  db?: Database.Database
-  /**
-   * The database being migrated *from*, read for highlights.
+   * The database being migrated *from*: highlights, snapshots, editorial
+   * metadata, AI summaries and muse cards are all read out of it.
    *
-   * ★ Separate from `db` even though production passes the same connection
-   * for both: one is a source and one is a destination, and reading the
-   * destination for the source's rows is a mistake that only shows up when
-   * they differ — which is exactly what a test does.
+   * ★ There is deliberately no destination parameter. The finished vault's
+   * database is `<vault>/.prism/prism.db`, which this function creates inside
+   * the staging directory and closes before the swap — so a caller cannot
+   * hand it the wrong one, and cannot hold an open handle across the rename.
    */
   sourceDb?: Database.Database
   /** Files copied verbatim into the backup, e.g. workspace.db and its WAL. */
@@ -119,32 +121,22 @@ export async function migrateSqliteToVault(options: MigrationOptions): Promise<M
     await journal.advance('writing-notes')
     const folderPathOf = await writeFolders(staging, options.source, sourceFolders)
 
-    // 3. Write the notes.
+    // 3. Write the notes, folding `page_meta` into their front matter.
+    const editorialMeta = readEditorialMeta(options.sourceDb)
     const { written, binaryIds } = await writeNotes({
       staging,
       pages: sourcePages,
       folderPathOf,
       readBytes: options.readBytes,
+      metaOf: (pageId) => editorialMeta.get(pageId),
       onProgress: options.onProgress,
     })
     await binaryIdsFor(path.join(staging, PRISM_DIR)).replaceAll(binaryIds)
 
-    // A PDF's searchable text cannot go into the PDF. Carrying it over means
-    // documents stay findable the moment the migration lands, instead of only
-    // after each has been opened once.
-    if (options.db) {
-      ensureCatalogSchema(options.db)
-      for (const page of sourcePages) {
-        if (kindOfFormat(page.format) === 'binary' && page.content) {
-          setExtractedText(options.db, page.id, page.content)
-        }
-      }
-    }
-    // Highlights come along in bulk, so a freshly migrated vault is complete
-    // from the first moment rather than healing note by note as they are
-    // opened. (The lazy backfill in annotationStore still exists, for vaults
-    // migrated before highlights lived here at all.)
-    if (options.sourceDb) await writeAnnotations(staging, options.sourceDb)
+    // Everything else that is keyed by a note id. All of it comes across in
+    // bulk, so a freshly migrated vault is complete from its first moment
+    // rather than healing note by note as they are opened.
+    await carryNoteScopedData(staging, sourcePages, options.sourceDb)
 
     await journal.advance('notes-written', { writtenNoteCount: written })
 
@@ -245,9 +237,11 @@ async function writeNotes(args: {
   pages: Page[]
   folderPathOf: Map<string, string>
   readBytes(pageId: string): Promise<Uint8Array | null>
+  /** Editorial metadata from `page_meta`, which becomes front matter. */
+  metaOf?(pageId: string): { status?: string; genre?: string; quality?: string } | undefined
   onProgress?(update: { step: string; done: number; total: number }): void
 }): Promise<{ written: number; binaryIds: Record<string, string> }> {
-  const { staging, pages, folderPathOf, readBytes, onProgress } = args
+  const { staging, pages, folderPathOf, readBytes, metaOf, onProgress } = args
   const binaryIds: Record<string, string> = {}
   let done = 0
 
@@ -283,6 +277,10 @@ async function writeNotes(args: {
             title: titleFromFileName(fileName) === page.title ? undefined : page.title,
             created: new Date(page.createdAt || Date.now()).toISOString(),
             updated: new Date(page.updatedAt || Date.now()).toISOString(),
+            // ★ `page_meta` has no destination table any more: in a vault
+            // these three are front matter. Dropping them here would lose a
+            // judgement the user made about every note they had classified.
+            ...(metaOf?.(page.id) ?? {}),
           },
           page.content,
         ),
@@ -293,6 +291,152 @@ async function writeNotes(args: {
     onProgress?.({ step: 'writing', done, total: pages.length })
   }
   return { written: done, binaryIds }
+}
+
+/**
+ * Editorial metadata, read as strings because that is what front matter is.
+ *
+ * Returns an empty map when there is no source database or no such table —
+ * an older workspace that never had one must still migrate.
+ */
+function readEditorialMeta(
+  db?: Database.Database,
+): Map<string, { status?: string; genre?: string; quality?: string }> {
+  const out = new Map<string, { status?: string; genre?: string; quality?: string }>()
+  if (!db) return out
+  let rows: Array<{ page_id: string; status: string | null; genre: string | null; quality: number | null }>
+  try {
+    rows = db.prepare('SELECT page_id, status, genre, quality FROM page_meta').all() as typeof rows
+  } catch {
+    return out
+  }
+  for (const row of rows) {
+    const fields: { status?: string; genre?: string; quality?: string } = {}
+    if (row.status) fields.status = row.status
+    if (row.genre) fields.genre = row.genre
+    if (row.quality !== null && row.quality !== undefined) fields.quality = String(row.quality)
+    if (Object.keys(fields).length > 0) out.set(row.page_id, fields)
+  }
+  return out
+}
+
+/**
+ * Bring across everything keyed by a note id that is not the note.
+ *
+ * ★ This exists because of where the vault's database now lives. While it sat
+ * in `userData`, all of these tables simply stayed where they were and kept
+ * working — page ids are carried across verbatim, so nothing was orphaned.
+ * Moving the derived database into the vault turns that inheritance into a
+ * loss: the new database starts empty, and a migration that did not copy
+ * would silently drop every snapshot, summary and highlight.
+ *
+ * Two of them stop being database rows on the way over. Snapshots and
+ * highlights are things the user made, so they become files in the vault;
+ * only the genuinely derived caches land in `prism.db`.
+ *
+ * The connection is closed before returning: the staging directory is about
+ * to be renamed, and an open handle inside it fails that rename on Windows.
+ */
+async function carryNoteScopedData(
+  staging: string,
+  pages: Page[],
+  sourceDb?: Database.Database,
+): Promise<void> {
+  await writeVersions(staging, sourceDb)
+  if (sourceDb) await writeAnnotations(staging, sourceDb)
+
+  const index = new Database(path.join(staging, PRISM_DIR, 'prism.db'))
+  try {
+    index.pragma('journal_mode = WAL')
+    ensureCatalogSchema(index)
+    ensureSatelliteSchema(index)
+
+    // A PDF's searchable text cannot go into the PDF. Carrying it over means
+    // documents stay findable the moment the migration lands, instead of only
+    // after each has been opened once.
+    for (const page of pages) {
+      if (kindOfFormat(page.format) === 'binary' && page.content) {
+        setExtractedText(index, page.id, page.content)
+      }
+    }
+    copyRows(sourceDb, index, 'doc_summaries')
+    copyRows(sourceDb, index, 'muse_cards')
+  } finally {
+    index.close()
+  }
+}
+
+/**
+ * Copy one table wholesale, matching on column name.
+ *
+ * Only used for tables that are pure caches on both sides, so a source that
+ * cannot be read is a warning rather than a failed migration.
+ */
+function copyRows(from: Database.Database | undefined, to: Database.Database, table: string): void {
+  if (!from) return
+  let rows: Record<string, unknown>[]
+  try {
+    rows = from.prepare(`SELECT * FROM ${table}`).all() as Record<string, unknown>[]
+  } catch {
+    return
+  }
+  if (rows.length === 0) return
+
+  const target = new Set(
+    (to.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map((c) => c.name),
+  )
+  const columns = Object.keys(rows[0]).filter((column) => target.has(column))
+  if (columns.length === 0) return
+
+  const insert = to.prepare(
+    `INSERT OR REPLACE INTO ${table} (${columns.join(', ')}) VALUES (${columns.map((c) => `@${c}`).join(', ')})`,
+  )
+  to.transaction(() => {
+    for (const row of rows) {
+      insert.run(Object.fromEntries(columns.map((column) => [column, row[column]])))
+    }
+  })()
+}
+
+/**
+ * Snapshot history into `.prism/versions/`.
+ *
+ * ★ Files, not rows, for the same reason highlights are: a snapshot is the
+ * only copy of what a note used to say, and the vault's database is declared
+ * disposable. Writing it into `prism.db` would mean "Rebuild index" could
+ * cost a user their history.
+ */
+async function writeVersions(staging: string, db?: Database.Database): Promise<number> {
+  if (!db) return 0
+  let rows: Array<{
+    id: string
+    page_id: string
+    content: string | null
+    title: string | null
+    source: string | null
+    label: string | null
+    created_at: number
+  }>
+  try {
+    rows = db.prepare('SELECT * FROM page_versions ORDER BY created_at').all() as typeof rows
+  } catch {
+    return 0
+  }
+  if (rows.length === 0) return 0
+
+  const versions = versionsFor(vaultPaths(staging).versions)
+  for (const row of rows) {
+    await versions.save({
+      id: row.id,
+      pageId: row.page_id,
+      title: row.title,
+      source: row.source ?? 'manual',
+      label: row.label,
+      createdAt: row.created_at,
+      content: row.content ?? '',
+    })
+  }
+  return rows.length
 }
 
 /**

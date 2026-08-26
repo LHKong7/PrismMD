@@ -423,6 +423,8 @@ app.on('before-quit', (event) => {
     try {
       const { closeDb } = require('./services/workspaceDb')
       closeDb()
+      const { closeIndexDatabase } = require('./services/indexDatabase')
+      closeIndexDatabase()
     } catch { /* DB may not have been opened */ }
 
     // Tear down both long-running services in parallel so the user

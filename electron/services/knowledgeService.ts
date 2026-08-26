@@ -7,7 +7,7 @@
  * pages come from) and notification (telling the renderer the graph moved).
  */
 import { BrowserWindow } from 'electron'
-import { getDb } from './workspaceDb'
+import { indexDb } from './indexDatabase'
 import { getNoteRepository } from '../repositories/repositoryFactory'
 import {
   buildRetrievalContext,
@@ -106,12 +106,12 @@ export async function indexPageNow(pageId: string): Promise<boolean> {
 
   const page = await getNoteRepository().getPage(pageId)
   if (!page) {
-    removePageFromIndex(getDb(), pageId)
+    removePageFromIndex(indexDb(), pageId)
     notifyRenderer()
     return true
   }
 
-  const changed = indexPage(getDb(), {
+  const changed = indexPage(indexDb(), {
     id: page.id,
     title: page.title,
     content: page.content,
@@ -129,7 +129,7 @@ export async function forgetPage(pageId: string): Promise<void> {
     clearTimeout(timer)
     pending.delete(pageId)
   }
-  removePageFromIndex(getDb(), pageId)
+  removePageFromIndex(indexDb(), pageId)
   notifyRenderer()
 }
 
@@ -159,7 +159,7 @@ export async function flushPendingIndexing(): Promise<void> {
  * repairs itself without the user knowing there was an index.
  */
 export async function syncWorkspaceIndex(options?: { force?: boolean }): Promise<SyncReport> {
-  const report = syncIndex(getDb(), await allIndexablePages(), options)
+  const report = syncIndex(indexDb(), await allIndexablePages(), options)
   if (report.indexed > 0 || report.removed > 0) notifyRenderer()
   return report
 }
@@ -174,7 +174,10 @@ export async function syncWorkspaceIndex(options?: { force?: boolean }): Promise
  * exists. Nothing here is a source of truth, so dropping it costs only time.
  */
 export async function rebuildIndex(): Promise<SyncReport> {
-  const db = getDb()
+  const db = indexDb()
+  // The schema may not exist yet: a migration switches to the vault's own
+  // database and rebuilds straight away, without passing through startup.
+  initKnowledge(db)
   resetKnowledgeIndex(db)
   const report = syncIndex(db, await allIndexablePages(), { force: true })
   notifyRenderer()
@@ -184,7 +187,7 @@ export async function rebuildIndex(): Promise<SyncReport> {
 /** Called once at startup. Never throws: a broken index must not block launch. */
 export async function initKnowledgeIndex(): Promise<void> {
   try {
-    initKnowledge(getDb())
+    initKnowledge(indexDb())
     const report = await syncWorkspaceIndex()
     console.log(
       `[knowledge] index ready — ${report.indexed} indexed, ${report.skipped} unchanged, ${report.removed} removed`,
@@ -197,7 +200,7 @@ export async function initKnowledgeIndex(): Promise<void> {
 // ─── Read paths ─────────────────────────────────────────────────────────────
 
 export function search(query: string, options?: SearchOptions) {
-  return searchNotes(getDb(), query, options)
+  return searchNotes(indexDb(), query, options)
 }
 
 /**
@@ -208,7 +211,7 @@ export function search(query: string, options?: SearchOptions) {
  */
 export async function searchPageSummaries(query: string, limit = 30) {
   const repository = getNoteRepository()
-  const hits = searchNotes(getDb(), query, { limit: limit * 2, maxPerNote: 1 })
+  const hits = searchNotes(indexDb(), query, { limit: limit * 2, maxPerNote: 1 })
   const out: {
     id: string
     title: string
@@ -238,35 +241,35 @@ export async function searchPageSummaries(query: string, limit = 30) {
 }
 
 export function backlinks(pageId: string) {
-  return getBacklinks(getDb(), pageId)
+  return getBacklinks(indexDb(), pageId)
 }
 
 export function outgoing(pageId: string) {
-  return getOutgoingLinks(getDb(), pageId)
+  return getOutgoingLinks(indexDb(), pageId)
 }
 
 export function related(pageId: string, limit?: number) {
-  return getRelatedNotes(getDb(), pageId, limit)
+  return getRelatedNotes(indexDb(), pageId, limit)
 }
 
 export function unresolved(limit?: number) {
-  return getUnresolvedLinks(getDb(), limit)
+  return getUnresolvedLinks(indexDb(), limit)
 }
 
 export function orphans(limit?: number) {
-  return getOrphanNotes(getDb(), limit)
+  return getOrphanNotes(indexDb(), limit)
 }
 
 export function tags(limit?: number) {
-  return listTags(getDb(), limit)
+  return listTags(indexDb(), limit)
 }
 
 export function notesByTag(tag: string, limit?: number) {
-  return getNotesByTag(getDb(), tag, limit)
+  return getNotesByTag(indexDb(), tag, limit)
 }
 
 export function stats() {
-  return getKnowledgeStats(getDb())
+  return getKnowledgeStats(indexDb())
 }
 
 /**
@@ -275,7 +278,7 @@ export function stats() {
  * in an arbitrary order, making the panel flicker through partial states.
  */
 export function noteContext(pageId: string) {
-  const db = getDb()
+  const db = indexDb()
   initKnowledge(db)
   return {
     backlinks: getBacklinks(db, pageId),
@@ -290,5 +293,5 @@ export function retrieve(
   query: string,
   options?: { maxPassages?: number; contextPageId?: string },
 ): RetrievalResult {
-  return buildRetrievalContext(getDb(), query, options)
+  return buildRetrievalContext(indexDb(), query, options)
 }

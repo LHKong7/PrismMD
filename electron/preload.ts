@@ -513,9 +513,11 @@ const electronAPI = {
     ipcRenderer.invoke('version:list', pageId),
   versionGet: (
     versionId: string,
+    pageId?: string,
   ): Promise<null | { id: string; pageId: string; title: string | null; source: string; label: string | null; createdAt: number; length: number; content: string }> =>
-    ipcRenderer.invoke('version:get', versionId),
-  versionDelete: (versionId: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('version:delete', versionId),
+    ipcRenderer.invoke('version:get', versionId, pageId),
+  versionDelete: (versionId: string, pageId?: string): Promise<{ ok: boolean }> =>
+    ipcRenderer.invoke('version:delete', versionId, pageId),
 
   // Book-skin metadata
   pageMetaGet: (pageId: string): Promise<{ status: string | null; genre: string | null; quality: number | null } | null> =>
