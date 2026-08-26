@@ -17,6 +17,7 @@ import { stopWatching } from './services/libraryWatcher'
 import { handleSquirrelEvent } from './services/windowsIntegration'
 import { flushPendingIndexing, initKnowledgeIndex } from './services/knowledgeService'
 import { getNoteRepository } from './repositories/repositoryFactory'
+import { initStorage } from './services/storageService'
 
 /**
  * What a reader window was asked to show when it was created. The renderer
@@ -325,6 +326,15 @@ app.whenReady().then(async () => {
     registerIpcHandlers()
   } catch (err) {
     console.error('[app] IPC handler registration failed:', err)
+  }
+
+  // Point the app at whichever store holds the notes — SQLite, or a vault the
+  // user migrated to. Before anything reads a page, or the first read would
+  // answer from the wrong store.
+  try {
+    await initStorage()
+  } catch (err) {
+    console.error('[storage] Failed to resolve the note store:', err)
   }
 
   // Seed a welcome page on first launch so the workspace isn't empty. Awaited

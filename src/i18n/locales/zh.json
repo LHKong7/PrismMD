@@ -652,7 +652,23 @@
       "filePath": "文件",
       "messages": "消息记录"
     },
-    "close": "关闭"
+    "close": "关闭",
+    "vault": {
+      "title": "Markdown 仓库",
+      "inDatabase": "你的笔记目前存放在应用的数据库里。迁移成 Markdown 仓库后，每篇笔记都是磁盘上真正的 .md 文件——可以用访达、git 或任何编辑器打开，而 PrismMD 的用法完全不变。",
+      "inVault": "你的笔记就是这个文件夹里的 Markdown 文件。在任何地方编辑，PrismMD 都会跟上。",
+      "openFolder": "打开仓库文件夹",
+      "unreachable": "这个文件夹当前不可用——可能是外置磁盘未挂载，或被移动了。PrismMD 没有动过你的笔记，它在等待，而不是给你一个空工作区。",
+      "migrate": "把笔记迁移到 Markdown 仓库……",
+      "confirm": "这会把每一篇笔记复制到你选择的文件夹。当前工作区会先备份并保持原样不动；复制完成后会逐篇校验，只要有一篇对不上，就什么都不会切换。",
+      "chooseFolder": "选择文件夹……",
+      "migrating": "迁移中……",
+      "cancel": "暂不",
+      "progress": "正在写入第 {{done}} / {{total}} 篇……",
+      "failed": "迁移已中止。",
+      "failedSafe": "没有做任何切换——你的笔记还在原处。未完成的副本已保留，可供你查看：",
+      "done": "你的笔记现在位于 {{path}}。"
+    }
   },
   "highlightPopover": {
     "highlightAs": "标记为 {{color}}",

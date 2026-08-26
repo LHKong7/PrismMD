@@ -41,6 +41,20 @@ export function ensureCatalogSchema(db: Database): void {
     );
     CREATE INDEX IF NOT EXISTS idx_note_catalog_path ON note_catalog(relative_path);
 
+    -- Text extracted from a binary document (a PDF's text layer). It cannot
+    -- live in the file — you cannot put a text layer back into a PDF — so
+    -- this is the one place a note's searchable content is not in the vault.
+    --
+    -- Still rebuildable, but only *lazily*: extraction runs in the renderer
+    -- with pdfjs, which the main process cannot do at startup. So "Rebuild
+    -- index" clears these and they refill as documents are opened, rather
+    -- than being re-derived in one pass like everything else.
+    CREATE TABLE IF NOT EXISTS note_text_cache (
+      page_id TEXT PRIMARY KEY,
+      text TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
     -- Deleted notes, so a restore knows where to put them back. Not a cache:
     -- the path a note came from exists nowhere else once the file has moved
     -- into .trash.
@@ -108,6 +122,26 @@ export function removeEntry(db: Database, id: string): void {
 
 export function clearCatalog(db: Database): void {
   db.exec('DELETE FROM note_catalog')
+}
+
+// ─── Extracted text ─────────────────────────────────────────────────────────
+
+export function getExtractedText(db: Database, pageId: string): string {
+  const row = db.prepare('SELECT text FROM note_text_cache WHERE page_id = ?').get(pageId) as
+    | { text: string }
+    | undefined
+  return row?.text ?? ''
+}
+
+export function setExtractedText(db: Database, pageId: string, text: string): void {
+  if (!text) {
+    db.prepare('DELETE FROM note_text_cache WHERE page_id = ?').run(pageId)
+    return
+  }
+  db.prepare(`
+    INSERT INTO note_text_cache (page_id, text, updated_at) VALUES (?, ?, ?)
+    ON CONFLICT(page_id) DO UPDATE SET text = excluded.text, updated_at = excluded.updated_at
+  `).run(pageId, text, Date.now())
 }
 
 // ─── Trash ──────────────────────────────────────────────────────────────────

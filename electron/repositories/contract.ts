@@ -352,6 +352,36 @@ export function describeNoteRepository(label: string, harness: RepositoryHarness
         expect([...(await repo.readPageBytes(page.id))!]).toEqual([...bytes])
       })
 
+      it('keeps a binary document\'s id stable across a move', async () => {
+        // ★ Regression guard, found by the migration validator rather than by
+        // this suite. A PDF cannot hold an id in its own bytes, so it is easy
+        // to hand it a fresh one on every read — and everything keyed to the
+        // old id (its highlights, the extracted text that makes it findable)
+        // is then silently orphaned, with the document still sitting there
+        // looking perfectly fine.
+        const repo = await fresh()
+        const folder = await repo.createFolder({ title: 'Papers' })
+        const bytes = new Uint8Array([0x25, 0x50, 0x44, 0x46])
+        const page = await repo.importDroppedFile('Paper.pdf', bytes, null)
+
+        await repo.movePage(page.id, folder.id, 0)
+
+        const moved = await repo.getPage(page.id)
+        expect(moved).not.toBeNull()
+        expect(moved!.parentId).toBe(folder.id)
+        expect([...(await repo.readPageBytes(page.id))!]).toEqual([...bytes])
+      })
+
+      it('remembers text attached to a binary document', async () => {
+        // A PDF's searchable content is extracted text that cannot go back
+        // into the PDF. Wherever a backend keeps it, it has to survive.
+        const repo = await fresh()
+        const page = await repo.importDroppedFile('Paper.pdf', new Uint8Array([1, 2]), null)
+
+        await repo.updatePage(page.id, { content: 'the extracted text' })
+        expect((await repo.getPage(page.id))!.content).toBe('the extracted text')
+      })
+
       it('returns no bytes for a text note', async () => {
         const repo = await fresh()
         const page = await repo.createPage({ title: 'Text', content: 'body' })

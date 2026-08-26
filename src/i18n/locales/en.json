@@ -652,7 +652,23 @@
       "filePath": "File",
       "messages": "Messages"
     },
-    "close": "Close"
+    "close": "Close",
+    "vault": {
+      "title": "Markdown vault",
+      "inDatabase": "Your notes are stored inside the app's database. Moving them into a vault makes each note a real Markdown file you can open in Finder, in git, or in any other editor — and nothing about how PrismMD works changes.",
+      "inVault": "Your notes are Markdown files in this folder. Edit them anywhere; PrismMD follows along.",
+      "openFolder": "Open vault folder",
+      "unreachable": "This folder is not there right now — an unmounted drive, or it was moved. PrismMD has not touched your notes and is waiting rather than starting an empty workspace.",
+      "migrate": "Move my notes into a vault…",
+      "confirm": "This copies every note into a folder you choose. Your current workspace is backed up first and left untouched, and the copy is checked note by note before anything switches over — if a single note does not match, nothing changes.",
+      "chooseFolder": "Choose a folder…",
+      "migrating": "Moving…",
+      "cancel": "Not now",
+      "progress": "Writing {{done}} of {{total}} notes…",
+      "failed": "The migration was stopped.",
+      "failedSafe": "Nothing was switched over — your notes are exactly where they were. The partial copy was left in place so you can look at it:",
+      "done": "Your notes now live at {{path}}."
+    }
   },
   "highlightPopover": {
     "highlightAs": "Highlight as {{color}}",

@@ -1,5 +1,5 @@
 /**
- * Workspace IPC Handlers — bridges the renderer to the note repository.
+ * Workspace IPC Handlers — bridges the renderer to the note repo().
  *
  * Storage is reached only through `getNoteRepository()`; nothing in here
  * imports `documentService` directly. That is what lets the Markdown-vault
@@ -21,20 +21,37 @@ import {
   syncWorkspaceIndex,
 } from '../services/knowledgeService'
 import { openDialogFilters } from '../services/fileFormats'
+import { areWritesSuspended } from '../services/storageService'
 import { getMainWindow } from '../main'
 
 function fail(err: unknown) {
   return { ok: false as const, error: err instanceof Error ? err.message : String(err) }
 }
 
+/**
+ * ★ A migration copies every note; a write landing halfway through goes into
+ * the store being left behind and is never seen again. The renderer autosaves
+ * on a debounce, so this is not hypothetical — it is what happens if someone
+ * keeps typing while the progress bar runs. Refusing the write surfaces as a
+ * save error the user can act on; accepting it loses the paragraph silently.
+ */
+function suspended() {
+  return { ok: false as const, error: 'A migration is in progress. Your last edit was not saved.' }
+}
+
 export function registerWorkspaceHandlers() {
-  const repository = getNoteRepository()
+  // ★ Resolved per call, never captured. A migration swaps the active
+  // repository at runtime, and a handler holding the old one would keep
+  // writing into the database the user just migrated away from — with every
+  // write appearing to succeed.
+  const repo = () => getNoteRepository()
 
   // ── Page CRUD ──
 
   ipcMain.handle('workspace:create-page', async (_event, title?: string, parentId?: string, content?: string) => {
+    if (areWritesSuspended()) return suspended()
     try {
-      const page = await repository.createPage({ title, parentId, content })
+      const page = await repo().createPage({ title, parentId, content })
       // Indexed immediately rather than on a debounce: a brand-new note's
       // title is what resolves every [[link]] someone already wrote to it,
       // and waiting a second and a half to say so looks like a broken link.
@@ -46,25 +63,27 @@ export function registerWorkspaceHandlers() {
   })
 
   ipcMain.handle('workspace:create-folder', async (_event, title?: string, parentId?: string) => {
+    if (areWritesSuspended()) return suspended()
     try {
-      return { ok: true, page: await repository.createFolder({ title, parentId }) }
+      return { ok: true, page: await repo().createFolder({ title, parentId }) }
     } catch (err) {
       return fail(err)
     }
   })
 
   ipcMain.handle('workspace:get-page', async (_event, pageId: string) => {
-    return repository.getPage(pageId)
+    return repo().getPage(pageId)
   })
 
   ipcMain.handle('workspace:update-page', async (_event, pageId: string, updates: Record<string, any>) => {
+    if (areWritesSuspended()) return suspended()
     try {
       // A title change is a rename, not a field write: it renames the note
       // *and* rewrites every [[link]] that pointed at the old title. The
       // repository owns both halves because between them the workspace is
       // inconsistent — see SqliteNoteRepository.renamePage.
       if (updates.title !== undefined) {
-        const { relinked } = await repository.renamePage(pageId, String(updates.title))
+        const { relinked } = await repo().renamePage(pageId, String(updates.title))
         await indexPageNow(pageId)
         for (const note of relinked) await indexPageNow(note.pageId)
 
@@ -72,11 +91,11 @@ export function registerWorkspaceHandlers() {
         // underneath any tab that has them open — a stale tab would autosave
         // the pre-rewrite content straight back over the fix.
         const { title: _title, ...rest } = updates
-        if (Object.keys(rest).length > 0) await repository.updatePage(pageId, rest)
+        if (Object.keys(rest).length > 0) await repo().updatePage(pageId, rest)
         return { ok: true, relinkedPageIds: relinked.map((n) => n.pageId) }
       }
 
-      await repository.updatePage(pageId, updates)
+      await repo().updatePage(pageId, updates)
       // Content edits arrive on every autosave tick, so they are debounced.
       scheduleIndex(pageId)
       return { ok: true }
@@ -86,8 +105,9 @@ export function registerWorkspaceHandlers() {
   })
 
   ipcMain.handle('workspace:delete-page', async (_event, pageId: string) => {
+    if (areWritesSuspended()) return suspended()
     try {
-      await repository.deletePage(pageId)
+      await repo().deletePage(pageId)
       await forgetPage(pageId)
       // deletePage cascades to descendants, so a full reconcile is the only
       // way to evict them all — one pass over unchanged notes is a hash each.
@@ -99,8 +119,9 @@ export function registerWorkspaceHandlers() {
   })
 
   ipcMain.handle('workspace:restore-page', async (_event, pageId: string) => {
+    if (areWritesSuspended()) return suspended()
     try {
-      await repository.restorePage(pageId)
+      await repo().restorePage(pageId)
       await syncWorkspaceIndex()
       return { ok: true }
     } catch (err) {
@@ -111,16 +132,17 @@ export function registerWorkspaceHandlers() {
   // ── Tree queries ──
 
   ipcMain.handle('workspace:get-children', async (_event, parentId: string | null) => {
-    return repository.getChildren(parentId)
+    return repo().getChildren(parentId)
   })
 
   ipcMain.handle('workspace:get-tree', async () => {
-    return repository.getTree()
+    return repo().getTree()
   })
 
   ipcMain.handle('workspace:move-page', async (_event, pageId: string, newParentId: string | null, position: number) => {
+    if (areWritesSuspended()) return suspended()
     try {
-      await repository.movePage(pageId, newParentId, position)
+      await repo().movePage(pageId, newParentId, position)
       return { ok: true }
     } catch (err) {
       return fail(err)
@@ -128,7 +150,7 @@ export function registerWorkspaceHandlers() {
   })
 
   ipcMain.handle('workspace:get-ancestors', async (_event, pageId: string) => {
-    return repository.getAncestors(pageId)
+    return repo().getAncestors(pageId)
   })
 
   ipcMain.handle('workspace:search', async (_event, query: string) => {
@@ -141,11 +163,11 @@ export function registerWorkspaceHandlers() {
     } catch (err) {
       console.error('[workspace] Knowledge search failed, falling back:', err)
     }
-    return repository.searchPages(query)
+    return repo().searchPages(query)
   })
 
   ipcMain.handle('workspace:get-page-count', async () => {
-    return repository.countPages()
+    return repo().countPages()
   })
 
   // ── Import / Export ──
@@ -161,7 +183,7 @@ export function registerWorkspaceHandlers() {
     try {
       const pages = []
       for (const filePath of result.filePaths) {
-        const page = await repository.importFile(filePath, parentId)
+        const page = await repo().importFile(filePath, parentId)
         await indexPageNow(page.id)
         pages.push(page)
       }
@@ -176,8 +198,9 @@ export function registerWorkspaceHandlers() {
   ipcMain.handle(
     'workspace:import-dropped-file',
     async (_event, fileName: string, data: Uint8Array, parentId?: string) => {
+      if (areWritesSuspended()) return suspended()
       try {
-        const page = await repository.importDroppedFile(fileName, data, parentId)
+        const page = await repo().importDroppedFile(fileName, data, parentId)
         await indexPageNow(page.id)
         return { ok: true, page }
       } catch (err) {
@@ -192,7 +215,7 @@ export function registerWorkspaceHandlers() {
     // Through the repository, not the asset store: in a vault the PDF *is* a
     // file in the vault, and reaching straight for the asset store would find
     // nothing there.
-    return repository.readPageBytes(pageId)
+    return repo().readPageBytes(pageId)
   })
 
   ipcMain.handle('workspace:get-page-asset', async (_event, pageId: string) => {
@@ -207,7 +230,7 @@ export function registerWorkspaceHandlers() {
     if (result.canceled || result.filePaths.length === 0) return { ok: false, canceled: true }
 
     try {
-      const pages = await repository.importFolder(result.filePaths[0], parentId)
+      const pages = await repo().importFolder(result.filePaths[0], parentId)
       // A folder import can be hundreds of files; one reconcile covers them
       // all and skips whatever was already indexed.
       await syncWorkspaceIndex()
@@ -218,11 +241,11 @@ export function registerWorkspaceHandlers() {
   })
 
   ipcMain.handle('workspace:export-page', async (_event, pageId: string) => {
-    const page = await repository.getPage(pageId)
+    const page = await repo().getPage(pageId)
     if (!page) return { ok: false, error: 'Page not found' }
 
     const win = getMainWindow()
-    const defaultName = await repository.exportFileNameFor(page)
+    const defaultName = await repo().exportFileNameFor(page)
     const ext = defaultName.slice(defaultName.lastIndexOf('.') + 1)
     const result = await dialog.showSaveDialog(win!, {
       defaultPath: defaultName,
@@ -231,7 +254,7 @@ export function registerWorkspaceHandlers() {
     if (result.canceled || !result.filePath) return { ok: false, canceled: true }
 
     try {
-      await repository.exportPage(pageId, result.filePath)
+      await repo().exportPage(pageId, result.filePath)
       return { ok: true, filePath: result.filePath }
     } catch (err) {
       return fail(err)

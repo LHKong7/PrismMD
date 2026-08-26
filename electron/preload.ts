@@ -125,6 +125,25 @@ export interface KnowledgeStats {
   fullTextSearch: boolean
 }
 
+/** Where note text is stored, and whether the store is reachable. */
+export interface StorageStatus {
+  mode: 'sqlite' | 'vault'
+  vaultPath: string | null
+  migratedAt: number | null
+  vaultReachable: boolean
+  interrupted: { step: string; stagingPath: string; error: string | null } | null
+}
+
+export interface MigrateOutcome {
+  ok: boolean
+  vaultPath?: string
+  /** What the validator refused to sign off on. */
+  problems?: string[]
+  stagingPath?: string
+  backupPath?: string
+  error?: string
+}
+
 const electronAPI = {
   // ── Library (reader mode) ──
   // Read-only browsing of a folder on disk. There is no library write
@@ -300,6 +319,31 @@ const electronAPI = {
     report?: { indexed: number; skipped: number; removed: number }
     error?: string
   }> => ipcRenderer.invoke('knowledge:reindex', force),
+  // Storage — which store holds the notes, and moving them into a vault.
+  storageStatus: (): Promise<{ ok: boolean; status?: StorageStatus; error?: string }> =>
+    ipcRenderer.invoke('storage:status'),
+  storageMigrateToVault: (folderName?: string): Promise<{
+    ok: boolean
+    canceled?: boolean
+    result?: MigrateOutcome
+    error?: string
+  }> => ipcRenderer.invoke('storage:migrate-to-vault', folderName),
+  storageRevealVault: (): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke('storage:reveal-vault'),
+  onStorageMigrationProgress: (
+    callback: (update: { step: string; done: number; total: number }) => void,
+  ): (() => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, update: { step: string; done: number; total: number }) =>
+      callback(update)
+    ipcRenderer.on('storage:migration-progress', handler)
+    return () => ipcRenderer.removeListener('storage:migration-progress', handler)
+  },
+  onStorageChanged: (callback: (next: StorageStatus) => void): (() => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, next: StorageStatus) => callback(next)
+    ipcRenderer.on('storage:changed', handler)
+    return () => ipcRenderer.removeListener('storage:changed', handler)
+  },
+
   /** Fires whenever the note index changes, so panels refresh without polling. */
   onKnowledgeUpdated: (callback: () => void): (() => void) => {
     const handler = () => callback()

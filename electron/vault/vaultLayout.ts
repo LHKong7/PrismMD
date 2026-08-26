@@ -8,6 +8,7 @@
  * ├── .trash/<uuid>/Note.md      deleted notes, recoverable to their old path
  * └── .prism/                    app data
  *     ├── ui.json                sibling ordering + icons (user intent, losable)
+ *     ├── binaries.json          ids for documents that cannot hold one (main data)
  *     └── annotations/<uuid>.json  highlights (main data — must be backed up)
  * ```
  *
@@ -33,6 +34,7 @@ export interface VaultPaths {
   trash: string
   attachments: string
   uiFile: string
+  binariesFile: string
   annotations: string
 }
 
@@ -44,6 +46,7 @@ export function vaultPaths(root: string): VaultPaths {
     trash: path.join(root, TRASH_DIR),
     attachments: path.join(root, ATTACHMENTS_DIR),
     uiFile: path.join(prism, 'ui.json'),
+    binariesFile: path.join(prism, 'binaries.json'),
     annotations: path.join(prism, 'annotations'),
   }
 }

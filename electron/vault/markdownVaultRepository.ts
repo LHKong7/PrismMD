@@ -40,15 +40,18 @@ import {
   ensureCatalogSchema,
   getEntry,
   getEntryByPath,
+  getExtractedText,
   getTrash,
   listEntries,
   listTrash,
   recordTrash,
   removeEntry,
   removeTrash,
+  setExtractedText,
   upsertEntry,
   type CatalogEntry,
 } from './vaultCatalog'
+import { binaryIdsFor, BinaryIdRegistry } from './binaryIds'
 import { sidecarFor, VaultSidecar } from './vaultSidecar'
 import {
   folderIdFor,
@@ -91,6 +94,7 @@ export class MarkdownVaultRepository implements NoteRepository {
   private readonly paths: VaultPaths
   private readonly db: Database
   private readonly sidecar: VaultSidecar
+  private readonly binaryIds: BinaryIdRegistry
   private scanned = false
 
   /**
@@ -107,6 +111,7 @@ export class MarkdownVaultRepository implements NoteRepository {
     this.paths = vaultPaths(this.root)
     this.db = options.db
     this.sidecar = sidecarFor(this.paths.prism)
+    this.binaryIds = binaryIdsFor(this.paths.prism)
     ensureCatalogSchema(this.db)
   }
 
@@ -122,14 +127,19 @@ export class MarkdownVaultRepository implements NoteRepository {
     await sweepTempFiles(this.root)
 
     const seen = new Set<string>()
+    const livePaths = new Set<string>()
     let indexed = 0
 
     for (const relativePath of await this.walk('')) {
       const entry = await this.readIntoCatalog(relativePath)
       if (!entry) continue
       seen.add(entry.id)
+      livePaths.add(relativePath)
       indexed++
     }
+    // Only a full walk knows a path is really gone; a single-file miss may
+    // just mean the document moved.
+    await this.binaryIds.prune(livePaths)
 
     let removed = 0
     for (const entry of listEntries(this.db)) {
@@ -174,7 +184,10 @@ export class MarkdownVaultRepository implements NoteRepository {
    * external reorganisation would silently orphan its backlinks. The write is
    * surgical — one front matter line, everything else byte-identical.
    */
-  private async readIntoCatalog(relativePath: string): Promise<CatalogEntry | null> {
+  private async readIntoCatalog(
+    relativePath: string,
+    knownId?: string,
+  ): Promise<CatalogEntry | null> {
     const absolute = toAbsolute(this.root, relativePath)
     const stat = await fs.promises.stat(absolute).catch(() => null)
     if (!stat?.isFile()) return null
@@ -205,11 +218,17 @@ export class MarkdownVaultRepository implements NoteRepository {
         source = stampedSource
       }
     } else {
-      // A binary file cannot carry front matter, so its identity is keyed to
-      // its path in the catalog and re-derived if it moves. Losing a PDF's id
-      // costs a re-extraction, not a broken link — nothing links to one.
-      const existing = getEntryByPath(this.db, relativePath)
-      id = existing?.id ?? crypto.randomUUID()
+      // ★ A PDF cannot carry front matter, so its id lives in
+      // `.prism/binaries.json`. It must be *stable*: the extracted text that
+      // makes the document searchable and every highlight on it are keyed to
+      // this id, so a fresh one on every catalog rebuild would quietly throw
+      // both away — which is exactly what the migration validator caught.
+      id =
+        knownId ??
+        this.binaryIds.idFor(relativePath) ??
+        getEntryByPath(this.db, relativePath)?.id ??
+        crypto.randomUUID()
+      await this.binaryIds.remember(relativePath, id)
     }
 
     const entry: CatalogEntry = {
@@ -263,7 +282,12 @@ export class MarkdownVaultRepository implements NoteRepository {
   private async entryToPage(entry: CatalogEntry): Promise<Page> {
     const absolute = toAbsolute(this.root, entry.relativePath)
     const isText = kindOfFormat(entry.format) === 'text'
-    const body = isText ? parseNote(await fs.promises.readFile(absolute, 'utf-8')).body : ''
+    // A PDF's searchable content is its extracted text, which cannot be
+    // stored inside the PDF — it comes from the cache instead. See D3 in
+    // recordDocs/2026-08-25-vault-migration-plan.md.
+    const body = isText
+      ? parseNote(await fs.promises.readFile(absolute, 'utf-8')).body
+      : getExtractedText(this.db, entry.id)
     const dir = path.posix.dirname(entry.relativePath)
     const folder = dir === '.' ? '' : dir
 
@@ -474,7 +498,13 @@ export class MarkdownVaultRepository implements NoteRepository {
     if (updates.icon !== undefined) await this.sidecar.setIcon(id, updates.icon)
 
     const entry = isFolderId(id) ? null : getEntry(this.db, id)
-    if (entry && updates.content !== undefined) {
+
+    if (entry && updates.content !== undefined && kindOfFormat(entry.format) === 'binary') {
+      // The renderer backfills a PDF's extracted text through the same
+      // `updatePage({ content })` path an editor save uses. Writing it into
+      // the file would corrupt the document.
+      setExtractedText(this.db, entry.id, updates.content)
+    } else if (entry && updates.content !== undefined) {
       const absolute = toAbsolute(this.root, entry.relativePath)
       const existing = await fs.promises.readFile(absolute, 'utf-8').catch(() => '')
       const parsed = parseNote(existing)
@@ -620,7 +650,10 @@ export class MarkdownVaultRepository implements NoteRepository {
     const available = await this.availableName(target, titleFromFileName(fileName), path.extname(fileName))
     const finalPath = target ? `${target}/${available}` : available
     await movePath(toAbsolute(this.root, entry.relativePath), toAbsolute(this.root, finalPath))
-    await this.readIntoCatalog(finalPath)
+    // The id is passed explicitly: for a binary document the file carries no
+    // identity, and the registry is still filed under the old path.
+    await this.binaryIds.forget(entry.relativePath)
+    await this.readIntoCatalog(finalPath, entry.id)
   }
 
   /**
@@ -676,6 +709,7 @@ export class MarkdownVaultRepository implements NoteRepository {
       path.join(this.paths.trash, encodeURIComponent(id), path.posix.basename(entry.relativePath)),
     )
     removeEntry(this.db, id)
+    await this.binaryIds.forget(entry.relativePath)
     await this.sidecar.forget(id)
   }
 
