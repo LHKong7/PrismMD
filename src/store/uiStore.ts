@@ -39,7 +39,7 @@ export type GraphScope = 'global' | 'document' | 'entity'
  * `rightSidebarTab` is widened to `string`. The built-in tabs stay a
  * union so switch-case readers still type-narrow when they need to.
  */
-export type BuiltinRightSidebarTab = 'toc' | 'entity' | 'related'
+export type BuiltinRightSidebarTab = 'toc' | 'knowledge' | 'entity' | 'related'
 export type RightSidebarTab = BuiltinRightSidebarTab | (string & {})
 
 /** Persisted layout state saved to electron-store. */

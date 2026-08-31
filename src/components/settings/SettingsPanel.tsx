@@ -11,6 +11,8 @@ import { usePluginManager, type PluginManagerStore } from '../../lib/plugins/hos
 import { reloadExternalPlugins } from '../../lib/plugins/externalLoader'
 import { useUpdaterStore } from '../../store/updaterStore'
 import { useKnowledgeBaseStore } from '../../store/knowledgeBaseStore'
+import { useKnowledgeStore } from '../../store/knowledgeStore'
+import type { MigrateOutcome, StorageStatus } from '../../types/electron'
 import { TemplateSettings } from './TemplateSettings'
 import { PromptSettings } from './PromptSettings'
 import { AgentSessionsPanel } from './AgentSessionsPanel'
@@ -498,10 +500,52 @@ function KnowledgeSettings() {
   const refresh = useKnowledgeBaseStore((s) => s.refresh)
   const removeDocument = useKnowledgeBaseStore((s) => s.removeDocument)
 
+  const stats = useKnowledgeStore((s) => s.stats)
+  const reindexing = useKnowledgeStore((s) => s.reindexing)
+  const loadStats = useKnowledgeStore((s) => s.loadStats)
+  const reindex = useKnowledgeStore((s) => s.reindex)
+
   useEffect(() => { refresh() }, [refresh])
+  useEffect(() => { void loadStats() }, [loadStats])
 
   return (
     <div>
+      <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+        {t('settings.knowledge.indexTitle')}
+      </h3>
+      <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
+        {t('settings.knowledge.indexDescription')}
+      </p>
+
+      <div className="rounded-lg border p-3 mb-6" style={{ borderColor: 'var(--border-color)' }}>
+        <div className="grid grid-cols-2 gap-y-2 sm:grid-cols-4">
+          <Stat label={t('settings.knowledge.statNotes')} value={stats?.notes} />
+          <Stat label={t('settings.knowledge.statLinks')} value={stats?.resolvedLinks} />
+          <Stat label={t('settings.knowledge.statUnresolved')} value={stats?.unresolvedLinks} />
+          <Stat label={t('settings.knowledge.statOrphans')} value={stats?.orphans} />
+        </div>
+
+        {stats && !stats.fullTextSearch && (
+          <p className="mt-3 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            {t('settings.knowledge.noFts')}
+          </p>
+        )}
+
+        <div className="mt-3 flex items-center gap-2">
+          <button
+            onClick={() => void reindex()}
+            disabled={reindexing}
+            className="rounded px-2 py-1 text-xs transition-colors disabled:opacity-50"
+            style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }}
+          >
+            {reindexing ? t('settings.knowledge.rebuilding') : t('settings.knowledge.rebuild')}
+          </button>
+          <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+            {t('settings.knowledge.rebuildHint')}
+          </span>
+        </div>
+      </div>
+
       <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
         {t('settings.knowledge.title')}
       </h3>
@@ -577,6 +621,18 @@ function KnowledgeSettings() {
       <p className="text-[11px] mt-4" style={{ color: 'var(--text-muted)' }}>
         {t('settings.knowledge.tip')}
       </p>
+    </div>
+  )
+}
+
+/** One number from the index, with a dash while the stats are still loading. */
+function Stat({ label, value }: { label: string; value?: number }) {
+  return (
+    <div>
+      <div className="text-lg font-semibold leading-none" style={{ color: 'var(--text-primary)' }}>
+        {value ?? '—'}
+      </div>
+      <div className="text-[11px] mt-1" style={{ color: 'var(--text-muted)' }}>{label}</div>
     </div>
   )
 }
@@ -1576,6 +1632,158 @@ function ShortcutsHelp() {
   )
 }
 
+/**
+ * Where the note text itself lives: a SQLite column, or a folder of Markdown
+ * files you can open in any other tool.
+ *
+ * ★ The migration is presented as one-way and consequential, because it is.
+ * The copy is validated note by note before anything switches over, and a
+ * backup is written first — but the honest framing is still "this moves all
+ * of your notes", not "change a setting".
+ */
+function VaultSettings() {
+  const { t } = useTranslation()
+  const [status, setStatus] = useState<StorageStatus | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+  const [outcome, setOutcome] = useState<MigrateOutcome | null>(null)
+  const [confirming, setConfirming] = useState(false)
+
+  useEffect(() => {
+    void window.electronAPI.storageStatus().then((res) => {
+      if (res.ok && res.status) setStatus(res.status)
+    })
+    return window.electronAPI.onStorageChanged(setStatus)
+  }, [])
+
+  useEffect(() => window.electronAPI.onStorageMigrationProgress(setProgress), [])
+
+  const migrate = async () => {
+    setBusy(true)
+    setOutcome(null)
+    try {
+      const res = await window.electronAPI.storageMigrateToVault()
+      if (res.canceled) return
+      setOutcome(res.result ?? { ok: false, error: res.error })
+    } finally {
+      setBusy(false)
+      setProgress(null)
+      setConfirming(false)
+    }
+  }
+
+  const isVault = status?.mode === 'vault'
+  const btn = 'text-xs px-3 py-1.5 rounded-md border transition-colors disabled:opacity-50'
+
+  return (
+    <div className="mb-8">
+      <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+        {t('settings.vault.title')}
+      </h3>
+      <p className="text-xs mb-3" style={{ color: 'var(--text-muted)' }}>
+        {isVault ? t('settings.vault.inVault') : t('settings.vault.inDatabase')}
+      </p>
+
+      {isVault && (
+        <div
+          className="rounded-lg border p-3 mb-3"
+          style={{ borderColor: 'var(--border-color)', backgroundColor: 'var(--bg-secondary)' }}
+        >
+          <div className="text-xs font-mono break-all" style={{ color: 'var(--text-primary)' }}>
+            {status?.vaultPath}
+          </div>
+          {status && !status.vaultReachable && (
+            // ★ Never quietly fall back to an empty workspace: someone who
+            // believes their notes are gone does something drastic.
+            <p className="mt-2 text-xs" style={{ color: 'var(--danger-color, #c0392b)' }}>
+              {t('settings.vault.unreachable')}
+            </p>
+          )}
+          <button
+            onClick={() => void window.electronAPI.storageRevealVault()}
+            className="mt-2 flex items-center gap-1.5 text-xs"
+            style={{ color: 'var(--accent-color)' }}
+          >
+            <FolderOpen size={13} />
+            {t('settings.vault.openFolder')}
+          </button>
+        </div>
+      )}
+
+      {!isVault && !confirming && (
+        <button
+          onClick={() => setConfirming(true)}
+          className={btn}
+          style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+        >
+          {t('settings.vault.migrate')}
+        </button>
+      )}
+
+      {!isVault && confirming && (
+        <div className="rounded-lg border p-3" style={{ borderColor: 'var(--border-color)' }}>
+          <p className="text-xs mb-3 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+            {t('settings.vault.confirm')}
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => void migrate()}
+              disabled={busy}
+              className={btn}
+              style={{ borderColor: 'var(--accent-color)', color: 'var(--accent-color)' }}
+            >
+              {busy ? t('settings.vault.migrating') : t('settings.vault.chooseFolder')}
+            </button>
+            <button
+              onClick={() => setConfirming(false)}
+              disabled={busy}
+              className={btn}
+              style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+            >
+              {t('settings.vault.cancel')}
+            </button>
+          </div>
+          {progress && progress.total > 0 && (
+            <p className="mt-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              {t('settings.vault.progress', { done: progress.done, total: progress.total })}
+            </p>
+          )}
+        </div>
+      )}
+
+      {outcome && !outcome.ok && (
+        <div
+          className="mt-3 rounded-lg border p-3 text-xs"
+          style={{ borderColor: 'var(--border-color)', color: 'var(--text-secondary)' }}
+        >
+          <p className="font-medium mb-1">{t('settings.vault.failed')}</p>
+          {/* Nothing switched: the workspace is exactly where it was. */}
+          <p className="mb-2" style={{ color: 'var(--text-muted)' }}>
+            {t('settings.vault.failedSafe')}
+          </p>
+          {outcome.error && <p className="mb-1">{outcome.error}</p>}
+          {outcome.problems?.slice(0, 6).map((problem) => (
+            <p key={problem} className="leading-snug" style={{ color: 'var(--text-muted)' }}>
+              · {problem}
+            </p>
+          ))}
+          {outcome.stagingPath && (
+            <p className="mt-2 font-mono break-all" style={{ color: 'var(--text-muted)' }}>
+              {outcome.stagingPath}
+            </p>
+          )}
+        </div>
+      )}
+
+      {outcome?.ok && (
+        <p className="mt-3 text-xs" style={{ color: 'var(--accent-color)' }}>
+          {t('settings.vault.done', { path: outcome.vaultPath })}
+        </p>
+      )}
+    </div>
+  )
+}
+
 function StorageSettings() {
   const { t } = useTranslation()
   const [info, setInfo] = useState<{ currentDir: string; defaultDir: string; isCustom: boolean } | null>(null)
@@ -1614,6 +1822,8 @@ function StorageSettings() {
 
   return (
     <div>
+      <VaultSettings />
+
       <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>{t('settings.storage.title')}</h3>
       <p className="text-xs mb-4" style={{ color: 'var(--text-muted)' }}>{t('settings.storage.description')}</p>
 

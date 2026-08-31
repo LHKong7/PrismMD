@@ -12,7 +12,7 @@ import crypto from 'crypto'
 import neo4j, { type Driver, type Session, type Record as Neo4jRecord } from 'neo4j-driver'
 import { getActiveProvider, getInsightGraphSettings, loadSettings, type InsightGraphSettings } from './settingsStore'
 import { agentWorker } from './agentWorkerManager'
-import { getPage } from './documentService'
+import { getNoteRepository } from '../repositories/repositoryFactory'
 
 // ─── Error Types ────────────────────────────────────────────────────────────
 
@@ -193,9 +193,9 @@ export async function ingestDocument(
     }
   }
 
-  // Phase 1: Parse — read the page content from the workspace DB.
+  // Phase 1: Parse — read the note text from whichever backend holds it.
   emit('parsing')
-  const page = getPage(pageId)
+  const page = await getNoteRepository().getPage(pageId)
   if (!page) throw new InsightGraphConfigError('Page not found.')
   const content = page.content
   const fileName = page.title || 'Untitled'

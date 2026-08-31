@@ -5,7 +5,7 @@
  * key to `pages` (ON DELETE CASCADE). Avoids regenerating the TL;DR on
  * every re-open.
  */
-import { getDb } from './workspaceDb'
+import { indexDb } from './indexDatabase'
 
 export interface DocSummary {
   /** A short 2–3 sentence overview of the document. */
@@ -30,7 +30,7 @@ export function signatureForContent(content: string): string {
 }
 
 export async function getDocSummary(pageId: string): Promise<DocSummary | null> {
-  const db = getDb()
+  const db = indexDb()
   const row = db.prepare('SELECT * FROM doc_summaries WHERE page_id = ?').get(pageId) as any
   if (!row) return null
   let questions: string[] = []
@@ -48,7 +48,7 @@ export async function getDocSummary(pageId: string): Promise<DocSummary | null> 
 }
 
 export async function setDocSummary(pageId: string, summary: DocSummary): Promise<void> {
-  const db = getDb()
+  const db = indexDb()
   db.prepare(`
     INSERT INTO doc_summaries (page_id, tldr, questions, generated_at, signature)
     VALUES (?, ?, ?, ?, ?)
@@ -67,6 +67,6 @@ export async function setDocSummary(pageId: string, summary: DocSummary): Promis
 }
 
 export async function clearDocSummaries(): Promise<void> {
-  const db = getDb()
+  const db = indexDb()
   db.prepare('DELETE FROM doc_summaries').run()
 }

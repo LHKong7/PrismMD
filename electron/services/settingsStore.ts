@@ -46,6 +46,22 @@ export interface WindowBounds {
   height: number
 }
 
+/**
+ * Where note text lives.
+ *
+ * ★ `mode` is not a preference — it describes the shape of the data on disk.
+ * Flipping it without a migration points the app at a store that does not
+ * hold the user's notes, and the symptom is an empty workspace. Only
+ * `migrateWorkspaceToVault()` may write it.
+ */
+export interface StorageSettings {
+  mode: 'sqlite' | 'vault'
+  /** Absolute path to the vault root. Null while on SQLite. */
+  vaultPath: string | null
+  /** When the migration ran, for the settings panel. */
+  migratedAt: number | null
+}
+
 export interface AppSettings {
   language: string
   themeId: string
@@ -56,6 +72,7 @@ export interface AppSettings {
   activeProvider: string | null
   insightGraph: InsightGraphSettings
   mcp: McpSettings
+  storage: StorageSettings
   /** Not user preferences — where each kind of window was last placed. */
   session?: {
     windowBounds?: WindowBounds
@@ -73,6 +90,8 @@ const DEFAULT_INSIGHT_GRAPH: InsightGraphSettings = {
   domain: 'default',
   entityLinking: false,
 }
+
+const DEFAULT_STORAGE: StorageSettings = { mode: 'sqlite', vaultPath: null, migratedAt: null }
 
 const DEFAULT_MCP: McpSettings = {
   enabled: false,
@@ -99,6 +118,7 @@ const store = new Store<{ settings: AppSettings }>({
       activeProvider: null,
       insightGraph: DEFAULT_INSIGHT_GRAPH,
       mcp: DEFAULT_MCP,
+      storage: DEFAULT_STORAGE,
     },
   },
 })
@@ -121,7 +141,23 @@ export function loadSettings(): AppSettings {
       ...(s.mcp ?? {}),
       servers: { ...(s.mcp?.servers ?? {}) },
     },
+    storage: { ...DEFAULT_STORAGE, ...(s.storage ?? {}) },
   }
+}
+
+export function getStorageSettings(): StorageSettings {
+  return loadSettings().storage
+}
+
+/**
+ * Record which store holds the notes. Called only by the migration, once it
+ * has proved the vault is complete.
+ */
+export function setStorageSettings(patch: Partial<StorageSettings>): StorageSettings {
+  const settings = loadSettings()
+  const storage = { ...settings.storage, ...patch }
+  saveSettings({ ...settings, storage })
+  return storage
 }
 
 export function getInsightGraphSettings(): InsightGraphSettings {

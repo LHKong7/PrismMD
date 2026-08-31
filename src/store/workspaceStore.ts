@@ -99,6 +99,11 @@ interface WorkspaceStore {
   deletePage: (pageId: string) => Promise<void>
   movePage: (pageId: string, newParentId: string | null, position: number) => Promise<void>
   renamePage: (pageId: string, title: string) => Promise<void>
+  /**
+   * Re-read a page whose text was changed by the main process (link rewrites
+   * after a rename) and push it into any open tab and the editor buffer.
+   */
+  syncExternalEdit: (pageId: string) => Promise<void>
   setIcon: (pageId: string, icon: string | null) => Promise<void>
   setRenamingId: (id: string | null) => void
   setToc: (toc: TocEntry[]) => void
@@ -515,17 +520,46 @@ export const useWorkspaceStore = create<WorkspaceStore>((set, get) => ({
       return
     }
     try {
-      await window.electronAPI.workspaceUpdatePage(pageId, { title: trimmed })
+      const res = await window.electronAPI.workspaceUpdatePage(pageId, { title: trimmed })
       // Update any open tabs.
       set((state) => {
         const tabs = state.tabs.map((t) => (t.pageId === pageId ? { ...t, title: trimmed } : t))
         return { tabs, ...syncFromActiveTab(tabs, state.activeTabId), renamingId: null }
       })
+      // A rename rewrites every [[link]] that pointed at the old title. Those
+      // notes changed on disk, so any tab holding them has to be refreshed or
+      // its next autosave puts the old links straight back.
+      for (const id of res.relinkedPageIds ?? []) {
+        if (get().tabs.some((t) => t.pageId === id)) await get().syncExternalEdit(id)
+      }
       await get().loadTree()
       invalidateSearchIndex()
     } catch (err) {
       showToast('error', err instanceof Error ? err.message : String(err))
       set({ renamingId: null })
+    }
+  },
+
+  syncExternalEdit: async (pageId: string) => {
+    const page = await window.electronAPI.workspaceGetPage(pageId)
+    if (!page) return
+    const content = page.content ?? ''
+
+    set((state) => {
+      if (!state.tabs.some((t) => t.pageId === pageId && t.content !== content)) return {}
+      const tabs = state.tabs.map((t) => (t.pageId === pageId ? { ...t, content } : t))
+      return { tabs, ...syncFromActiveTab(tabs, state.activeTabId) }
+    })
+
+    // Same guard as savePage: never yank the buffer out from under someone who
+    // is mid-edit. Their own text wins; the rewrite is re-applied next time
+    // the note is opened clean.
+    if (get().currentPageId === pageId) {
+      const { useEditorStore } = await import('./editorStore')
+      const ed = useEditorStore.getState()
+      if (ed.editing && !ed.isDirty && ed.editorContent !== content) {
+        ed.loadExternalContent(content)
+      }
     }
   },
 

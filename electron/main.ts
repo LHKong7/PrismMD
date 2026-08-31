@@ -15,6 +15,9 @@ import { mountRoot, mountFileParent } from './services/libraryService'
 import { rememberFile, rememberRoot } from './services/libraryRecents'
 import { stopWatching } from './services/libraryWatcher'
 import { handleSquirrelEvent } from './services/windowsIntegration'
+import { flushPendingIndexing, initKnowledgeIndex } from './services/knowledgeService'
+import { getNoteRepository } from './repositories/repositoryFactory'
+import { initStorage, stopWatching as stopWatchingVault } from './services/storageService'
 
 /**
  * What a reader window was asked to show when it was created. The renderer
@@ -325,6 +328,25 @@ app.whenReady().then(async () => {
     console.error('[app] IPC handler registration failed:', err)
   }
 
+  // Point the app at whichever store holds the notes — SQLite, or a vault the
+  // user migrated to. Before anything reads a page, or the first read would
+  // answer from the wrong store.
+  try {
+    await initStorage()
+  } catch (err) {
+    console.error('[storage] Failed to resolve the note store:', err)
+  }
+
+  // Seed a welcome page on first launch so the workspace isn't empty. Awaited
+  // *before* the window exists: the first thing a fresh window does is ask for
+  // the page tree, and answering that before the seed lands shows an empty
+  // workspace to someone who has never opened the app.
+  try {
+    await getNoteRepository().ensureWelcomePage()
+  } catch (err) {
+    console.error('[workspace] Failed to seed welcome page:', err)
+  }
+
   // Launched *with* a document → open the reader and nothing else. Creating
   // the workbench too would put a window the user didn't ask for in front of
   // the one they did.
@@ -335,6 +357,12 @@ app.whenReady().then(async () => {
   } else {
     createWindow()
   }
+
+  // Reconcile the note index with the workspace. Runs after the window is
+  // created, not before: a first-run index of a large workspace should not
+  // sit between the user and their notes, and every read path initializes
+  // the schema on its own if this has not finished yet.
+  setImmediate(() => void initKnowledgeIndex())
 
   // Fire MCP servers in the background — failures don't block window
   // creation, and individual server errors are logged inside the service.
@@ -376,10 +404,27 @@ app.on('before-quit', (event) => {
       ])
     }
 
+    // Debounced index jobs hold the *last* edit of the session; running them
+    // now is the difference between quitting and losing the final paragraph
+    // from search until the next launch repairs it.
+    // Stop watching before the flush: a file event arriving mid-shutdown
+    // would schedule an index write onto a database about to be closed.
+    try {
+      stopWatchingVault()
+    } catch { /* nothing to stop */ }
+
+    try {
+      await flushPendingIndexing()
+    } catch (err) {
+      console.warn('[knowledge] flush on quit failed:', err)
+    }
+
     // Close workspace database synchronously (SQLite, no async needed)
     try {
       const { closeDb } = require('./services/workspaceDb')
       closeDb()
+      const { closeIndexDatabase } = require('./services/indexDatabase')
+      closeIndexDatabase()
     } catch { /* DB may not have been opened */ }
 
     // Tear down both long-running services in parallel so the user

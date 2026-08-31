@@ -104,7 +104,9 @@ export function ArchiveOverlay({ onClose }: ArchiveOverlayProps) {
   const pick = async (id: string) => {
     setNote(null)
     try {
-      const full = await window.electronAPI.versionGet(id)
+      // The page id is passed so a vault can go straight to that note's
+      // history folder instead of looking through every note that has one.
+      const full = await window.electronAPI.versionGet(id, currentPageId ?? undefined)
       setSelected(full)
     } catch {
       setSelected(null)
@@ -150,7 +152,7 @@ export function ArchiveOverlay({ onClose }: ArchiveOverlayProps) {
   }
 
   const remove = async (id: string) => {
-    await window.electronAPI.versionDelete(id)
+    await window.electronAPI.versionDelete(id, currentPageId ?? undefined)
     if (selected?.id === id) setSelected(null)
     await refresh()
   }

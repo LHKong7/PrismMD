@@ -2,7 +2,7 @@ import { app } from 'electron'
 import fs from 'fs/promises'
 import path from 'path'
 import crypto from 'crypto'
-import { getPage } from './documentService'
+import { getNoteRepository } from '../repositories/repositoryFactory'
 
 export interface KBEntry {
   id: string
@@ -97,7 +97,7 @@ export async function addDocument(
 export async function addPage(pageId: string, tags?: string[], summary?: string): Promise<KBEntry> {
   await ensureKBDir()
 
-  const page = getPage(pageId)
+  const page = await getNoteRepository().getPage(pageId)
   if (!page) throw new Error('Page not found')
 
   const id = crypto.randomUUID()

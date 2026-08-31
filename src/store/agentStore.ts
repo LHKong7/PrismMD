@@ -14,6 +14,13 @@ export interface CitationEvidence {
   index: number
   text: string
   source?: string
+  /**
+   * The note this passage came from, when it came from the local note index.
+   * ★ Its presence is what lets a citation *navigate*: without it the marker
+   * can only search the note you already have open, which is exactly the note
+   * least likely to contain the passage the model quoted from somewhere else.
+   */
+  pageId?: string
 }
 
 /**
@@ -255,15 +262,39 @@ export const useAgentStore = create<AgentStore>((set, get) => {
         }
       }
 
-      // Gather Knowledge Base context (best-effort).
-      let kbContext: string | undefined
+      // Retrieve from the local note index (best-effort).
+      //
+      // ★ This replaced a keyword scan over a folder of *snapshots* taken when
+      // a document was manually "added to the knowledge base". Two things were
+      // wrong with that: the snapshots went stale the moment the note was
+      // edited, and nothing was in there unless you had remembered to put it
+      // there. Retrieval now runs over every note as it currently is, which is
+      // the only version of a self-knowledge base that answers questions about
+      // what you actually wrote.
+      let noteContext: string | undefined
       try {
-        const kbRes = await window.electronAPI.kbGetContext(content, 3)
-        if (kbRes.ok && kbRes.context) {
-          kbContext = kbRes.context
+        // Numbering continues after any graph evidence: both sets share one
+        // `[n]` namespace in the reply, and a collision would send a citation
+        // to the wrong source.
+        const offset = get().pendingEvidence.length
+        const res = await window.electronAPI.knowledgeRetrieve(content, {
+          maxPassages: 6,
+          contextPageId: currentFilePath ?? undefined,
+        })
+        if (res.ok && res.citations?.length) {
+          const numbered = res.citations.map((c) => ({
+            index: offset + c.index,
+            text: c.text,
+            source: c.headingPath.length ? `${c.title} › ${c.headingPath.join(' › ')}` : c.title,
+            pageId: c.pageId,
+          }))
+          set({ pendingEvidence: [...get().pendingEvidence, ...numbered] })
+          noteContext = numbered
+            .map((c) => `[${c.index}] ${c.source}\n${c.text}`)
+            .join('\n\n---\n\n')
         }
       } catch {
-        // KB not available
+        // The index is optional context, never a reason a message fails to send.
       }
 
       // Build message history — send a generous window and let the
@@ -284,11 +315,13 @@ export const useAgentStore = create<AgentStore>((set, get) => {
         appendStreamContent(chunk)
       })
 
-      // Combine document context with KB context
+      // Combine the open document with the retrieved passages.
       let fullDocContext = documentContext ?? undefined
-      if (kbContext) {
+      if (noteContext) {
         fullDocContext = (fullDocContext ? fullDocContext + '\n\n---\n\n' : '') +
-          'Knowledge Base references:\n\n' + kbContext
+          'Passages from the user\'s own notes. Cite them by bracketed number ' +
+          '(e.g. `…as decided earlier [2].`) whenever you use one, and say so ' +
+          'plainly when the notes do not cover the question:\n\n' + noteContext
       }
 
       const result = await window.electronAPI.sendAgentMessage({

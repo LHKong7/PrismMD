@@ -88,7 +88,8 @@
     "importFolder": "导入文件夹",
     "searchPages": "搜索页面…",
     "noPages": "暂无页面",
-    "noResults": "未找到页面"
+    "noResults": "未找到页面",
+    "knowledge": "知识"
   },
   "pagetree": {
     "untitled": "未命名",
@@ -97,7 +98,7 @@
     "newFolder": "新建文件夹",
     "rename": "重命名",
     "export": "导出为 Markdown",
-    "addToKb": "加入知识库",
+    "addToKb": "保存快照",
     "moveToRoot": "移到顶层",
     "delete": "删除",
     "more": "更多",
@@ -406,13 +407,23 @@
       "save": "保存"
     },
     "knowledge": {
-      "title": "知识库",
-      "description": "添加到知识库的文档会在与 AI 助手对话时自动作为上下文参考。",
+      "title": "导入的快照",
+      "description": "添加时保存的文档副本，仅作留存。助手检索的不是这些快照，而是上方的实时笔记索引。",
       "loading": "加载中...",
-      "empty": "知识库中暂无文档。在文件树中右键点击文件，选择「添加到知识库」即可开始。",
+      "empty": "还没有导入的快照。",
       "addedOn": "添加于",
-      "remove": "从知识库移除",
-      "tip": "提示：发送消息时，AI 助手会自动从知识库中搜索相关文档作为参考。"
+      "remove": "删除该快照",
+      "tip": "助手会检索你笔记的当前内容，不必再手动添加到这里才能被找到。",
+      "indexTitle": "笔记索引",
+      "indexDescription": "工作区里的每一篇笔记都会自动建立索引 —— 用于搜索、反向链接，以及 AI 助手的回答。无需手动添加。",
+      "statNotes": "笔记",
+      "statLinks": "链接",
+      "statUnresolved": "待写",
+      "statOrphans": "孤立",
+      "rebuild": "重建索引",
+      "rebuilding": "重建中……",
+      "rebuildHint": "仅当搜索结果看起来过时时才需要。",
+      "noFts": "当前构建不支持全文检索，已降级为较慢、较粗的扫描方式。"
     },
     "ai": {
       "title": "AI 服务商",
@@ -641,7 +652,23 @@
       "filePath": "文件",
       "messages": "消息记录"
     },
-    "close": "关闭"
+    "close": "关闭",
+    "vault": {
+      "title": "Markdown 仓库",
+      "inDatabase": "你的笔记目前存放在应用的数据库里。迁移成 Markdown 仓库后，每篇笔记都是磁盘上真正的 .md 文件——可以用访达、git 或任何编辑器打开，而 PrismMD 的用法完全不变。",
+      "inVault": "你的笔记就是这个文件夹里的 Markdown 文件。在任何地方编辑，PrismMD 都会跟上。",
+      "openFolder": "打开仓库文件夹",
+      "unreachable": "这个文件夹当前不可用——可能是外置磁盘未挂载，或被移动了。PrismMD 没有动过你的笔记，它在等待，而不是给你一个空工作区。",
+      "migrate": "把笔记迁移到 Markdown 仓库……",
+      "confirm": "这会把每一篇笔记复制到你选择的文件夹。当前工作区会先备份并保持原样不动；复制完成后会逐篇校验，只要有一篇对不上，就什么都不会切换。",
+      "chooseFolder": "选择文件夹……",
+      "migrating": "迁移中……",
+      "cancel": "暂不",
+      "progress": "正在写入第 {{done}} / {{total}} 篇……",
+      "failed": "迁移已中止。",
+      "failedSafe": "没有做任何切换——你的笔记还在原处。未完成的副本已保留，可供你查看：",
+      "done": "你的笔记现在位于 {{path}}。"
+    }
   },
   "highlightPopover": {
     "highlightAs": "标记为 {{color}}",
@@ -750,7 +777,7 @@
     "saveToGraph": "存入知识图谱",
     "ingestFolder": "整个文件夹入图谱（{{count}} 个文件）",
     "savingToGraph": "保存中…",
-    "addToKB": "添加到知识库"
+    "addToKB": "保存快照"
   },
   "batchIngest": {
     "running": "正在摄入 {{done}} / {{total}}",
@@ -879,8 +906,18 @@
     "read": "阅读",
     "edit": "编辑",
     "pickHint": "点一本书，给它定状态、类型与品质，或翻开它。",
-    "status": { "draft": "草稿", "done": "完成", "revise": "待修", "hot": "热门" },
-    "genre": { "tech": "技术", "biz": "商业", "essay": "随笔", "note": "笔记" }
+    "status": {
+      "draft": "草稿",
+      "done": "完成",
+      "revise": "待修",
+      "hot": "热门"
+    },
+    "genre": {
+      "tech": "技术",
+      "biz": "商业",
+      "essay": "随笔",
+      "note": "笔记"
+    }
   },
   "muse": {
     "title": "灵感墙",
@@ -893,7 +930,12 @@
     "aiError": "AI 暂时没给出灵感，稍后再试。",
     "copy": "复制",
     "delete": "删除",
-    "kind": { "topic": "选题", "quote": "金句", "snippet": "素材", "opening": "开头" }
+    "kind": {
+      "topic": "选题",
+      "quote": "金句",
+      "snippet": "素材",
+      "opening": "开头"
+    }
   },
   "library": {
     "collect": "收进笔记",
@@ -903,8 +945,8 @@
     "readerMode": "阅读器",
     "welcomeTitle": "阅读一个文件夹",
     "welcomeBody": "只读模式在文件原本的位置打开它们：不拷贝，也不回写。",
-    "openFolder": "打开文件夹\u2026",
-    "openFile": "打开文件\u2026",
+    "openFolder": "打开文件夹…",
+    "openFile": "打开文件…",
     "openWorkspace": "进入笔记模式",
     "toggleSidebar": "显示/隐藏目录",
     "refresh": "刷新",
@@ -912,7 +954,29 @@
     "emptyFolder": "这里没有可读的文件",
     "truncated": "文件太多，未全部列出",
     "pickAFile": "从左侧选一个文件开始阅读。",
-    "loading": "正在打开\u2026",
+    "loading": "正在打开…",
     "openError": "无法打开这个文件"
+  },
+  "knowledge": {
+    "noNoteOpen": "打开一篇笔记，查看它与其他笔记的连接。",
+    "backlinks": "反向链接",
+    "backlinksHint": "还没有笔记链接到这里。在别的笔记里写 [[本篇标题]] 即可建立连接。",
+    "outgoing": "本篇链出",
+    "related": "相关笔记",
+    "relatedHint": "当笔记之间共享链接、标签或用词时，这里会出现相关笔记。",
+    "notWrittenYet": "尚未写过 —— 点击创建",
+    "emptyNote": "这篇笔记还是孤立的。用 [[笔记标题]] 建立链接，或用 #主题 打上标签，它就会出现在同类笔记旁边。",
+    "reasonLink": "本篇链接了它",
+    "reasonBacklink": "它链接到本篇",
+    "reasonTag": "共享标签",
+    "reasonText": "用词相近",
+    "indexSummary": "{{notes}} 篇 · {{links}} 条链接 · {{unresolved}} 条待写",
+    "reindex": "重建笔记索引",
+    "openNote": "打开「{{title}}」",
+    "createNote": "创建「{{title}}」",
+    "createdFromLink": "已创建「{{title}}」",
+    "searchPlaceholder": "搜索你的笔记……",
+    "noResults": "笔记里没有匹配的内容。",
+    "citedNotes": "引用自你的笔记"
   }
 }
