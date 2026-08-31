@@ -3,7 +3,7 @@
  *
  * A separate React root from `App`, not a mode flag inside it. That is what
  * keeps the promise cheap: this tree never mounts the workspace store, the
- * editor, the agent sidebar, the knowledge graph or the Pixi front stage, so
+ * editor, the agent sidebar or the knowledge graph, so
  * a reader window starts fast and cannot write to anything.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'

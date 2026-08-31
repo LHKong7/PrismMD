@@ -809,47 +809,6 @@
     "dismiss": "Dismiss",
     "close": "Close"
   },
-  "frontStage": {
-    "enter": "Return to Inkwell Keep",
-    "backstage": "Enter Workbench",
-    "untitled": "Untitled",
-    "hotspot": {
-      "stacks": "The Stacks · Read",
-      "desk": "The Desk · Write",
-      "npc": "Talk to a Scribe",
-      "door": "Door · To Workbench",
-      "guild": "Guild Hall · The Scribes",
-      "atrium": "Back to the Atrium",
-      "toRoundtable": "Round Table · Convene",
-      "toGuild": "Back to the Guild Hall",
-      "roundtable": "Take a seat · Convene",
-      "archive": "Archive · Version history",
-      "muse": "Muse Wall · Collect"
-    },
-    "hint": {
-      "move": "move",
-      "click": "click to walk",
-      "interact": "interact"
-    },
-    "stacks": {
-      "title": "The Stacks",
-      "sub": "Pull a book to read, or write a new one at the desk.",
-      "empty": "The shelves are empty — write your first book at the desk.",
-      "write": "Write a new book"
-    },
-    "desk": {
-      "title": "The Desk",
-      "sub": "Lay out paper and pen — start a new book, or pick up the last one.",
-      "new": "New article",
-      "newDesc": "A blank page to start from",
-      "continue": "Continue this one",
-      "none": "No open article"
-    },
-    "npc": {
-      "noAI": "No AI model configured yet — the scribes can't speak.",
-      "configure": "Configure AI"
-    }
-  },
   "roundTable": {
     "title": "Round Table",
     "docLabel": "Document",

@@ -809,47 +809,6 @@
     "dismiss": "关闭",
     "close": "关闭"
   },
-  "frontStage": {
-    "enter": "回到烛笺阁",
-    "backstage": "进入工作台",
-    "untitled": "无题",
-    "hotspot": {
-      "stacks": "典藏书柜 · 看书",
-      "desk": "写字桌 · 写作",
-      "npc": "与贤者交谈",
-      "door": "推门 · 去工作台",
-      "guild": "工位廊 · 见诸贤",
-      "atrium": "回中庭",
-      "toRoundtable": "圆桌厅 · 会诊",
-      "toGuild": "回工位廊",
-      "roundtable": "入座圆桌 · 会诊",
-      "archive": "档案柜 · 版本史",
-      "muse": "灵感墙 · 收集"
-    },
-    "hint": {
-      "move": "移动",
-      "click": "点击地面行走",
-      "interact": "交互"
-    },
-    "stacks": {
-      "title": "典藏书柜 · The Stacks",
-      "sub": "抽一本书翻开阅读，或在书桌上写下新的一本。",
-      "empty": "书柜还空着——去写字桌写下第一本书吧。",
-      "write": "写新书"
-    },
-    "desk": {
-      "title": "写字桌 · The Desk",
-      "sub": "摊开纸笔，开始一本新书；或继续手边那一篇。",
-      "new": "新建文章",
-      "newDesc": "空白一页，从头写起",
-      "continue": "继续手边这篇",
-      "none": "暂无打开的文章"
-    },
-    "npc": {
-      "noAI": "还没有配置 AI 模型，贤者暂时无法开口。",
-      "configure": "去配置 AI"
-    }
-  },
   "roundTable": {
     "title": "写作圆桌",
     "docLabel": "会诊文章",

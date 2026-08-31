@@ -106,26 +106,6 @@ export interface VersionFull extends VersionMeta {
   content: string
 }
 
-export interface PageMeta {
-  status: string | null
-  genre: string | null
-  quality: number | null
-}
-
-export interface PageMetaListItem extends PageMeta {
-  pageId: string
-  length: number
-  updatedAt: number
-}
-
-export interface MuseCard {
-  id: string
-  kind: string
-  text: string
-  pageId: string | null
-  createdAt: number
-}
-
 /**
  * The renderer's view of the preload bridge.
  *

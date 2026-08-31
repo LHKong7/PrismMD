@@ -9,7 +9,7 @@ import 'katex/dist/katex.min.css'
  * `?mode=reader` (set by `createReaderWindow` in the main process) mounts the
  * standalone read-only reader; anything else mounts the workbench. Both roots
  * are imported dynamically so a reader window never parses the workspace
- * store, the editor, the plugin host or the Pixi front stage — that omission
+ * store, the editor or the plugin host — that omission
  * is the whole reason reader windows are cheap to open.
  */
 const isReaderWindow = new URLSearchParams(window.location.search).get('mode') === 'reader'

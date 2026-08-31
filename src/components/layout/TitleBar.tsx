@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type CSSProperties } from 'react'
-import { Minus, Square, X, PanelLeft, PanelRight, Settings, Network, BookOpen, BookOpenText, Columns2, Rows2, XCircle, Download, FileText, FileType, Printer, Zap, Castle } from 'lucide-react'
+import { Minus, Square, X, PanelLeft, PanelRight, Settings, Network, BookOpen, BookOpenText, Columns2, Rows2, XCircle, Download, FileText, FileType, Printer, Zap } from 'lucide-react'
 import { Tooltip } from '../ui/Tooltip'
 import { useTranslation } from 'react-i18next'
 import { useUIStore } from '../../store/uiStore'
@@ -39,7 +39,6 @@ export function TitleBar({ onOpenSettings, onOpenHorseMode }: TitleBarProps) {
   const toggleAgentSidebar = useAgentStore((s) => s.toggleAgentSidebar)
   const agentSidebarOpen = useAgentStore((s) => s.agentSidebarOpen)
   const isDirty = useEditorStore((s) => s.isDirty)
-  const setFrontStageActive = useUIStore((s) => s.setFrontStageActive)
 
   const isMac = window.electronAPI.platform === 'darwin'
 
@@ -221,17 +220,6 @@ export function TitleBar({ onOpenSettings, onOpenHorseMode }: TitleBarProps) {
             <span style={{ color: agentSidebarOpen ? 'var(--accent-ink, #fff)' : 'var(--accent-color)' }}>✦</span>
             {t('titlebar.ask', 'Ask')}
           </button>
-        </Tooltip>
-        <Tooltip label={t('frontStage.enter', '回到烛笺阁')} side="bottom">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setFrontStageActive(true)}
-            className="p-1.5"
-            aria-label={t('frontStage.enter', '回到烛笺阁')}
-          >
-            <Castle size={16} style={{ color: 'var(--color-warning)' }} />
-          </Button>
         </Tooltip>
         <Tooltip label={t('library.openReader', '打开只读阅读器')} side="bottom">
           <Button

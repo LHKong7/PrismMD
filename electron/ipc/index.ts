@@ -14,7 +14,6 @@ import { registerWorkspaceHandlers } from './workspaceHandlers'
 import { registerLibraryHandlers } from './libraryHandlers'
 import { registerDataLocationHandlers } from './dataLocationHandlers'
 import { registerVersionHandlers } from './versionHandlers'
-import { registerFrontStageHandlers } from './frontStageHandlers'
 import { getMainWindow } from '../main'
 /**
  * Lazily resolve the current main window. Handlers that send events to the
@@ -41,5 +40,4 @@ export function registerIpcHandlers() {
   registerLibraryHandlers()
   registerDataLocationHandlers()
   registerVersionHandlers()
-  registerFrontStageHandlers()
 }

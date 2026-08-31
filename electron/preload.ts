@@ -519,24 +519,6 @@ const electronAPI = {
   versionDelete: (versionId: string, pageId?: string): Promise<{ ok: boolean }> =>
     ipcRenderer.invoke('version:delete', versionId, pageId),
 
-  // Book-skin metadata
-  pageMetaGet: (pageId: string): Promise<{ status: string | null; genre: string | null; quality: number | null } | null> =>
-    ipcRenderer.invoke('page-meta:get', pageId),
-  pageMetaSet: (
-    pageId: string,
-    partial: { status?: string | null; genre?: string | null; quality?: number | null },
-  ): Promise<{ status: string | null; genre: string | null; quality: number | null }> =>
-    ipcRenderer.invoke('page-meta:set', pageId, partial),
-  pageMetaList: (): Promise<Array<{ pageId: string; status: string | null; genre: string | null; quality: number | null; length: number; updatedAt: number }>> =>
-    ipcRenderer.invoke('page-meta:list'),
-
-  // Muse Wall
-  museList: (): Promise<Array<{ id: string; kind: string; text: string; pageId: string | null; createdAt: number }>> =>
-    ipcRenderer.invoke('muse:list'),
-  museAdd: (kind: string, text: string, pageId?: string | null): Promise<{ id: string; kind: string; text: string; pageId: string | null; createdAt: number }> =>
-    ipcRenderer.invoke('muse:add', kind, text, pageId),
-  museDelete: (id: string): Promise<{ ok: boolean }> => ipcRenderer.invoke('muse:delete', id),
-
   // InsightGraph (optional knowledge-graph RAG)
   insightGraphTestNeo4j: (uri: string, user: string, password: string): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke('insightgraph:test-neo4j', uri, user, password),

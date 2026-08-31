@@ -149,7 +149,7 @@ function createWindow() {
  * Create a reader window — the standalone, read-only half of the app.
  *
  * It runs the same renderer bundle behind `?mode=reader`, which mounts a
- * different React root: no workspace store, no front stage, no Pixi. The
+ * different React root: no workspace store, no editor, no agent. The
  * target's folder is mounted here rather than in the renderer so that the
  * first `library:read-*` call already has permission.
  */

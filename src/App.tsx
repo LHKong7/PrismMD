@@ -13,7 +13,6 @@ import { ToastHost } from './components/ui/Toast'
 import { MemoPanel } from './components/memo/MemoPanel'
 import { HorseModeDialog } from './components/horsemode/HorseModeDialog'
 import { ThemeCompare } from './components/theme/ThemeCompare'
-import { FrontStageView } from './components/frontstage/FrontStageView'
 import { useAutoHide } from './hooks/useAutoHide'
 import { useUpdaterBridge } from './hooks/useUpdaterBridge'
 import { useSettingsStore } from './store/settingsStore'
@@ -36,7 +35,6 @@ function AppContent() {
   const toasts = useToastStore((s) => s.toasts)
   const dismissToast = useToastStore((s) => s.dismiss)
   const zenMode = useUIStore((s) => s.zenMode)
-  const frontStageActive = useUIStore((s) => s.frontStageActive)
   const [memoOpen, setMemoOpen] = useState(false)
   const [horseModeOpen, setHorseModeOpen] = useState(false)
   const loadSettings = useSettingsStore((s) => s.loadSettings)
@@ -119,9 +117,6 @@ function AppContent() {
   // Ctrl/Cmd + , : settings  |  Ctrl/Cmd + S : save  |  Ctrl/Cmd + E : toggle edit
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // While the 烛笺阁 front stage is up it owns all keyboard input.
-      if (useUIStore.getState().frontStageActive) return
-
       // Ctrl+Tab / Ctrl+Shift+Tab — cycle tabs (no meta required)
       if (e.ctrlKey && e.key === 'Tab') {
         e.preventDefault()
@@ -278,7 +273,6 @@ function AppContent() {
       <ThemeCompare />
       <PluginNotificationHost />
       <ToastHost items={toasts} onDismiss={dismissToast} />
-      {frontStageActive && <FrontStageView />}
     </div>
   )
 }
